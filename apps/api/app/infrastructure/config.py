@@ -1,0 +1,37 @@
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal, Self
+
+from pydantic import SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT = Path(__file__).resolve().parents[4]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
+
+    app_env: Literal["development", "test", "production"] = "development"
+    database_url: str
+    jwt_secret: SecretStr
+    jwt_issuer: str = "eleven-br"
+    jwt_audience: str = "eleven-mobile"
+    cors_origins: list[str] = []
+
+    @model_validator(mode="after")
+    def secure_configuration(self) -> Self:
+        secret = self.jwt_secret.get_secret_value()
+        if len(secret) < 32 or secret.startswith("replace-with"):
+            raise ValueError("Configure JWT_SECRET with a random secret (32+ characters)")
+        if not self.database_url.startswith("postgresql+psycopg://"):
+            raise ValueError("DATABASE_URL must use PostgreSQL with psycopg")
+        if self.app_env == "production" and any(
+            not origin.startswith("https://") for origin in self.cors_origins
+        ):
+            raise ValueError("Production CORS origins must use HTTPS")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

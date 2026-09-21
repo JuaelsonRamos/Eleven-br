@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "ELEVEN BR",
+    "slug": "eleven-br",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.eleven.app"
+    },
+    "android": {
+      "package": "br.com.eleven.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "name": "ELEVEN BR",
+      "lang": "pt-BR"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

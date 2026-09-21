@@ -1,0 +1,13 @@
+{
+  "name": "eleven-br",
+  "private": true,
+  "workspaces": ["apps/mobile", "packages/shared"],
+  "scripts": {
+    "mobile": "npm run start --workspace @eleven/mobile --",
+    "mobile:web": "npm run web --workspace @eleven/mobile --",
+    "web": "npm run mobile:web --",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspace @eleven/mobile"
+  },
+  "engines": { "node": ">=22.13.0" }
+}
