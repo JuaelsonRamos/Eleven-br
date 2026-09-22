@@ -17,11 +17,30 @@ de uso não permite simplificar incorretamente regras de negócio.
 
 ## Escopo progressivo
 
-O estado atual inclui a fundação e o Prompt 02: cadastro por contato, verificação,
-login, sessões revogáveis e perfil inicial. As cinco abas exigem autenticação;
-módulos de times/jogos/notificações continuam placeholders. Verificação local é
-simulada com opção explícita; provedor de produção, cadastro de time e cobrança
-ainda não foram implementados.
+O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
+e o Prompt 03 (criação, perfil, edição e seleção de times). As cinco abas exigem
+autenticação; Jogos e Notificações continuam placeholders. Verificação local é
+simulada com opção explícita; provedor de produção e cobrança não foram implementados.
+
+Times reutilizam a estrutura existente; a migration `0003_team_modalities` converte
+a modalidade anterior em um array PostgreSQL não vazio, preservando o valor.
+Uma ou mais modalidades estão disponíveis em **Free e Pro**, sem exclusividade Pro.
+Novos times são Free, com um vínculo ativo para o Player criador e Presidência derivada
+da FK existente. Códigos aleatórios de oito caracteres são únicos e imutáveis;
+colisões são tratadas com savepoint e constraint. O vocabulário de modalidades e
+UFs está em `app/domain/team_identity.py`, consumido pelo app via API. `modalities`
+é uma lista JSON nos contratos e um array `varchar(40)[]` no banco, nunca CSV.
+O seletor de UF pesquisa os 26 estados e o DF por nome/sigla e envia somente a
+sigla oficial. O backend também valida e normaliza a UF.
+O aviso de semelhança divulga somente identidade pública limitada e não impede
+nomes iguais. Upload de escudo segue pendente, com campo existente e placeholder.
+
+`apps/mobile/src/teams` mantém o contexto de time. Persista somente o UUID,
+separado por User; restaure dados pela lista de vínculos ativos da API. Ao perder
+acesso, descarte a preferência inválida e selecione um time autorizado ou nenhum.
+Não confundir seleção local com autorização; não persistir dados privados de times.
+Os testes de navegador em `apps/api/tests/browser_team_flow.py` são opt-in e usam
+API temporária/banco `_test`; nunca inserir exemplos automaticamente no banco de desenvolvimento.
 
 - **MVP 1 — Base utilizável:** conta, perfil, times, elenco, convidados, peladas,
   presença, sorteio básico, mensalidades, Pix, notificações e jogos contra adversários.

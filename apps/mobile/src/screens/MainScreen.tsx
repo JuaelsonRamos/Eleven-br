@@ -1,7 +1,11 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader, Badge, Button, Card, EmptyState } from '../components/ui';
+import { AppHeader, Badge, Button, Card, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTeams } from '../teams/TeamContext';
+import { TeamSummary } from '../teams/TeamSummary';
 import { theme } from '../theme';
 import type { TabParams } from '../navigation';
 
@@ -14,6 +18,8 @@ const content = {
 
 export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams>) {
   const name = route.name;
+  const { selected, loading, error, reload } = useTeams();
+  useFocusEffect(useCallback(() => { if (name === 'Início') void reload(); }, [name, reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.container}>
@@ -23,18 +29,25 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
           <Text style={styles.pageDescription}>{name === 'Início' ? 'Mais futebol. Menos burocracia.' : 'Seu futebol, mais organizado.'}</Text>
         </View>
         {name === 'Início' ? <>
-          <View style={styles.hero}>
+          {!selected && !loading && !error && <View style={styles.hero}>
             <Text style={styles.eyebrow}>DENTRO E FORA DE CAMPO</Text>
             <Text accessibilityRole="header" style={styles.heroTitle}>Seu time.{ '\n' }Seu jogo.</Text>
             <View style={styles.accent} />
             <Text style={styles.heroDescription}>Um lugar para reunir a turma e cuidar do que faz o futebol acontecer.</Text>
-          </View>
-          <Card>
+          </View>}
+          {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <Card>
+            <View style={{ gap: 16 }}>
+              <Badge label="TIME SELECIONADO" />
+              <TeamSummary team={selected} />
+              <Text style={styles.pageDescription}>A estrutura do seu time está pronta. Seu futebol começa aqui.</Text>
+              <Button label="Ver meus times" onPress={() => navigation.navigate('Times')} />
+            </View>
+          </Card> : <Card>
             <Badge label="BEM-VINDO AO ELEVEN BR" />
-            <EmptyState title="Seu futebol começa aqui." description="Em breve você poderá criar seu time ou entrar em um time para começar." icon="people-outline">
+            <EmptyState title="Seu futebol começa aqui." description="Crie seu primeiro time para começar." icon="people-outline">
               <Button label="Conhecer a área de times" onPress={() => navigation.navigate('Times')} />
             </EmptyState>
-          </Card>
+          </Card>}
         </> : <Card><EmptyState {...content[name]} /></Card>}
         <Text style={styles.footer}>ELEVEN BR · Feito para o nosso futebol</Text>
       </View>

@@ -24,7 +24,7 @@ def create_team(
     code: str,
     city: str,
     state: str,
-    modality: str,
+    modalities: list[str],
     plan: Plan = Plan.FREE,
 ) -> Team:
     """Atomic foundation primitive, not a complete team registration workflow.
@@ -38,7 +38,7 @@ def create_team(
         code=code,
         city=city,
         state=state,
-        modality=modality,
+        modalities=modalities,
         plan=plan.value,
         president_membership_id=membership_id,
     )

@@ -24,7 +24,7 @@ def make_team(session: Session, president: Player, plan: Plan = Plan.FREE) -> Te
         code=uuid4().hex[:8].upper(),
         city="São Paulo",
         state="SP",
-        modality="futebol",
+        modalities=["campo"],
         plan=plan,
     )
 

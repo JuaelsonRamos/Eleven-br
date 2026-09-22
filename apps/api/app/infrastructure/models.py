@@ -14,7 +14,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -69,7 +69,7 @@ class Team(Entity, Base):
     code: Mapped[str] = mapped_column(String(10), unique=True)
     city: Mapped[str] = mapped_column(String(100))
     state: Mapped[str] = mapped_column(String(2))
-    modality: Mapped[str] = mapped_column(String(40))
+    modalities: Mapped[list[str]] = mapped_column(ARRAY(String(40)))
     crest_url: Mapped[str | None] = mapped_column(String(2048))
     status: Mapped[str] = mapped_column(String(16), server_default="active")
     plan: Mapped[str] = mapped_column(String(16), server_default="free")
@@ -79,6 +79,11 @@ class Team(Entity, Base):
         CheckConstraint("length(trim(name)) > 0", name="name"),
         CheckConstraint("code ~ '^[A-Z0-9]{6,10}$'", name="code"),
         CheckConstraint("state ~ '^[A-Z]{2}$'", name="state"),
+        CheckConstraint(
+            "cardinality(modalities) > 0 AND array_ndims(modalities) = 1 "
+            "AND array_position(modalities, NULL) IS NULL",
+            name="modalities_required",
+        ),
         CheckConstraint("status IN ('active', 'inactive')", name="status"),
         CheckConstraint("plan IN ('free', 'pro')", name="plan"),
         ForeignKeyConstraint(

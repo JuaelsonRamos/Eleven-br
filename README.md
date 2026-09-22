@@ -2,9 +2,9 @@
 
 **Seu time. Seu jogo.** Fundação técnica para gestão de futebol amador.
 
-O projeto entrega a fundação e o fluxo de cadastro, verificação de contato, login,
-sessão e perfil inicial. As cinco abas ficam na área autenticada. Não inclui
-cadastro de time, elenco, jogos, financeiro ou cobrança.
+O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
+perfil inicial e gestão básica de times. As cinco abas ficam na área autenticada.
+Não inclui elenco, jogos, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -148,7 +148,8 @@ Android pode usar emulador/dispositivo; o simulador iOS exige macOS/Xcode.
 O aplicativo restaura a sessão antes de mostrar login ou abas. Cadastro pede nome,
 telefone OU e-mail e senha com confirmação. A verificação cria o Player com o nome
 já informado, sem TeamMembership e sem exigir time. Contas existentes sem Player
-recebem apenas a complementação de nome. Jogos, Times e Notificações continuam placeholders.
+recebem apenas a complementação de nome. Times permitem criação, consulta, edição
+e seleção; Jogos e Notificações continuam placeholders.
 
 A API deve estar executando junto com o Expo. Web usa por padrão o hostname do
 navegador na porta 8011; celular usa o host LAN anunciado pelo Expo. Para aparelho
@@ -368,11 +369,121 @@ testada também com falha de conexão e retry; tokens não apareceram em armazen
 A execução nativa em aparelho/simulador Android/iOS ainda não foi validada.
 Resta um aviso de depreciação interno de Starlette/AnyIO nos testes, sem falhas.
 
+## Times — Prompt 03
+
+Em **Times**, crie um time com nome, cidade, UF e uma ou mais modalidades (Campo,
+Society / Fut7 e Futsal), inclusive no Free. O criador usa seu Player existente e recebe exatamente
+um vínculo ativo, referenciado como Presidente. Time e vínculo são criados na
+mesma transação. Todo novo time começa Free; nenhum campo do formulário altera
+plano, Presidência, UUID ou código. As policies Free/Pro existentes são preservadas.
+
+A migration incremental `0003_team_modalities` converte `modality` em `modalities`,
+um array nativo PostgreSQL `varchar(40)[]`, mantendo a modalidade anterior como
+único item inicial. `0001` e `0002` foram preservadas. O banco exige array não vazio,
+unidimensional e sem itens nulos. A API valida cada modalidade pelo vocabulário
+centralizado, remove repetições e usa ordem estável. Novas modalidades podem ser
+acrescentadas ao vocabulário sem mudar a estrutura de persistência.
+O downgrade para `0002` recusa execução se houver times com múltiplas modalidades,
+evitando descartar escolhas silenciosamente. Não execute downgrade em dados reais.
+
+No formulário, os chips permitem seleção múltipla; é obrigatório selecionar ao
+menos uma modalidade para salvar. Perfil, lista e Home mostram os nomes separados
+por `•`. Essa regra vale igualmente para **Free e Pro**.
+
+UF usa seletor pesquisável com 26 estados e Distrito Federal. A lista apresenta
+nome e sigla, como `Espírito Santo (ES)`, e aceita busca por nome/sigla, ignorando
+acentos e caixa. Digitar na busca não altera a UF: é necessário selecionar uma opção.
+Somente a sigla oficial é enviada/persistida; a API valida a lista oficial e
+normaliza entradas como ` es ` para `ES`.
+
+O código usa oito caracteres aleatórios de `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`,
+sem 0/O/1/I. A unicidade é garantida pelo PostgreSQL; uma colisão gera outra
+tentativa dentro de savepoint, sem deixar time/vínculo parcial. Renomear não muda o código.
+
+| Método | Endpoint | Função |
+| --- | --- | --- |
+| GET | `/v1/teams` | Times com vínculo ativo, papel e permissão de edição |
+| GET | `/v1/teams/options` | Modalidades e UFs centralizadas no domínio |
+| POST | `/v1/teams/similar` | Aviso por nome, cidade, UF e alguma modalidade em comum |
+| POST | `/v1/teams` | Cria time Free e vínculo do Presidente |
+| GET | `/v1/teams/{id}` | Perfil do time autorizado |
+| PUT | `/v1/teams/{id}` | Atualiza nome, cidade, UF e modalidades com permissão |
+| GET | `/v1/teams/{id}/administration` | Contexto administrativo autorizado existente |
+
+Todos exigem autenticação. A consulta de semelhança é uma exceção deliberada à
+consulta por vínculo: retorna até cinco identidades públicas (nome, código,
+cidade/UF e modalidades), nunca UUID, membros ou informações administrativas.
+Compara nomes ignorando caixa e acentos, por inclusão de texto ou similaridade
+de pelo menos 80%, na mesma cidade/UF e com ao menos uma modalidade em comum.
+É uma heurística de aviso, não
+uma garantia de encontrar toda duplicidade. **Criar mesmo assim** permite nomes
+iguais. Semelhança não concede acesso ao perfil privado nem cria associação.
+
+**Abrir** um time seleciona seu contexto. A Home mostra somente os dados desse
+time; não há indicadores fictícios de jogos ou financeiro. A preferência salva
+é apenas um UUID por User, em localStorage na Web e SecureStore no Android/iOS.
+Dados e permissões vêm da API. A restauração e o retorno às telas de Times/Início
+revalidam a lista; retornar ao app nativo também revalida. Se o vínculo não existir
+mais, a seleção passa ao primeiro time autorizado (ordem nome/UUID), ou fica vazia.
+Falhas de rede mostram erro/retry sem apresentar dados antigos como autorizados.
+Trocar de conta recria o contexto e não reaproveita dados da conta anterior.
+
+O campo `crest_url` foi preservado. Upload de escudo continua pendente de uma
+solução de armazenamento; Free pode ter escudo e a criação funciona sem imagem.
+Não há transferência de Presidência, exclusão, elenco, convites ou cobrança.
+
+### Teste manual de times
+
+Com PostgreSQL ativo, inicie a API em `apps/api`:
+
+```powershell
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --no-proxy-headers --port 8011
+```
+
+Na raiz, execute `npm.cmd run mobile:web` e abra `http://localhost:8081`.
+Swagger: `http://127.0.0.1:8011/docs`.
+
+1. Entre com sua conta e abra **Times → Criar time**.
+2. Informe Tabajara e sua cidade; abra UF, pesquise `Esp` ou `ES` e selecione
+   Espírito Santo (ES). Marque Society / Fut7 e Futsal; salve.
+3. Confira Presidente, Free e código; edite o nome e confirme que o código permanece.
+4. Volte a Meus times, crie outro time e alterne usando **Abrir**.
+5. Confira a Home; feche/reabra e confira o último contexto.
+6. Edite adicionando Campo ou removendo uma modalidade; confira o resultado após reabrir.
+7. Para conferir o aviso, repita nome/cidade/UF e alguma modalidade, usando **Criar mesmo assim**.
+
+Teste automatizado de navegador, com Expo já ativo em 8081, a partir de `apps/api`:
+
+```powershell
+uv run --with playwright playwright install chromium
+uv run --with playwright pytest tests/browser_team_flow.py -q -s
+```
+
+Esse teste usa a fixture PostgreSQL `_test` com schema temporário, cria uma API
+temporária em porta livre e encaminha somente as requisições do navegador de teste
+para ela. Não grava dados na API/banco de desenvolvimento. Remove o schema e para
+o servidor temporário ao terminar. Playwright não foi adicionado às dependências
+do produto; capturas locais ficam em `.local` e não são versionadas.
+
+Validação do Prompt 03 e ajuste: 70 testes backend e o fluxo Chromium passaram. Foram
+conferidos criação, edição, aviso de semelhança, alternância, reabertura, vínculo
+revogado, troca de conta e ID local manipulado, além de listas com uma/duas/três
+modalidades, edição, rejeição de lista vazia e pesquisa/validação de UF.
+A migration foi aplicada preservando o Tabajara FC com `['society']`, todos os
+outros campos e os dados das demais tabelas. Nenhum dado de teste foi inserido
+no banco de desenvolvimento. Alembic upgrade/check, Ruff/check de formatação,
+mypy, ESLint e TypeScript passaram; Expo Doctor passou em 20/20 e a exportação
+Android/iOS/Web foi concluída. API/Swagger em 8011 e Web em 8081 responderam;
+o navegador carregou o bundle de desenvolvimento sem erros JavaScript.
+Execução nativa em aparelho permanece pendente. Há apenas o aviso já existente
+de depreciação Starlette/AnyIO no pytest.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento de fotos e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
-Cadastro de time e demais módulos continuam fora deste escopo.
+Elenco, convites, jogos, financeiro e assinaturas continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

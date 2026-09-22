@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def no_store(request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
-        if request.url.path.startswith(("/v1/auth", "/v1/me")):
+        if request.url.path.startswith(("/v1/auth", "/v1/me", "/v1/teams")):
             response.headers["Cache-Control"] = "no-store"
         return response
 
