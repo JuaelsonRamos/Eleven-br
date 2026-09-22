@@ -18,9 +18,10 @@ de uso não permite simplificar incorretamente regras de negócio.
 ## Escopo progressivo
 
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
-o Prompt 03 (criação, perfil, edição e seleção de times) e o Prompt 04 (elenco).
+o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
+e o Prompt 05 (eventos, peladas e presença).
 As cinco abas exigem
-autenticação; Jogos e Notificações continuam placeholders. Verificação local é
+autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
 
 Times reutilizam a estrutura existente; a migration `0003_team_modalities` converte
@@ -84,6 +85,21 @@ ou edição com coincidência exige confirmação explícita, inclusive para con
 Não criar endpoints de consulta global de Player nem vínculo automático por contato.
 `0004_roster_management` preserva registros existentes; o downgrade é bloqueado
 se houver dados do elenco que a estrutura anterior não consegue representar.
+
+Eventos usam `Permission.MANAGE_EVENTS` e as policies existentes. `0005_events_attendance`
+adiciona séries semanais, ocorrências, presença única por evento/vínculo e convidados
+exclusivos do evento. FKs compostas mantêm presença e ocorrência no mesmo time.
+Respostas são derivadas do User autenticado, somente para seu vínculo ativo; nunca
+aceitar ID de jogador enviado pelo cliente para responder por outra pessoa.
+Recorrência pode ter término ou ser indefinida. O modelo semanal gera até oito
+semanas adiante ao consultar Jogos, sob bloqueio do time e chave única série/data.
+Não gerar histórico faltante nem sobrescrever ocorrências editadas/canceladas.
+Edição e cancelamento individuais valem só para a ocorrência. Encerrar recorrência
+impede novas datas e cancela ocorrências de hoje em diante, preservando histórico,
+respostas e convidados. Datas/horários são locais da partida; a janela usa a data
+local do servidor. Cancelamento encerra respostas; nenhuma ocorrência é apagada.
+Convidados não criam Player, User ou Membership. Não antecipar sorteio, placar,
+estatísticas, busca de adversários ou financeiro.
 
 Um usuário pode participar de vários times, ser jogador em um, administrador em
 outro e Presidente em outro, inclusive Presidente de vários times. Papéis,

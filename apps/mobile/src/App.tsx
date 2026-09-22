@@ -12,6 +12,7 @@ import { AuthScreens } from './screens/AuthScreens';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { TeamsScreen } from './screens/TeamsScreen';
 import { TeamProvider } from './teams/TeamContext';
+import { GamesScreen } from './screens/GamesScreen';
 
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
@@ -31,7 +32,7 @@ function MainNavigation() {
     tabBarStyle: { height: 66 + insets.bottom, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), borderTopColor: theme.colors.border },
     tabBarIcon: ({ color, size }) => <Ionicons name={icons[route.name]} color={color} size={size} />,
   })}>
-    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : MainScreen} />)}
+    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : name === 'Jogos' ? GamesScreen : MainScreen} />)}
   </Tab.Navigator>;
 }
 

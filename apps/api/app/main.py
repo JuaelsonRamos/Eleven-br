@@ -9,6 +9,7 @@ from app.domain.auth import DeliveryUnavailable, InvalidVerification, RateLimite
 from app.domain.policies import Conflict, DomainError, Forbidden, NotFound
 from app.infrastructure.config import get_settings
 from app.presentation.auth_routes import router as auth_router
+from app.presentation.event_routes import router as event_router
 from app.presentation.roster_routes import router as roster_router
 from app.presentation.routes import router
 
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(auth_router)
     app.include_router(roster_router)
+    app.include_router(event_router)
     return app
 
 

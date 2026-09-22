@@ -3,8 +3,8 @@
 **Seu time. Seu jogo.** Fundação técnica para gestão de futebol amador.
 
 O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
-perfil inicial, gestão básica de times e elenco. As cinco abas ficam na área autenticada.
-Não inclui jogos, financeiro ou cobrança.
+perfil inicial, gestão básica de times, elenco e eventos com confirmação de presença.
+As cinco abas ficam na área autenticada. Não inclui placar, estatísticas, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -150,7 +150,7 @@ O aplicativo restaura a sessão antes de mostrar login ou abas. Cadastro pede no
 telefone OU e-mail e senha com confirmação. A verificação cria o Player com o nome
 já informado, sem TeamMembership e sem exigir time. Contas existentes sem Player
 recebem apenas a complementação de nome. Times permitem criação, consulta, edição
-e seleção; Jogos e Notificações continuam placeholders.
+e seleção; Jogos apresenta eventos do time selecionado e Notificações continua placeholder.
 
 A API deve estar executando junto com o Expo. Web usa por padrão o hostname do
 navegador na porta 8011; celular usa o host LAN anunciado pelo Expo. Para aparelho
@@ -542,11 +542,56 @@ Chromium aprovados (times e elenco). Ruff, formatação, mypy, ESLint e TypeScri
 passaram; Expo Doctor 20/20 e exportações Web/Android/iOS concluídas. A comparação
 antes/depois da `0004` confirmou a preservação de todas as linhas existentes.
 
+## Eventos e presença — Prompt 05
+
+Abra **Jogos** com um time selecionado. O Presidente e administradores Pro com
+`manage_events` podem criar/editar/cancelar eventos e adicionar/remover convidados.
+Membros ativos visualizam e respondem **VOU / NÃO VOU** somente por si; ausência
+de resposta é **PENDENTE**. Contagens/listas usam o elenco ativo, sem contatos privados.
+Convidados aparecem separadamente e não criam conta, jogador nem vínculo permanente.
+
+Pelada pode repetir semanalmente com término opcional: deixe o término vazio para
+continuar até cancelar. A criação e as consultas geram uma janela de até oito semanas,
+com unicidade por série/data, sem tarefas agendadas ou geração infinita antecipada.
+Após períodos sem acesso, geram-se somente próximas datas, sem preencher o passado.
+Editar/cancelar um evento afeta apenas aquela ocorrência. **Encerrar recorrência**
+impede novas ocorrências e cancela as datas de hoje em diante, preservando histórico,
+respostas e convidados. Datas/horários são locais da partida; a janela usa a data local
+do servidor. Respostas podem ser alteradas enquanto a ocorrência não estiver cancelada.
+Jogo avulso aceita adversário textual opcional, sem vínculo com outro time.
+
+`0005_events_attendance` adiciona `event_series`, `events`, `event_attendance` e
+`event_guests`, além da permissão `manage_events`. Preserva tabelas e linhas anteriores;
+downgrade é recusado se houver dados novos que seriam perdidos.
+
+Endpoints abaixo começam com `/v1/teams/{team_id}/events`:
+
+| Método | Sufixo | Ação |
+| --- | --- | --- |
+| GET / POST | vazio | Lista / cria evento (e recorrência opcional) |
+| GET / PUT | `/{event_id}` | Detalha / edita uma ocorrência |
+| PUT | `/{event_id}/attendance` | Confirma/altera a própria presença |
+| POST | `/{event_id}/cancel` | Cancela uma ocorrência |
+| POST | `/{event_id}/cancel-series` | Encerra a recorrência |
+| POST | `/{event_id}/guests` | Adiciona convidado |
+| POST | `/{event_id}/guests/{guest_id}/remove` | Remove convidado daquela ocorrência |
+
+Aplique `uv run alembic upgrade head` em `apps/api`, mantenha API na porta **8011**
+e execute `npm.cmd run mobile:web` na raiz. Teste pelo fluxo **Jogos → Criar evento**.
+Com Expo ativo em 8081, o teste isolado de navegador roda em `apps/api`:
+`uv run --with playwright pytest tests/browser_events_flow.py -q -s`.
+Não inclui sorteio, placar, estatísticas, campeonatos, busca de adversários ou financeiro.
+
+Validação do Prompt 05: 114 testes backend e três fluxos Chromium aprovados (times,
+elenco e eventos). Ruff, formatação, mypy, ESLint e TypeScript passaram; Expo Doctor
+20/20 e exportações Web/Android/iOS concluídas. A aplicação da `0005` comparou todas
+as linhas anteriores e preservou o Tabajara FC. Validação em aparelhos físicos permanece pendente.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento de fotos e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
-Convites, jogos, financeiro e assinaturas continuam fora deste escopo.
+Convites para contas, placar, financeiro e assinaturas continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

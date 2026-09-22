@@ -1,0 +1,21 @@
+import { authenticated } from '../auth/api';
+
+export type Answer = 'VOU' | 'NAO_VOU' | 'PENDENTE';
+export type EventInput = { modality: string; kind: 'PELADA' | 'JOGO'; title: string; date: string;
+  time: string; location: string; notes: string | null; opponent: string | null; recurring_weekly?: boolean; recurring_until?: string | null };
+export type SportEvent = EventInput & { id: string; team_id: string; series_id: string | null;
+  status: 'open' | 'cancelled'; recurrence_status: 'active' | 'cancelled' | null; can_manage: boolean; my_response: Answer; going: number; not_going: number; pending: number;
+  participants: { membership_id: string; player_id: string; name: string; response: Answer }[];
+  guests: { id: string; name: string }[] };
+export type EventPage = { items: SportEvent[]; can_manage: boolean };
+const base = (team: string) => `/v1/teams/${encodeURIComponent(team)}/events`;
+const path = (team: string, id: string) => `${base(team)}/${encodeURIComponent(id)}`;
+export const listEvents = (team: string) => authenticated<EventPage>(base(team));
+export const getEvent = (team: string, id: string) => authenticated<SportEvent>(path(team, id));
+export const saveEvent = (team: string, data: EventInput, id?: string) => authenticated<SportEvent>(id ? path(team, id) : base(team), data, id ? 'PUT' : 'POST');
+export const respond = (team: string, id: string, response: Exclude<Answer, 'PENDENTE'>) => authenticated<SportEvent>(`${path(team, id)}/attendance`, { response }, 'PUT');
+export const cancelEvent = (team: string, id: string) => authenticated<SportEvent>(`${path(team, id)}/cancel`, {}, 'POST');
+export const cancelSeries = (team: string, id: string) => authenticated<SportEvent>(`${path(team, id)}/cancel-series`, {}, 'POST');
+export const addGuest = (team: string, id: string, name: string) => authenticated<SportEvent>(`${path(team, id)}/guests`, { name }, 'POST');
+export const removeGuest = (team: string, id: string, guest: string) => authenticated<SportEvent>(`${path(team, id)}/guests/${encodeURIComponent(guest)}/remove`, {}, 'POST');
+export const eventWhen = (event: SportEvent) => `${new Date(`${event.date}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} • ${event.time.slice(0, 5)}`;

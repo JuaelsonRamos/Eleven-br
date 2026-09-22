@@ -131,5 +131,7 @@ class MembershipPermission(Entity, Base):
     permission: Mapped[str] = mapped_column(String(40))
     __table_args__ = (
         UniqueConstraint("membership_id", "permission"),
-        CheckConstraint("permission IN ('manage_team', 'manage_members')", name="permission"),
+        CheckConstraint(
+            "permission IN ('manage_team', 'manage_members', 'manage_events')", name="permission"
+        ),
     )

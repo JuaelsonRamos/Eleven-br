@@ -31,6 +31,10 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "auth_sessions",
             "refresh_tokens",
             "auth_rate_limits",
+            "event_series",
+            "events",
+            "event_attendance",
+            "event_guests",
         }
         command.check(config)
 
