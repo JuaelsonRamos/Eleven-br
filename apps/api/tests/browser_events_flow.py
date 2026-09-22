@@ -103,19 +103,34 @@ def test_browser_events_flow(engine: Engine) -> None:
             browser = playwright.chromium.launch()
             context = browser.new_context(viewport={"width": 390, "height": 844})
             errors = []
+            missing_modalities = False
+            event_writes = []
+            events_path = f"/v1/teams/{team['id']}/events"
 
             def isolated(route):
                 source = urlsplit(route.request.url)
-                route.fulfill(
-                    response=route.fetch(
-                        url=f"http://127.0.0.1:{port}{source.path}"
-                        + (f"?{source.query}" if source.query else "")
-                    )
+                response = route.fetch(
+                    url=f"http://127.0.0.1:{port}{source.path}"
+                    + (f"?{source.query}" if source.query else "")
                 )
+                if missing_modalities and source.path == "/v1/teams/options":
+                    # Exercise unavailable choices without corrupting a real team's modalities.
+                    route.fulfill(response=response, json={**response.json(), "modalities": []})
+                else:
+                    route.fulfill(response=response)
 
             context.route("**/v1/**", isolated)
             page = context.new_page()
             page.on("pageerror", lambda error: errors.append(str(error)))
+            page.on(
+                "request",
+                lambda request: (
+                    event_writes.append(request)
+                    if request.method in {"POST", "PUT"}
+                    and urlsplit(request.url).path.startswith(events_path)
+                    else None
+                ),
+            )
             page.goto("http://localhost:8081", wait_until="domcontentloaded", timeout=120000)
             page.get_by_role("button", name="Já tenho conta", exact=True).click(timeout=120000)
 
@@ -130,7 +145,74 @@ def test_browser_events_flow(engine: Engine) -> None:
                     page.locator(':not([aria-hidden="true"] *)')
                 )
 
+            def invalid_save(message):
+                previous = len(event_writes)
+                page.get_by_role("button", name="Salvar evento", exact=True).click()
+                expect(page.get_by_role("alert")).to_have_text(message)
+                assert len(event_writes) == previous, "Invalid form must not send POST/PUT"
+
+            def create_and_check(title, modality, recurring, until=None):
+                with page.expect_response(
+                    lambda response: (
+                        urlsplit(response.url).path == events_path
+                        and response.request.method == "POST"
+                    )
+                ) as pending:
+                    page.get_by_role("button", name="Salvar evento", exact=True).click()
+                response = pending.value
+                assert response.status == 201
+                body = response.request.post_data_json
+                assert body["modality"] == modality
+                assert body["recurring_weekly"] == recurring and body["recurring_until"] == until
+                created = response.json()
+                assert created["id"] and created["title"] == title
+                assert created["modality"] == modality
+                # Real API persistence and the actual Jogos list must both contain the event.
+                with httpx.Client(base_url=f"http://127.0.0.1:{port}", headers=owner) as api:
+                    assert api.get(f"{events_path}/{created['id']}").json()["title"] == title
+                    assert created["id"] in {
+                        item["id"] for item in api.get(events_path).json()["items"]
+                    }
+                page.get_by_role("button", name="Voltar aos jogos", exact=True).click()
+                label = f"Abrir {title} • {'/'.join(reversed(created['date'].split('-')))}"
+                expect(page.get_by_role("button", name=label, exact=True)).to_be_visible()
+                page.get_by_role("button", name=label, exact=True).click()
+                return created
+
             login("owner-events@example.com")
+            page.get_by_role("button", name="Criar evento", exact=True).click()
+            expect(page.get_by_role("radio", name="Society / Fut7", exact=True)).to_be_checked()
+            expect(page.get_by_role("radio", name="Campo", exact=True)).to_have_count(0)
+            invalid_save("Informe o título.")
+            page.get_by_label("Título do evento", exact=True).fill("Pelada simples")
+            invalid_save("Informe a data.")
+            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("31/02/2026")
+            invalid_save("Informe uma data válida (DD/MM/AAAA).")
+            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("27/09/2026")
+            invalid_save("Informe o horário.")
+            page.get_by_label("Horário (HH:MM)", exact=True).fill("25:00")
+            invalid_save("Informe um horário válido (HH:MM).")
+            page.get_by_label("Horário (HH:MM)", exact=True).fill("08:00")
+            invalid_save("Informe o local.")
+            page.get_by_label("Local", exact=True).fill("Campo local")
+            page.get_by_role("radio", name="Futsal", exact=True).click()
+            expect(page.get_by_role("radio", name="Futsal", exact=True)).to_be_checked()
+            expect(page.get_by_role("radio", name="Society / Fut7", exact=True)).not_to_be_checked()
+            create_and_check("Pelada simples", "futsal", False)
+
+            # No visible/enabled modality must never silently send a hidden default.
+            missing_modalities = True
+            page.reload(wait_until="domcontentloaded")
+            page.get_by_role("tab", name="Jogos", exact=True).click()
+            page.get_by_role("button", name="Criar evento", exact=True).click()
+            page.get_by_label("Título do evento", exact=True).fill("Sem modalidade")
+            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("27/09/2026")
+            page.get_by_label("Horário (HH:MM)", exact=True).fill("08:00")
+            page.get_by_label("Local", exact=True).fill("Campo local")
+            invalid_save("Selecione uma modalidade.")
+            missing_modalities = False
+            page.reload(wait_until="domcontentloaded")
+            page.get_by_role("tab", name="Jogos", exact=True).click()
             page.get_by_role("button", name="Criar evento", exact=True).click()
             page.get_by_label("Título do evento", exact=True).fill("Pelada de Domingo")
             page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("27/09/2026")
@@ -138,7 +220,7 @@ def test_browser_events_flow(engine: Engine) -> None:
             page.get_by_label("Repetir semanalmente", exact=True).click()
             page.get_by_label("Repetir até (DD/MM/AAAA) — opcional", exact=True).fill("11/10/2026")
             page.get_by_label("Local", exact=True).fill("Arena do bairro")
-            page.get_by_role("button", name="Salvar evento", exact=True).click()
+            create_and_check("Pelada de Domingo", "society", True, "2026-10-11")
             expect(visible_text("Pendentes: 2")).to_be_visible()
             page.get_by_role("button", name="VOU", exact=True).click()
             expect(visible_text("Confirmados: 1")).to_be_visible()
@@ -151,8 +233,24 @@ def test_browser_events_flow(engine: Engine) -> None:
             page.get_by_role("button", name="Remover Zeca", exact=True).click()
             expect(visible_text("Convidados: 0")).to_be_visible()
             page.get_by_role("button", name="Editar evento", exact=True).click()
+            expect(page.get_by_role("radio", name="Society / Fut7", exact=True)).to_be_checked()
+            page.get_by_label("Título do evento", exact=True).fill("")
+            invalid_save("Informe o título.")
+            page.get_by_label("Título do evento", exact=True).fill("Pelada de Domingo")
+            page.get_by_label("Local", exact=True).fill(" ")
+            invalid_save("Informe o local.")
             page.get_by_label("Local", exact=True).fill("Arena nova")
-            page.get_by_role("button", name="Salvar evento", exact=True).click()
+            page.get_by_role("radio", name="Futsal", exact=True).click()
+            with page.expect_response(
+                lambda response: (
+                    urlsplit(response.url).path.startswith(events_path + "/")
+                    and response.request.method == "PUT"
+                )
+            ) as edited:
+                page.get_by_role("button", name="Salvar evento", exact=True).click()
+            assert edited.value.status == 200
+            assert edited.value.request.post_data_json["modality"] == "futsal"
+            assert edited.value.json()["modality"] == "futsal"
             expect(visible_text("Arena nova")).to_be_visible()
             artifacts = Path(__file__).resolve().parents[3] / ".local"
             artifacts.mkdir(exist_ok=True)
@@ -178,7 +276,7 @@ def test_browser_events_flow(engine: Engine) -> None:
             page.get_by_label("Horário (HH:MM)", exact=True).fill("19:30")
             page.get_by_label("Local", exact=True).fill("Quadra central")
             page.get_by_label("Adversário (opcional)", exact=True).fill("Visitantes")
-            page.get_by_role("button", name="Salvar evento", exact=True).click()
+            create_and_check("Amistoso", "society", False)
             expect(visible_text("Adversário: Visitantes")).to_be_visible()
             page.get_by_role("button", name="Voltar aos jogos", exact=True).click()
             page.get_by_role("button", name="Criar evento", exact=True).click()
@@ -187,7 +285,7 @@ def test_browser_events_flow(engine: Engine) -> None:
             page.get_by_label("Horário (HH:MM)", exact=True).fill("10:00")
             page.get_by_label("Local", exact=True).fill("Campo")
             page.get_by_label("Repetir semanalmente", exact=True).click()
-            page.get_by_role("button", name="Salvar evento", exact=True).click()
+            create_and_check("Pelada sem fim", "society", True)
             expect(
                 visible_text("Pelada semanal • sem data final • presença por data")
             ).to_be_visible()
@@ -222,7 +320,8 @@ def test_browser_events_flow(engine: Engine) -> None:
             context.close()
             browser.close()
             print(
-                "PASS: finite/endless weekly and one-off events, attendance, guests, edit, "
+                "PASS: field validation/no invalid requests, selected modality in POST/PUT, "
+                "API persistence/list, finite/endless weekly and one-off events, guests, edit, "
                 "cancel event/series, reload and member permissions; isolated DB."
             )
     finally:
