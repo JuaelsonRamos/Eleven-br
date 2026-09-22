@@ -18,7 +18,8 @@ de uso não permite simplificar incorretamente regras de negócio.
 ## Escopo progressivo
 
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
-e o Prompt 03 (criação, perfil, edição e seleção de times). As cinco abas exigem
+o Prompt 03 (criação, perfil, edição e seleção de times) e o Prompt 04 (elenco).
+As cinco abas exigem
 autenticação; Jogos e Notificações continuam placeholders. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
 
@@ -64,6 +65,26 @@ conceito independente em fase futura. Não criar essa modelagem antecipadamente.
 - `Player`: identidade esportiva da pessoa.
 - `TeamMembership`: vínculo do jogador com determinado time.
 
+O Prompt 04 permite `Player.user_id` nulo, mantendo unicidade quando há User.
+Cadastro manual cria Player e vínculo atomicamente, sem criar conta e sem vincular
+por coincidência de contato. `TeamMembership` guarda `roster_name`, `nickname`,
+`contact_phone` e `contact_email`. Edições do cadastro manual são locais ao vínculo;
+não alteram a identidade global do Player compartilhado com outro time. Para
+Player com conta, nome e contatos globais permanecem sob controle do titular;
+no elenco, a administração pode editar apenas o apelido local. Contatos manuais
+são visíveis somente a quem pode gerenciar o elenco; contatos de User não são expostos.
+
+Elenco usa `Permission.MANAGE_MEMBERS` e as policies existentes. Membros ativos
+podem visualizar; somente os autorizados gerenciam. Cadastro, edição e mudanças
+de status bloqueiam a linha do time antes de autorizar/contar/escrever. Reativação
+reutiliza Player/Membership e respeita limites ativos e de papéis já existentes.
+O Presidente conta uma vez e não pode ser inativado pelo fluxo comum.
+Duplicidades são verificadas apenas dentro do time, incluindo inativos; inclusão
+ou edição com coincidência exige confirmação explícita, inclusive para contatos.
+Não criar endpoints de consulta global de Player nem vínculo automático por contato.
+`0004_roster_management` preserva registros existentes; o downgrade é bloqueado
+se houver dados do elenco que a estrutura anterior não consegue representar.
+
 Um usuário pode participar de vários times, ser jogador em um, administrador em
 outro e Presidente em outro, inclusive Presidente de vários times. Papéis,
 permissões, dados e configurações devem respeitar o contexto de cada time.
@@ -102,8 +123,8 @@ Centralize regras em `apps/api/app/domain/policies.py` (`ENTITLEMENTS` e `allows
 Não espalhar verificações como `if plan == "PRO"` quando a política central resolve
 a decisão. As operações em `apps/api/app/application/teams.py` bloqueiam a linha
 do time antes de contar/incluir membros. Preserve a proteção contra concorrência;
-futuros fluxos de reativação, troca de papel ou plano devem aplicar as mesmas
-políticas e transações. Limites de plano não são garantidos por escritas SQL diretas.
+reativação usa as mesmas políticas e transações; futuras trocas de papel ou plano
+também devem usá-las. Limites de plano não são garantidos por escritas SQL diretas.
 O fluxo de downgrade ainda não está implementado; esta seção define sua evolução.
 
 ## Stack e estrutura reais

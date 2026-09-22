@@ -71,38 +71,11 @@ def add_member(
     team = session.scalar(select(Team).where(Team.id == team_id).with_for_update())
     if team is None:
         raise NotFound("Time não encontrado")
-    limits = ENTITLEMENTS[Plan(team.plan)]
-    active = (
-        session.scalar(
-            select(func.count())
-            .select_from(TeamMembership)
-            .where(
-                TeamMembership.team_id == team_id,
-                TeamMembership.status == "active",
-            )
-        )
-        or 0
-    )
-    if active >= limits.active_players:
-        raise Conflict("Limite de jogadores ativos do plano atingido")
+    ensure_active_slot(session, team)
     if permissions and role != Role.ADMIN:
         raise Conflict("Permissões administrativas exigem vínculo administrativo")
     if role == Role.ADMIN:
-        admins = (
-            session.scalar(
-                select(func.count())
-                .select_from(TeamMembership)
-                .where(
-                    TeamMembership.team_id == team_id,
-                    TeamMembership.status == "active",
-                    TeamMembership.role == Role.ADMIN.value,
-                    TeamMembership.id != team.president_membership_id,
-                )
-            )
-            or 0
-        )
-        if admins >= limits.administrators:
-            raise Conflict("Limite de administradores do plano atingido")
+        ensure_admin_slot(session, team)
     membership = TeamMembership(team_id=team_id, player_id=player_id, role=role.value)
     session.add(membership)
     session.flush()
@@ -114,6 +87,49 @@ def add_member(
     )
     session.flush()
     return membership
+
+
+def active_count(session: Session, team_id: UUID) -> int:
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(TeamMembership)
+            .where(
+                TeamMembership.team_id == team_id,
+                TeamMembership.status == "active",
+            )
+        )
+        or 0
+    )
+
+
+def ensure_active_slot(session: Session, team: Team) -> None:
+    """Caller must hold the team row lock before checking capacity and writing."""
+    limit = ENTITLEMENTS[Plan(team.plan)].active_players
+    if active_count(session, team.id) >= limit:
+        raise Conflict(
+            f"Seu time atingiu o limite de {limit} jogadores ativos do plano {team.plan.title()}. "
+            "Inative um jogador para liberar uma vaga."
+        )
+
+
+def ensure_admin_slot(session: Session, team: Team) -> None:
+    """Keep existing administrator limits when reactivating a preserved admin role."""
+    admins = (
+        session.scalar(
+            select(func.count())
+            .select_from(TeamMembership)
+            .where(
+                TeamMembership.team_id == team.id,
+                TeamMembership.status == "active",
+                TeamMembership.role == Role.ADMIN.value,
+                TeamMembership.id != team.president_membership_id,
+            )
+        )
+        or 0
+    )
+    if admins >= ENTITLEMENTS[Plan(team.plan)].administrators:
+        raise Conflict("Limite de administradores do plano atingido")
 
 
 def visible_teams(session: Session, user_id: UUID) -> list[Team]:

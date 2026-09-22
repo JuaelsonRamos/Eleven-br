@@ -55,6 +55,7 @@ class TeamRead(BaseModel):
     crest_url: str | None = None
     my_role: str = "member"
     can_edit: bool = False
+    active_player_count: int = 0
 
 
 class ProfileRead(BaseModel):

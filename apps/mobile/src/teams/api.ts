@@ -5,6 +5,7 @@ export type PublicTeam = TeamInput & { code: string };
 export type Team = PublicTeam & {
   id: string; status: string; plan: 'free' | 'pro'; crest_url: string | null;
   my_role: 'president' | 'admin' | 'member'; can_edit: boolean;
+  active_player_count: number;
 };
 export type Choice = { value: string; label: string };
 export type Options = { modalities: Choice[]; states: Choice[] };

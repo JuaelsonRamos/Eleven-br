@@ -57,7 +57,7 @@ class User(Entity, Base):
 
 class Player(Entity, Base):
     __tablename__ = "players"
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), unique=True)
     display_name: Mapped[str] = mapped_column(String(80))
     photo_url: Mapped[str | None] = mapped_column(String(2048))
     __table_args__ = (CheckConstraint("length(trim(display_name)) > 0", name="name"),)
@@ -103,11 +103,22 @@ class TeamMembership(Entity, Base):
     player_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("players.id"), index=True)
     role: Mapped[str] = mapped_column(String(16), server_default="member")
     status: Mapped[str] = mapped_column(String(16), server_default="active")
+    roster_name: Mapped[str | None] = mapped_column(String(80))
+    nickname: Mapped[str | None] = mapped_column(String(80))
+    contact_phone: Mapped[str | None] = mapped_column(String(16))
+    contact_email: Mapped[str | None] = mapped_column(String(254))
     __table_args__ = (
         UniqueConstraint("team_id", "player_id", name="uq_membership_team_player"),
         UniqueConstraint("team_id", "id", name="uq_membership_team_id"),
         CheckConstraint("role IN ('member', 'admin')", name="role"),
         CheckConstraint("status IN ('active', 'inactive')", name="status"),
+        CheckConstraint("roster_name IS NULL OR length(trim(roster_name)) > 0", name="roster_name"),
+        CheckConstraint(
+            "contact_email IS NULL OR contact_email = lower(contact_email)", name="email_normalized"
+        ),
+        CheckConstraint(
+            "contact_phone IS NULL OR contact_phone ~ '^\\+[1-9][0-9]{7,14}$'", name="phone_e164"
+        ),
         Index("ix_memberships_team_status", "team_id", "status"),
     )
 

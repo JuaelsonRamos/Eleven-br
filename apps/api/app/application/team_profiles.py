@@ -62,7 +62,12 @@ def edit_team(
     return team
 
 
-def membership_context(session: Session, team: Team, user_id: UUID) -> tuple[str, bool]:
+def membership_context(
+    session: Session,
+    team: Team,
+    user_id: UUID,
+    permission: Permission = Permission.MANAGE_TEAM,
+) -> tuple[str, bool]:
     membership = session.scalars(
         select(TeamMembership)
         .join(Player, Player.id == TeamMembership.player_id)
@@ -87,7 +92,7 @@ def membership_context(session: Session, team: Team, user_id: UUID) -> tuple[str
             is_president=president,
             role=Role(membership.role),
             grants=grants,
-            permission=Permission.MANAGE_TEAM,
+            permission=permission,
         ),
     )
 

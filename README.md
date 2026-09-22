@@ -3,8 +3,8 @@
 **Seu time. Seu jogo.** Fundação técnica para gestão de futebol amador.
 
 O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
-perfil inicial e gestão básica de times. As cinco abas ficam na área autenticada.
-Não inclui elenco, jogos, financeiro ou cobrança.
+perfil inicial, gestão básica de times e elenco. As cinco abas ficam na área autenticada.
+Não inclui jogos, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -32,20 +32,21 @@ Dependências reproduzíveis em `apps/api/uv.lock` e `package-lock.json`.
 
 `User` é a conta; `Player` é a identidade esportiva (no máximo uma por conta);
 `TeamMembership` é o vínculo único entre jogador e time. Uma conta pode existir sem
-perfil esportivo. Funções administrativas não são atributos de `User`.
+perfil esportivo; Player pode existir sem conta. Funções administrativas não são atributos de `User`.
 
 `Team.president_membership_id` é obrigatório. A FK composta para `(team_id, id)` do
 vínculo garante exatamente um Presidente pertencente ao próprio time. A checagem
 é adiada até o commit para permitir a criação atômica do time e do primeiro vínculo.
 Presidente é derivado dessa referência, sem um segundo campo de função que possa divergir.
-Não há fluxo de transferência ou inativação de membros nesta etapa.
+O elenco permite inativar membros, preservando o vínculo; Presidente não pode ser
+inativado nesse fluxo. Transferência de Presidência permanece fora do escopo.
 
 O plano está no time. `domain/policies.py` centraliza 24/100 jogadores ativos e
 0/5 administradores adicionais para Free/Pro. Permissões de administradores são
 explícitas e por vínculo; no Free, somente o Presidente tem poderes administrativos.
 Os limites de inclusão são checados sob bloqueio da linha do time, inclusive em
-requisições concorrentes. Novas operações de reativação, troca de plano e papel
-deverão usar essas mesmas políticas e o mesmo bloqueio. Escritas SQL diretas não
+requisições concorrentes. Reativação usa essas mesmas políticas e o mesmo bloqueio;
+futuras operações de troca de plano e papel também deverão usá-los. Escritas SQL diretas não
 aplicam os limites de plano da camada de aplicação.
 
 Os routers são finos; regras ficam na aplicação/domínio. Consultas usam sessões
@@ -430,7 +431,7 @@ Trocar de conta recria o contexto e não reaproveita dados da conta anterior.
 
 O campo `crest_url` foi preservado. Upload de escudo continua pendente de uma
 solução de armazenamento; Free pode ter escudo e a criação funciona sem imagem.
-Não há transferência de Presidência, exclusão, elenco, convites ou cobrança.
+Não há transferência de Presidência, exclusão, convites ou cobrança.
 
 ### Teste manual de times
 
@@ -479,11 +480,73 @@ o navegador carregou o bundle de desenvolvimento sem erros JavaScript.
 Execução nativa em aparelho permanece pendente. Há apenas o aviso já existente
 de depreciação Starlette/AnyIO no pytest.
 
+## Elenco — Prompt 04
+
+Acesse **Times → abrir time → Elenco**, ou **Elenco** na Home do time selecionado.
+A lista tem filtros Ativos/Inativos/Todos (padrão Ativos), contagem e situação da
+conta. Presidente aparece pelo vínculo já existente, sem duplicação. Cadastro
+manual exige apenas nome; apelido, telefone e e-mail são opcionais. Foto usa avatar
+ou o campo existente; upload continua pendente. Há edição, confirmação de
+inativação e reativação sem apagar registros nem criar novo vínculo.
+
+`0004_roster_management` torna `Player.user_id` opcional e adiciona nome local,
+apelido e contatos a `TeamMembership`. Nome original permanece na identidade do
+Player; alterações manuais são específicas daquele time. Quando há conta vinculada,
+nome/contatos globais não são editáveis pelo Presidente; apenas apelido local.
+Contatos manuais são restritos à gestão do elenco. Telefone/e-mail são normalizados
+pela regra existente e nunca criam User nem vinculam contas automaticamente.
+
+Free permite 24 ativos e Pro 100, incluindo o Presidente uma única vez. Cadastro
+e reativação bloqueiam a mesma linha do time antes da contagem/escrita, impedindo
+ultrapassar o limite por concorrência. Inativos não contam; a reativação também
+respeita os limites de papéis administrativos já existentes. Não há atribuição
+de administradores ou compra de plano nesta etapa.
+
+Todos os endpoints abaixo começam com `/v1/teams/{team_id}/players`:
+
+| Método | Sufixo | Ação |
+| --- | --- | --- |
+| GET | `?status=active\|inactive\|all` | Lista, contagens, limite e permissão |
+| POST | vazio | Cadastro manual |
+| POST | `/similar?exclude={membership_id}` | Aviso de duplicidade; exclusão opcional na edição |
+| GET / PUT | `/{membership_id}` | Perfil / edição dos campos enviados |
+| POST | `/{membership_id}/deactivate` | Inativação, exceto Presidente |
+| POST | `/{membership_id}/reactivate` | Reativação com verificação de vagas |
+
+Leitura exige vínculo ativo; escrita exige `manage_members` pelas policies atuais.
+Cada membership é validado dentro do time autorizado. Não existe consulta global
+de Player. O aviso compara nomes e contatos apenas no mesmo elenco, inclusive
+inativos; coincidências exigem `confirm_duplicate: true` para continuar. Contatos
+iguais continuam cadastros separados e não autorizam vinculação de conta.
+
+Para testar, aplique `uv run alembic upgrade head` em `apps/api`, mantenha API em
+8011 e execute `npm.cmd run mobile:web` na raiz. Entre, abra Tabajara FC → Elenco,
+confira o Presidente, adicione um jogador só com nome e outro com opcionais.
+Edite, inative, filtre Inativos, reative e recarregue para conferir a persistência.
+
+Testes automatizados usam exclusivamente schemas descartáveis no banco `_test`.
+Além de `uv run pytest -q`, com Expo ativo em 8081:
+
+```powershell
+uv run --with playwright pytest tests/browser_roster_flow.py tests/browser_team_flow.py -q -s
+```
+
+O upgrade preserva Tabajara FC, contas, sessões, modalidades, códigos e vínculos.
+Upgrade/downgrade/upgrade é testado no banco isolado; downgrade com dados novos de
+elenco é recusado para não descartar Players sem conta ou informações do vínculo.
+Pendentes: convites/vinculação por aprovação e armazenamento de fotos, sem fluxos
+antecipados. Execução nativa em aparelhos ainda exige validação manual.
+
+Validação do Prompt 04: 88 testes backend, ciclos de migration e dois fluxos
+Chromium aprovados (times e elenco). Ruff, formatação, mypy, ESLint e TypeScript
+passaram; Expo Doctor 20/20 e exportações Web/Android/iOS concluídas. A comparação
+antes/depois da `0004` confirmou a preservação de todas as linhas existentes.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento de fotos e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
-Elenco, convites, jogos, financeiro e assinaturas continuam fora deste escopo.
+Convites, jogos, financeiro e assinaturas continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

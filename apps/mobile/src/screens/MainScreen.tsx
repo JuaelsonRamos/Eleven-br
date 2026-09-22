@@ -40,6 +40,8 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
               <Badge label="TIME SELECIONADO" />
               <TeamSummary team={selected} />
               <Text style={styles.pageDescription}>A estrutura do seu time está pronta. Seu futebol começa aqui.</Text>
+              <Text style={styles.pageDescription}>{selected.active_player_count} jogadores ativos</Text>
+              <Button label="Elenco" onPress={() => navigation.navigate('Times', { rosterFor: selected.id })} />
               <Button label="Ver meus times" onPress={() => navigation.navigate('Times')} />
             </View>
           </Card> : <Card>

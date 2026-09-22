@@ -11,7 +11,7 @@ from app.application.team_profiles import (
     register_team,
     similar_teams,
 )
-from app.application.teams import require_membership, visible_teams
+from app.application.teams import active_count, require_membership, visible_teams
 from app.domain.policies import ENTITLEMENTS, Permission, Plan
 from app.domain.team_identity import MODALITIES, STATES
 from app.infrastructure.models import Player, Team
@@ -68,7 +68,13 @@ def teams(session: SessionDep, user: CurrentUser) -> list[TeamRead]:
 
 def team_response(team: Team, session: SessionDep, user_id: UUID) -> TeamRead:
     role, can_edit = membership_context(session, team, user_id)
-    return TeamRead.model_validate(team).model_copy(update={"my_role": role, "can_edit": can_edit})
+    return TeamRead.model_validate(team).model_copy(
+        update={
+            "my_role": role,
+            "can_edit": can_edit,
+            "active_player_count": active_count(session, team.id),
+        }
+    )
 
 
 @router.get("/v1/teams/options", tags=["teams"])

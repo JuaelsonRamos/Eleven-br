@@ -88,12 +88,13 @@ def test_0003_preserves_existing_team_account_and_session(engine: Engine) -> Non
                     "refresh_tokens",
                 ]
             }
-            command.upgrade(config, "head")
+            command.upgrade(config, "0003")
             migrated = dict(connection.execute(text("SELECT * FROM teams")).mappings().one())
             assert migrated.pop("modalities") == [legacy.pop("modality")]
             assert migrated == legacy
             for table, rows in preserved.items():
                 assert connection.execute(text(f"SELECT * FROM {table}")).all() == rows
+            command.upgrade(config, "head")
         # The old access session and credentials still work after the schema upgrade.
         assert client.get(f"/v1/teams/{original['id']}").json() == original
         assert (
