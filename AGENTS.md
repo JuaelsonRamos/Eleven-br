@@ -17,9 +17,11 @@ de uso não permite simplificar incorretamente regras de negócio.
 
 ## Escopo progressivo
 
-O estado atual é uma fundação: modelagem, políticas, estrutura de autenticação,
-API de leitura protegida e cinco telas placeholder. Ainda não há fluxo público
-completo de cadastro/login, cadastro completo de time ou cobrança.
+O estado atual inclui a fundação e o Prompt 02: cadastro por contato, verificação,
+login, sessões revogáveis e perfil inicial. As cinco abas exigem autenticação;
+módulos de times/jogos/notificações continuam placeholders. Verificação local é
+simulada com opção explícita; provedor de produção, cadastro de time e cobrança
+ainda não foram implementados.
 
 - **MVP 1 — Base utilizável:** conta, perfil, times, elenco, convidados, peladas,
   presença, sorteio básico, mensalidades, Pix, notificações e jogos contra adversários.
@@ -215,10 +217,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local-postg
 ```powershell
 uv sync --frozen
 uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uv run uvicorn app.main:app --reload --no-proxy-headers --port 8011
 ```
 
-Swagger: `http://127.0.0.1:8000/docs`; processo: `/health`; conexão com banco:
+Swagger: `http://127.0.0.1:8011/docs`; processo: `/health`; conexão com banco:
 `/ready`. A API lê `.env` na raiz. O README detalha ambientes e a alternativa Docker.
 
 **Na raiz — Expo/celular, Web e verificações TypeScript:**

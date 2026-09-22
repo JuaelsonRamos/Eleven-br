@@ -7,6 +7,9 @@ import type { MainTab } from '@eleven/shared';
 import type { TabParams } from './navigation';
 import { MainScreen } from './screens/MainScreen';
 import { theme } from './theme';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { AuthScreens } from './screens/AuthScreens';
+import { ProfileScreen } from './screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
@@ -26,15 +29,23 @@ function MainNavigation() {
     tabBarStyle: { height: 66 + insets.bottom, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), borderTopColor: theme.colors.border },
     tabBarIcon: ({ color, size }) => <Ionicons name={icons[route.name]} color={color} size={size} />,
   })}>
-    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={MainScreen} />)}
+    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : MainScreen} />)}
   </Tab.Navigator>;
 }
 
 export default function App() {
   return <SafeAreaProvider>
     <StatusBar style="dark" />
+    <AuthProvider><AppContent /></AuthProvider>
+  </SafeAreaProvider>;
+}
+
+function AppContent() {
+  const { profile, booting, bootError } = useAuth();
+  if (booting || bootError || !profile?.player_id) return <AuthScreens />;
+  return (
     <NavigationContainer theme={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, primary: theme.colors.green, background: theme.colors.background, text: theme.colors.graphite } }}>
       <MainNavigation />
     </NavigationContainer>
-  </SafeAreaProvider>;
+  );
 }

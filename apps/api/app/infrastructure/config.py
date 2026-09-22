@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     jwt_issuer: str = "eleven-br"
     jwt_audience: str = "eleven-mobile"
     cors_origins: list[str] = []
+    dev_verification_codes: bool = False
 
     @model_validator(mode="after")
     def secure_configuration(self) -> Self:
@@ -29,6 +30,10 @@ class Settings(BaseSettings):
             not origin.startswith("https://") for origin in self.cors_origins
         ):
             raise ValueError("Production CORS origins must use HTTPS")
+        if self.app_env == "production" and self.dev_verification_codes:
+            raise ValueError("DEV_VERIFICATION_CODES cannot be enabled in production")
+        if "*" in self.cors_origins:
+            raise ValueError("Use explicit CORS origins for credentialed requests")
         return self
 
 

@@ -7,12 +7,12 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.application.sessions import create_session
 from app.application.teams import add_member, create_team, require_membership, visible_teams
 from app.domain.policies import Conflict, Forbidden, NotFound, Permission, Plan, Role
 from app.infrastructure.config import get_settings
 from app.infrastructure.database import get_session
 from app.infrastructure.models import Player, Team, TeamMembership, User
-from app.infrastructure.security import create_access_token
 from tests.conftest import make_player
 
 
@@ -178,7 +178,10 @@ def test_api_authorization_and_safe_responses(session: Session) -> None:
     assert client.get("/ready").status_code == 200
     assert client.get("/v1/teams").status_code == 401
     assert client.get("/v1/teams", headers={"Authorization": "Bearer invalid"}).status_code == 401
-    token = create_access_token(outsider.user_id, get_settings())
+    token = create_session(
+        session, session.get(User, outsider.user_id), "native", get_settings()
+    ).access_token
+    session.commit()
     client.headers["Authorization"] = f"Bearer {token}"
     assert client.get("/v1/teams").json() == []
     assert client.get(f"/v1/teams/{team.id}").status_code == 404
@@ -187,7 +190,11 @@ def test_api_authorization_and_safe_responses(session: Session) -> None:
     session.commit()
     assert client.get(f"/v1/teams/{team.id}").status_code == 200
     assert client.get(f"/v1/teams/{team.id}/administration").status_code == 403
-    client.headers["Authorization"] = f"Bearer {create_access_token(owner.user_id, get_settings())}"
+    owner_token = create_session(
+        session, session.get(User, owner.user_id), "native", get_settings()
+    ).access_token
+    session.commit()
+    client.headers["Authorization"] = f"Bearer {owner_token}"
     assert client.get(f"/v1/teams/{team.id}/administration").status_code == 200
     assert "password_hash" not in client.get("/v1/me").text
     user = session.get(User, owner.user_id)

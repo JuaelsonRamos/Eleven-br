@@ -4,9 +4,11 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.application.accounts import complete_profile
 from app.application.teams import require_membership, visible_teams
 from app.domain.policies import ENTITLEMENTS, Permission, Plan
 from app.infrastructure.models import Player
+from app.presentation.auth_schemas import ProfileInput
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.schemas import AdministrationRead, ProfileRead, TeamRead
 
@@ -34,7 +36,16 @@ def me(session: SessionDep, user: CurrentUser) -> ProfileRead:
         user_id=user.id,
         player_id=player.id if player else None,
         display_name=player.display_name if player else None,
+        photo_url=player.photo_url if player else None,
+        email=user.email,
+        phone=user.phone,
     )
+
+
+@router.put("/v1/me/profile", response_model=ProfileRead, tags=["profile"])
+def save_profile(data: ProfileInput, session: SessionDep, user: CurrentUser) -> ProfileRead:
+    complete_profile(session, user, data.name)
+    return me(session, user)
 
 
 @router.get("/v1/teams", response_model=list[TeamRead], tags=["teams"])

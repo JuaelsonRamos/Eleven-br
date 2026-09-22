@@ -12,7 +12,7 @@ from app.infrastructure.security import (
     hash_password,
     verify_password,
 )
-from app.presentation.schemas import AccountInput
+from app.presentation.auth_schemas import RegisterInput
 
 
 def settings() -> Settings:
@@ -30,7 +30,10 @@ def test_argon2_and_token_roundtrip() -> None:
     assert not verify_password("another-password", hashed)
     user_id = uuid4()
     config = settings()
-    assert decode_access_token(create_access_token(user_id, config), config) == user_id
+    session_id = uuid4()
+    claims = decode_access_token(create_access_token(user_id, config, session_id), config)
+    assert claims.user_id == user_id
+    assert claims.session_id == session_id
 
 
 @pytest.mark.parametrize(
@@ -41,6 +44,7 @@ def test_invalid_tokens_are_rejected(change: str) -> None:
     now = datetime.now(UTC)
     claims = {
         "sub": str(uuid4()),
+        "sid": str(uuid4()),
         "iat": now,
         "exp": now + timedelta(minutes=1),
         "iss": config.jwt_issuer,
@@ -66,19 +70,26 @@ def test_invalid_tokens_are_rejected(change: str) -> None:
 
 
 def test_contact_validation() -> None:
-    account = AccountInput(
-        email="PLAYER@example.com", password="test-password-long", display_name=" Ana "
+    account = RegisterInput(
+        contact="PLAYER@example.com",
+        password="test-password-long",
+        name=" Ana ",
+        password_confirmation="test-password-long",
     )
-    assert account.email == "player@example.com"
-    assert account.display_name == "Ana"
-    AccountInput(phone="+5511999999999", password="test-password-long", display_name="Ana")
+    assert account.contact == "player@example.com"
+    assert account.name == "Ana"
     for data in (
         {},
-        {"phone": "11999999999"},
-        {"email": "invalid"},
-        {"email": "ok@example.com", "display_name": " "},
+        {"contact": "123"},
+        {"contact": "invalid"},
+        {"contact": "ok@example.com", "name": " "},
     ):
         with pytest.raises(ValidationError):
-            AccountInput.model_validate(
-                {"password": "test-password-long", "display_name": "Ana", **data}
+            RegisterInput.model_validate(
+                {
+                    "password": "test-password-long",
+                    "password_confirmation": "test-password-long",
+                    "name": "Ana",
+                    **data,
+                }
             )

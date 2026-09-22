@@ -43,6 +43,7 @@ class User(Entity, Base):
     email: Mapped[str | None] = mapped_column(String(254), unique=True)
     phone: Mapped[str | None] = mapped_column(String(16), unique=True)
     password_hash: Mapped[str | None] = mapped_column(String(255))
+    registration_name: Mapped[str | None] = mapped_column(String(80))
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), server_default="active")
@@ -58,6 +59,7 @@ class Player(Entity, Base):
     __tablename__ = "players"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), unique=True)
     display_name: Mapped[str] = mapped_column(String(80))
+    photo_url: Mapped[str | None] = mapped_column(String(2048))
     __table_args__ = (CheckConstraint("length(trim(display_name)) > 0", name="name"),)
 
 

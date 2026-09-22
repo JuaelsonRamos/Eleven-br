@@ -30,8 +30,8 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
             <Text style={styles.heroDescription}>Um lugar para reunir a turma e cuidar do que faz o futebol acontecer.</Text>
           </View>
           <Card>
-            <Badge label="ESTAMOS COMEÇANDO" />
-            <EmptyState title="O futebol conecta a gente" description="Este é o primeiro passo do ELEVEN BR. Conheça o espaço que vai receber seus times." icon="people-outline">
+            <Badge label="BEM-VINDO AO ELEVEN BR" />
+            <EmptyState title="Seu futebol começa aqui." description="Em breve você poderá criar seu time ou entrar em um time para começar." icon="people-outline">
               <Button label="Conhecer a área de times" onPress={() => navigation.navigate('Times')} />
             </EmptyState>
           </Card>

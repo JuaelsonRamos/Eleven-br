@@ -6,6 +6,7 @@ each generated schema, including deferred FK checks and transactional commits.
 
 import os
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -40,6 +41,8 @@ def engine(monkeypatch: pytest.MonkeyPatch) -> Iterator[Engine]:
     monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("JWT_SECRET", "only-for-tests-" + "x" * 40)
+    monkeypatch.setenv("DEV_VERIFICATION_CODES", "true")
+    monkeypatch.setenv("CORS_ORIGINS", '["http://localhost:8081"]')
     get_settings.cache_clear()
     config = Config(str(ROOT / "apps/api/alembic.ini"))
     try:
@@ -62,7 +65,7 @@ def session(engine: Engine) -> Iterator[Session]:
 
 
 def make_player(session: Session) -> Player:
-    user = User(email=f"{uuid4().hex}@example.com")
+    user = User(email=f"{uuid4().hex}@example.com", email_verified_at=datetime.now(UTC))
     session.add(user)
     session.flush()
     player = Player(user_id=user.id, display_name="Jogador de teste")

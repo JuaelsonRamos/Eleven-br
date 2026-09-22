@@ -2,8 +2,9 @@
 
 **Seu time. Seu jogo.** Fundação técnica para gestão de futebol amador.
 
-Esta etapa entrega a estrutura executável, a modelagem fundamental e cinco telas
-iniciais. Não inclui cadastro completo de time, elenco, jogos, financeiro ou cobrança.
+O projeto entrega a fundação e o fluxo de cadastro, verificação de contato, login,
+sessão e perfil inicial. As cinco abas ficam na área autenticada. Não inclui
+cadastro de time, elenco, jogos, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -18,7 +19,8 @@ apps/
     tests/               # Segurança e integração com PostgreSQL real
   mobile/
     src/components/      # Componentes acessíveis e reutilizáveis
-    src/screens/         # Início, Jogos, Times, Notificações, Perfil
+    src/auth/            # Cliente da API, sessão e armazenamento por plataforma
+    src/screens/         # Entrada, cadastro, verificação, login e cinco abas
     assets/              # Local reservado para assets oficiais
 packages/shared/         # Identidade visual e vocabulário TypeScript
 scripts/                 # PostgreSQL local isolado no Windows
@@ -47,8 +49,8 @@ deverão usar essas mesmas políticas e o mesmo bloqueio. Escritas SQL diretas n
 aplicam os limites de plano da camada de aplicação.
 
 Os routers são finos; regras ficam na aplicação/domínio. Consultas usam sessões
-SQLAlchemy explícitas, sem camada genérica de repositórios. Não há dados fictícios
-carregados no banco nem no aplicativo. Preferências de notificação e assinaturas
+SQLAlchemy explícitas, sem camada genérica de repositórios. Não há carga automática
+de dados fictícios. Preferências de notificação e assinaturas
 com cobrança foram adiadas por não serem necessárias à fundação.
 
 ## Instalação e configuração no Windows
@@ -99,17 +101,22 @@ desenvolvimento como banco de testes.
 cd apps/api
 uv sync --frozen
 uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8011 --no-proxy-headers
 ```
 
-- Swagger: http://127.0.0.1:8000/docs
-- OpenAPI: http://127.0.0.1:8000/openapi.json
-- Processo: http://127.0.0.1:8000/health
-- Conexão PostgreSQL: http://127.0.0.1:8000/ready
+- Swagger: http://127.0.0.1:8011/docs
+- OpenAPI: http://127.0.0.1:8011/openapi.json
+- Processo: http://127.0.0.1:8011/health
+- Conexão PostgreSQL: http://127.0.0.1:8011/ready
 
 `0001_foundation` cria `users`, `players`, `teams`, `team_memberships` e
 `membership_permissions`, com UUIDs, timestamps, índices, unicidade, checks e FKs.
 `updated_at` é atualizado em alterações feitas pelo SQLAlchemy.
+
+`0002_authentication_sessions` adiciona desafios de verificação, sessões revogáveis,
+hashes de refresh tokens e contadores de rate limit. Acrescenta nome provisório
+de cadastro ao User e `photo_url` opcional ao Player, preservando os dados existentes.
+A migration `0001` não foi alterada. Tokens antigos sem sessão persistida exigem novo login.
 
 ```powershell
 uv run alembic current
@@ -138,8 +145,22 @@ servidor no terminal; `web` é um alias para esse comando. Se a porta estiver
 ocupada, confira a porta indicada pelo Expo ou encerre a instância anterior com
 Ctrl+C. Não é necessário iniciar um servidor separado para cada plataforma.
 Android pode usar emulador/dispositivo; o simulador iOS exige macOS/Xcode.
-O mobile nesta etapa apresenta placeholders funcionais e navegação local;
-não simula login nem consulta dados privados sem autenticação.
+O aplicativo restaura a sessão antes de mostrar login ou abas. Cadastro pede nome,
+telefone OU e-mail e senha com confirmação. A verificação cria o Player com o nome
+já informado, sem TeamMembership e sem exigir time. Contas existentes sem Player
+recebem apenas a complementação de nome. Jogos, Times e Notificações continuam placeholders.
+
+A API deve estar executando junto com o Expo. Web usa por padrão o hostname do
+navegador na porta 8011; celular usa o host LAN anunciado pelo Expo. Para aparelho
+físico, execute a API com `--host 0.0.0.0 --no-proxy-headers`, permita a conexão
+na rede local e use a mesma rede Wi-Fi. Se necessário, crie `apps/mobile/.env`
+a partir de seu `.env.example` e defina `EXPO_PUBLIC_API_URL=http://IP-DO-PC:8011`.
+Reinicie o Expo após alterar essa variável. Nunca use `localhost` para apontar do
+celular ao computador. Nenhum segredo deve usar o prefixo público `EXPO_PUBLIC_`.
+
+Na Web, mantenha o mesmo hostname para app e API (por exemplo, ambos `localhost`)
+para o cookie SameSite. `CORS_ORIGINS` deve conter a origem exata do app, inclusive
+porta. Se usar `8083`, acrescente `http://localhost:8083` ao `.env` da API e reinicie-a.
 
 Tema claro, áreas seguras, conteúdo rolável, largura limitada em telas grandes,
 rótulos de acessibilidade e botões de pelo menos 48 pontos. Componentes:
@@ -183,17 +204,114 @@ verificado o servidor **de desenvolvimento** em `localhost:8081`: HTML 200,
 bundle JavaScript 200, mensagem `Web Bundled`, cinco abas e navegação funcionando
 sem erros JavaScript. Essa verificação é distinta da exportação estática.
 
-## Autenticação e ambientes
+## Autenticação, verificação e sessão
 
-Estrutura preparada: contatos e-mail/telefone E.164, normalização/validação,
-campos de verificação de contato, hash Argon2id e tokens com expiração de 15 minutos,
-emissor, audiência e algoritmo fixos. CPF e login social não fazem parte do modelo.
+Normalização central em `app/domain/contacts.py`: e-mail em minúsculas, celular
+brasileiro com DDD convertido para `+55...` e números internacionais com `+` em
+E.164. E-mail e telefone permanecem únicos. Senhas têm 8–128 caracteres, sem
+exigências de símbolos/maiúsculas, e são armazenadas com Argon2id. CPF não é utilizado.
 
-Não existem endpoints públicos de cadastro/login ou emissão de tokens nesta etapa.
-`create_access_token` é uma função interna para o futuro fluxo de login verificado.
+| Método | Endpoint | Função |
+| --- | --- | --- |
+| POST | `/v1/auth/register` | Nome, contato, senha e confirmação; inicia verificação |
+| POST | `/v1/auth/login` | Telefone/e-mail e senha; retoma verificação ou abre sessão |
+| POST | `/v1/auth/verify` | Confirma código e cria Player/sessão |
+| POST | `/v1/auth/resend` | Reenvia respeitando cooldown e orçamento de tentativas |
+| POST | `/v1/auth/change-contact` | Corrige contato ainda não verificado e emite novo código |
+| POST | `/v1/auth/refresh` | Rotaciona refresh e emite novo access token |
+| POST | `/v1/auth/logout` | Revoga a sessão atual e limpa cookie Web |
+| GET | `/v1/me` | Conta/perfil atuais, sem credenciais |
+| PUT | `/v1/me/profile` | Completa/atualiza nome do Player autenticado |
+
+No Swagger, use o cliente `native` para receber refresh no JSON e o botão
+**Authorize** com o access token para consultar `/v1/me`. Para executar POSTs pelo
+próprio Swagger, inclua sua origem (ex.: `http://localhost:8011`) em `CORS_ORIGINS`;
+a validação de origem também se aplica às ferramentas no navegador.
+
+Código numérico de seis dígitos, validade de 10 minutos, uso único, cinco erros
+permitidos e cooldown de 60 segundos. O banco guarda HMAC do código e do token de
+continuação, com finalidade e contato vinculados. O token de continuação expira
+em 24 horas; login correto permite retomada sem criar outra conta. Novo envio
+invalida o código anterior; novo login invalida o token de continuação anterior.
+Senhas, códigos e tokens não são gravados em logs nem refletidos em erros de validação.
+
+Access JWT dura 15 minutos e exige emissor, audiência, algoritmo fixo e ID de
+sessão. O refresh é opaco, aleatório e armazenado no banco somente como hash.
+Cada renovação consome o refresh e emite outro; reutilizar um refresh consumido
+revoga toda aquela sessão. A sessão tem prazo absoluto de 30 dias, não prorrogado
+por renovação. Logout invalida também access tokens em uso, pois cada requisição
+protegida confere a sessão no banco. Cada login cria sessão independente para
+permitir múltiplos dispositivos, sem painel de gerenciamento nesta etapa.
+
+No Android/iOS, somente o refresh é persistido no **Expo SecureStore**; access
+fica em memória. Na Web, refresh fica em **cookie HttpOnly, SameSite=Strict**, com
+`Secure` em produção e caminho `/v1/auth`; access fica em memória. Nenhum token
+vai para localStorage/sessionStorage. Requisições Web de autenticação exigem
+`X-Eleven-Client: web` e Origin autorizado; clientes nativos usam `native` e refresh
+no corpo JSON, sem consumir cookies. A API não permite transportar cookie Web
+como refresh nativo. Headers personalizados e validação de origem protegem os
+fluxos de cookie contra CSRF. CORS aceita apenas origens explícitas.
+
+Renovações concorrentes do cliente são unificadas; na Web, Web Locks serializa
+renovações entre abas quando disponível. Um replay real ou perda da resposta de
+rotação pode exigir novo login; não há janela de tolerância que aceite refresh
+já consumido. Logout depende da confirmação da API: se a conexão falhar, a tela
+informa a falha e permite tentar de novo, sem alegar que houve revogação.
+
 Rotas `/v1/me`, `/v1/teams`, `/v1/teams/{id}` e `/v1/teams/{id}/administration`
-exigem token válido e conta ativa. Administração também exige vínculo ativo e
-permissão do time. Usuários externos recebem 404 para times aos quais não pertencem.
+exigem token válido, sessão válida, conta ativa e contato verificado. Administração
+também exige vínculo ativo e permissão do time. Usuários externos recebem 404
+para times aos quais não pertencem. As regras Free/Pro não foram alteradas.
+
+### Código de desenvolvimento e teste manual
+
+Adicione explicitamente ao `.env` da raiz e reinicie a API:
+
+```dotenv
+APP_ENV=development
+DEV_VERIFICATION_CODES=true
+```
+
+A opção é **false por padrão** e já foi ativada no `.env` local desta implementação.
+O adaptador `DevelopmentSender` não envia SMS/e-mail: devolve `development_code`
+apenas nas respostas de cadastro/reenvio/troca de contato autorizadas. O Expo em
+modo de desenvolvimento mostra o código na tela de verificação, identificado como
+ambiente local. Ele não é persistido em texto puro. Se perder o código, aguarde
+o cooldown e solicite outro. Não compartilhe esse ambiente de simulação publicamente.
+
+`APP_ENV=production` rejeita a configuração `DEV_VERIFICATION_CODES=true` na
+inicialização. Sem adaptador configurado, o envio falha com 503; não existe fallback
+silencioso de produção para desenvolvimento. `VerificationSender` é o contrato
+para um futuro provedor, ainda não implementado.
+
+Para testar, inicie PostgreSQL, aplique `alembic upgrade head`, inicie API e execute
+`npm.cmd run mobile:web` na raiz. Então:
+
+1. Clique em **Criar minha conta**, informe nome, e-mail OU celular e senha duas vezes.
+2. Copie o **Código de desenvolvimento** mostrado e clique em **Confirmar**.
+3. Confira a Home e as cinco abas; feche/reabra ou recarregue o app e confira a sessão.
+4. Em **Perfil**, confira nome/contato e clique em **Sair da conta**.
+5. Na tela de login, entre novamente com o mesmo contato e senha.
+
+Foto é opcional: a interface usa avatar e permite continuar sem upload. O campo
+`Player.photo_url` está preparado, mas não há endpoint para gravar URLs arbitrárias
+ou arquivos; armazenamento de fotos será definido em tarefa posterior.
+
+### Proteção contra abuso e ambientes
+
+Rate limit compartilhado e atômico no PostgreSQL, sem Redis: cadastro até 10
+tentativas/IP/hora; demais endpoints de autenticação até 60/IP/15 minutos; login
+até 10/contato normalizado/15 minutos; reenvio e troca de contato compartilham
+até 5 tentativas/usuário/hora, inclusive após novo login. Erros de código são
+persistidos e operações críticas usam locks. Respostas 429 incluem `Retry-After`.
+Os identificadores dos contadores são HMACs, não contatos/IPs em texto puro.
+
+Essa proteção básica não substitui proteção de borda contra ataques distribuídos.
+Antes da publicação, definir proxy confiável, HTTPS, provedor real e rotina de
+retenção/limpeza de contadores expirados e sessões/tokens após seu prazo absoluto.
+Não remova hashes de refresh consumidos de sessões ainda válidas: são necessários
+para detectar replay. Os comandos locais usam `--no-proxy-headers` para não confiar
+em um `X-Forwarded-For` arbitrário. Em produção, configure proxies confiáveis explicitamente.
 
 - `development`: `.env` local, Swagger disponível.
 - `test`: testes usam `TEST_DATABASE_URL`, segredo exclusivo de teste e um schema
@@ -201,11 +319,15 @@ permissão do time. Usuários externos recebem 404 para times aos quais não per
 - `production`: configurar `APP_ENV=production`, URLs e segredo via variáveis de
   ambiente, banco com usuário de privilégio mínimo e TLS conforme o provedor;
   HTTPS na publicação. CORS exige origens HTTPS; Swagger/OpenAPI públicos são desativados.
-  Nunca usar o usuário de bootstrap local em produção.
+  Nunca usar o usuário de bootstrap local em produção. Configure `EXPO_PUBLIC_API_URL`
+  com HTTPS e mantenha frontend/API no mesmo site para o cookie SameSite.
 
 As escolhas seguem as bases documentadas do [Expo SDK 55](https://expo.dev/changelog/sdk-55),
 do [FastAPI para hashing e JWT](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/)
 e do [PostgreSQL no Windows](https://www.postgresql.org/download/windows/).
+Armazenamento e sessão seguem a separação de plataformas do
+[Expo SecureStore](https://docs.expo.dev/versions/latest/sdk/securestore/) e as orientações
+da [OWASP sobre sessões](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
 
 ## Verificações
 
@@ -235,20 +357,22 @@ vínculo, FK de Presidente no commit, isolamento e permissões granulares, limit
 Free/Pro, concorrência na última vaga, validação de contatos, hashing, tokens
 inválidos, autorização HTTP e ciclo de migration com verificação de divergência.
 
-Validação realizada nesta entrega: 23 testes passaram em PostgreSQL 18; Ruff,
+Validação do Prompt 02: 45 testes passaram em PostgreSQL 18, incluindo cadastro por
+telefone/e-mail, duplicidade, códigos, login, cookies/CSRF, refresh, revogação,
+concorrência, rate limit e preservação de dados na migration incremental. Ruff,
 formatação, mypy, ESLint e TypeScript passaram; Expo Doctor passou em 20/20
 verificações; bundles Android/iOS/web foram exportados. A navegação pelas cinco
-abas e o botão da tela inicial foram conferidos em Chromium, em larguras de
-320, 390 e 1440 pixels, sem erros JavaScript. API, readiness e Swagger responderam.
+abas e o fluxo de cadastro → verificação → Home → reabertura → Perfil → logout →
+login foram conferidos em Chromium, sem erros JavaScript. A restauração foi
+testada também com falha de conexão e retry; tokens não apareceram em armazenamento JS.
 A execução nativa em aparelho/simulador Android/iOS ainda não foi validada.
 Resta um aviso de depreciação interno de Starlette/AnyIO nos testes, sem falhas.
 
 ## Próxima etapa
 
-Definir o fluxo de acesso e verificação de e-mail/telefone, incluindo provedor de
-mensagens, recuperação de conta, limitação de tentativas e revogação de sessões,
-antes de expor login ao público. Entregar assets oficiais e validar visualmente
-em Android/iOS reais. Cadastro de time e demais módulos continuam fora deste escopo.
+Definir provedor de verificação para publicação, armazenamento de fotos e futura
+recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
+Cadastro de time e demais módulos continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida
