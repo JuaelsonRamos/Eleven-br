@@ -1,0 +1,33 @@
+import { StyleSheet } from 'react-native';
+import { theme } from '../theme';
+
+export const formationStyles = StyleSheet.create({
+  summary: { gap: 4 },
+  list: { gap: 0 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 60, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
+  identity: { flex: 1, minWidth: 0, gap: 2 },
+  name: { fontFamily: theme.fontFamily, fontSize: 15, lineHeight: 21, color: theme.colors.graphite },
+  meta: { fontFamily: theme.fontFamily, fontSize: 12, lineHeight: 17, color: theme.colors.muted },
+  guest: { color: theme.colors.blue },
+  column: { width: 64, textAlign: 'center', fontFamily: theme.fontFamily, fontSize: 12, color: theme.colors.muted },
+  toggle: { width: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.white },
+  selected: { borderColor: theme.colors.green, backgroundColor: theme.colors.lightGreen },
+  toggleText: { fontSize: 22, color: theme.colors.muted },
+  selectedText: { color: theme.colors.green, fontWeight: '700' },
+  disabled: { opacity: 0.45 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  step: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: theme.colors.green, backgroundColor: theme.colors.white },
+  stepText: { color: theme.colors.green, fontSize: 26, fontWeight: '600' },
+  count: { minWidth: 32, textAlign: 'center', fontFamily: theme.fontFamily, fontSize: 24, fontWeight: '700', color: theme.colors.graphite },
+  preview: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  forecast: { flexGrow: 1, minWidth: 128, padding: 10, borderRadius: 10, backgroundColor: theme.colors.lightGreen },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  card: { padding: 16, borderRadius: theme.radius, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.border },
+  cardHeading: { gap: 3, marginBottom: 8 },
+  player: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, paddingVertical: 4 },
+  keeper: { color: theme.colors.green, fontWeight: '700' },
+  action: { minHeight: 48, minWidth: 56, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: theme.colors.lightGreen },
+  actionText: { color: theme.colors.green, fontFamily: theme.fontFamily, fontSize: 14, fontWeight: '600' },
+  destinations: { paddingVertical: 8, gap: 8 },
+});

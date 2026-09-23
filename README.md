@@ -673,7 +673,7 @@ gera aviso, sem bloquear. Limites técnicos: **2–32 equipes e até 256 partici
 sem permitir mais equipes que participantes. Os limites do elenco continuam 24/100.
 
 Resultado e ajustes persistem. **Mover → Time N** ajusta um participante, sem arrastar;
-ajustes manuais podem deixar quantidades diferentes. **Sortear novamente** permite
+ajustes manuais podem deixar quantidades diferentes. **Refazer sorteio** permite
 revisar a configuração e exige confirmação antes de substituir a formação atual.
 Versão e bloqueio transacional impedem sobrescrever alterações concorrentes sem revisão.
 

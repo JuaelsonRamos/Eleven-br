@@ -184,7 +184,7 @@ def test_browser_formations_flow(engine: Engine) -> None:
                 page.get_by_role("checkbox", name=f"Goleiro: {name}", exact=True).click()
             page.get_by_role("button", name="Mais times", exact=True).click()
             expect(visible_text("Número de times: 3")).to_be_visible()
-            expect(visible_text("Time 1 → 2 participantes")).to_be_visible()
+            expect(visible_text("Time 1 — 2 jogadores")).to_be_visible()
             with page.expect_response(
                 lambda r: r.request.method == "POST" and r.url.endswith("/formation/draw")
             ) as result:
@@ -222,7 +222,7 @@ def test_browser_formations_flow(engine: Engine) -> None:
             open_formation()
             expect(visible_text("Times da pelada")).to_be_visible()
             assert stored()["formation"] == moved
-            page.get_by_role("button", name="Sortear novamente", exact=True).click()
+            page.get_by_role("button", name="Refazer sorteio", exact=True).click()
             page.get_by_role("button", name="Sortear", exact=True).click()
             expect(
                 visible_text(
@@ -232,7 +232,7 @@ def test_browser_formations_flow(engine: Engine) -> None:
             assert len(writes) == 1
             page.get_by_role("button", name="Manter sorteio atual", exact=True).click()
             assert stored()["formation"] == moved
-            page.get_by_role("button", name="Sortear novamente", exact=True).click()
+            page.get_by_role("button", name="Refazer sorteio", exact=True).click()
             page.get_by_role("button", name="Sortear", exact=True).click()
             page.get_by_role("button", name="Confirmar novo sorteio", exact=True).click()
             expect(visible_text("Times da pelada")).to_be_visible()
@@ -259,17 +259,161 @@ def test_browser_formations_flow(engine: Engine) -> None:
             expect(
                 visible_text("A lista de participantes mudou desde o último sorteio.")
             ).to_be_visible()
-            expect(visible_text("Bruno • Convidado")).to_be_visible()
+            expect(page.get_by_role("button", name="Mover Bruno", exact=True)).to_be_visible()
             assert stored()["formation"] == stable
+            # Exercise compact controls and actual API results at mobile/desktop widths.
+            for total, teams_count, goalkeeper_count in [
+                (2, 2, 0),
+                (12, 2, 2),
+                (13, 3, 1),
+                (13, 4, 0),
+            ]:
+                title = f"Visual {total} participantes {teams_count} times"
+                with httpx.Client(base_url=f"http://127.0.0.1:{port}") as api:
+                    scenario = api.post(
+                        f"/v1/teams/{team['id']}/events",
+                        headers=owner,
+                        json={
+                            "modality": "society",
+                            "kind": "PELADA",
+                            "title": title,
+                            "date": "2026-09-27",
+                            "time": "08:00",
+                            "location": "Campo do teste visual",
+                        },
+                    ).json()
+                    scenario_path = f"/v1/teams/{team['id']}/events/{scenario['id']}"
+                    for headers in [owner, member]:
+                        assert (
+                            api.put(
+                                scenario_path + "/attendance",
+                                headers=headers,
+                                json={"response": "VOU"},
+                            ).status_code
+                            == 200
+                        )
+                    for index in range(total - 2):
+                        assert (
+                            api.post(
+                                scenario_path + "/guests",
+                                headers=owner,
+                                json={"name": f"Convidado visual {index + 1}"},
+                            ).status_code
+                            == 201
+                        )
+                page.get_by_role("tab", name="Início", exact=True).click()
+                page.get_by_role("tab", name="Jogos", exact=True).click()
+                page.get_by_role("button", name=f"Abrir {title} • 27/09/2026", exact=True).click()
+                page.get_by_role("button", name="Montar times", exact=True).click()
+                expect(visible_text(f"Participantes — {total}")).to_be_visible()
+                page.set_viewport_size({"width": 320, "height": 844})
+                rows = page.get_by_test_id("formation-candidate")
+                expect(rows).to_have_count(total)
+                for row in rows.all():
+                    boxes = [row.get_by_role("checkbox").nth(i).bounding_box() for i in range(2)]
+                    assert all(
+                        b
+                        and b["width"] >= 48
+                        and b["height"] >= 48
+                        and b["x"] >= 0
+                        and b["x"] + b["width"] <= 320
+                        for b in boxes
+                    )
+                    assert abs(boxes[0]["y"] - boxes[1]["y"]) < 1
+                for name in ["Presidente dos eventos", "Jogador dos eventos"][:goalkeeper_count]:
+                    page.get_by_role("checkbox", name=f"Goleiro: {name}", exact=True).click()
+                keeper_text = "goleiro" if goalkeeper_count == 1 else "goleiros"
+                expect(
+                    visible_text(
+                        f"{goalkeeper_count} {keeper_text} • "
+                        f"{total - goalkeeper_count} jogadores de linha"
+                    )
+                ).to_be_visible()
+                if total == 12:
+                    # Removing a goalkeeper updates counters, without losing the saved choice.
+                    toggle = page.get_by_role(
+                        "checkbox", name="Participa: Presidente dos eventos", exact=True
+                    )
+                    toggle.click()
+                    expect(visible_text("1 goleiro • 10 jogadores de linha")).to_be_visible()
+                    toggle.click()
+                    expect(visible_text("2 goleiros • 10 jogadores de linha")).to_be_visible()
+                    page.screenshot(
+                        path=str(artifacts / "formation-preparation-320.png"), animations="disabled"
+                    )
+                for _ in range(teams_count - 2):
+                    page.get_by_role("button", name="Mais times", exact=True).click()
+                for index in range(teams_count):
+                    size = total // teams_count + (index < total % teams_count)
+                    expect(
+                        visible_text(
+                            f"Time {index + 1} — {size} "
+                            + ("jogador" if size == 1 else "jogadores")
+                        )
+                    ).to_be_visible()
+                with page.expect_response(
+                    lambda r: r.request.method == "POST" and r.url.endswith("/formation/draw")
+                ) as drawn:
+                    page.get_by_role("button", name="Sortear", exact=True).click()
+                assert drawn.value.status == 200
+                squads = drawn.value.json()["formation"]["squads"]
+                assert [len(s["participants"]) for s in squads] == [
+                    total // teams_count + (i < total % teams_count) for i in range(teams_count)
+                ]
+                assert (
+                    sum(p["goalkeeper"] for s in squads for p in s["participants"])
+                    == goalkeeper_count
+                )
+                expect(visible_text("Times da pelada")).to_be_visible()
+                first_card = page.get_by_test_id("formation-squad-1")
+                second_card = page.get_by_test_id("formation-squad-2")
+                a, b = first_card.bounding_box(), second_card.bounding_box()
+                assert b["y"] >= a["y"] + a["height"]
+                assert a["x"] >= 0 and a["x"] + a["width"] <= 320
+                if total == 12:
+                    page.screenshot(
+                        path=str(artifacts / "formation-result-320.png"), animations="disabled"
+                    )
+                    page.set_viewport_size({"width": 1280, "height": 900})
+                    page.wait_for_function("""() => {
+                        const a=document.querySelector('[data-testid="formation-squad-1"]')
+                            ?.getBoundingClientRect();
+                        const b=document.querySelector('[data-testid="formation-squad-2"]')
+                            ?.getBoundingClientRect();
+                        return a && b && Math.abs(a.y-b.y)<1 && b.x>a.x;
+                    }""")
+                    page.screenshot(
+                        path=str(artifacts / "formation-result-desktop.png"), animations="disabled"
+                    )
+                    page.set_viewport_size({"width": 390, "height": 844})
+                    page.wait_for_function("""() => {
+                        const a=document.querySelector('[data-testid="formation-squad-1"]')
+                            ?.getBoundingClientRect();
+                        const b=document.querySelector('[data-testid="formation-squad-2"]')
+                            ?.getBoundingClientRect();
+                        return a && b && b.y>=a.bottom;
+                    }""")
+                current_squad = next(
+                    s
+                    for s in squads
+                    if any(p["name"] == "Presidente dos eventos" for p in s["participants"])
+                )
+                page.get_by_role("button", name="Mover Presidente dos eventos", exact=True).click()
+                expect(
+                    page.get_by_role(
+                        "button", name=f"Mover para {current_squad['name']}", exact=True
+                    )
+                ).to_have_count(0)
+                expect(
+                    page.get_by_role("button", name="Mover para Time", exact=False)
+                ).to_have_count(teams_count - 1)
             page.get_by_role("tab", name="Mais", exact=True).click()
             page.get_by_role("button", name="Perfil", exact=True).click()
             page.get_by_role("button", name="Sair da conta", exact=True).click()
             login("member-events@example.com")
             open_formation("Ver times da pelada")
             expect(visible_text("Times da pelada")).to_be_visible()
-            expect(page.get_by_role("button", name="Sortear novamente", exact=True)).to_have_count(
-                0
-            )
+            expect(page.get_by_role("button", name="Refazer sorteio", exact=True)).to_have_count(0)
             expect(page.get_by_role("button", name="Mover Bruno", exact=True)).to_have_count(0)
             assert not errors, errors
             context.unroute_all(behavior="wait")
