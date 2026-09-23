@@ -4,7 +4,7 @@
 
 O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
 perfil inicial, gestão básica de times, elenco e eventos com confirmação de presença.
-As cinco abas ficam na área autenticada. Não inclui placar, estatísticas, financeiro ou cobrança.
+As áreas pessoais e do time ficam na área autenticada. Não inclui placar, estatísticas, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -20,7 +20,7 @@ apps/
   mobile/
     src/components/      # Componentes acessíveis e reutilizáveis
     src/auth/            # Cliente da API, sessão e armazenamento por plataforma
-    src/screens/         # Entrada, cadastro, verificação, login e cinco abas
+    src/screens/         # Conta, áreas pessoais e navegação do time
     assets/              # Local reservado para assets oficiais
 packages/shared/         # Identidade visual e vocabulário TypeScript
 scripts/                 # PostgreSQL local isolado no Windows
@@ -295,9 +295,10 @@ Para testar, inicie PostgreSQL, aplique `alembic upgrade head`, inicie API e exe
 4. Em **Perfil**, confira nome/contato e clique em **Sair da conta**.
 5. Na tela de login, entre novamente com o mesmo contato e senha.
 
-Foto é opcional: a interface usa avatar e permite continuar sem upload. O campo
-`Player.photo_url` está preparado, mas não há endpoint para gravar URLs arbitrárias
-ou arquivos; armazenamento de fotos será definido em tarefa posterior.
+Foto é opcional. Em Perfil, selecione, confira a prévia e salve; é possível
+substituir ou remover. Sem foto, o avatar padrão permanece. O campo `Player.photo_url`
+existente guarda somente a referência da imagem processada, nunca URLs arbitrárias
+enviadas no JSON. Consulte a seção de imagens abaixo.
 
 ### Proteção contra abuso e ambientes
 
@@ -372,7 +373,7 @@ Resta um aviso de depreciação interno de Starlette/AnyIO nos testes, sem falha
 
 ## Times — Prompt 03
 
-Em **Times**, crie um time com nome, cidade, UF e uma ou mais modalidades (Campo,
+Em **Meus Times**, crie um time com nome, cidade, UF e uma ou mais modalidades (Campo,
 Society / Fut7 e Futsal), inclusive no Free. O criador usa seu Player existente e recebe exatamente
 um vínculo ativo, referenciado como Presidente. Time e vínculo são criados na
 mesma transação. Todo novo time começa Free; nenhum campo do formulário altera
@@ -429,8 +430,8 @@ mais, a seleção passa ao primeiro time autorizado (ordem nome/UUID), ou fica v
 Falhas de rede mostram erro/retry sem apresentar dados antigos como autorizados.
 Trocar de conta recria o contexto e não reaproveita dados da conta anterior.
 
-O campo `crest_url` foi preservado. Upload de escudo continua pendente de uma
-solução de armazenamento; Free pode ter escudo e a criação funciona sem imagem.
+O campo `crest_url` foi preservado e recebe o escudo opcional enviado pelo formulário.
+Free pode ter escudo e a criação funciona sem imagem.
 Não há transferência de Presidência, exclusão, convites ou cobrança.
 
 ### Teste manual de times
@@ -445,7 +446,7 @@ uv run uvicorn app.main:app --reload --no-proxy-headers --port 8011
 Na raiz, execute `npm.cmd run mobile:web` e abra `http://localhost:8081`.
 Swagger: `http://127.0.0.1:8011/docs`.
 
-1. Entre com sua conta e abra **Times → Criar time**.
+1. Entre com sua conta e abra **Mais → Meus Times / Trocar time → Criar time**.
 2. Informe Tabajara e sua cidade; abra UF, pesquise `Esp` ou `ES` e selecione
    Espírito Santo (ES). Marque Society / Fut7 e Futsal; salve.
 3. Confira Presidente, Free e código; edite o nome e confirme que o código permanece.
@@ -482,11 +483,11 @@ de depreciação Starlette/AnyIO no pytest.
 
 ## Elenco — Prompt 04
 
-Acesse **Times → abrir time → Elenco**, ou **Elenco** na Home do time selecionado.
+Acesse **Elenco** na barra inferior ou na Home do time selecionado.
 A lista tem filtros Ativos/Inativos/Todos (padrão Ativos), contagem e situação da
 conta. Presidente aparece pelo vínculo já existente, sem duplicação. Cadastro
 manual exige apenas nome; apelido, telefone e e-mail são opcionais. Foto usa avatar
-ou o campo existente; upload continua pendente. Há edição, confirmação de
+ou a imagem que o próprio jogador enviou no Perfil. Há edição, confirmação de
 inativação e reativação sem apagar registros nem criar novo vínculo.
 
 `0004_roster_management` torna `Player.user_id` opcional e adiciona nome local,
@@ -534,8 +535,8 @@ uv run --with playwright pytest tests/browser_roster_flow.py tests/browser_team_
 O upgrade preserva Tabajara FC, contas, sessões, modalidades, códigos e vínculos.
 Upgrade/downgrade/upgrade é testado no banco isolado; downgrade com dados novos de
 elenco é recusado para não descartar Players sem conta ou informações do vínculo.
-Pendentes: convites/vinculação por aprovação e armazenamento de fotos, sem fluxos
-antecipados. Execução nativa em aparelhos ainda exige validação manual.
+Pendentes: convites/vinculação por aprovação, sem fluxos antecipados.
+Execução nativa em aparelhos ainda exige validação manual.
 
 Validação do Prompt 04: 88 testes backend, ciclos de migration e dois fluxos
 Chromium aprovados (times e elenco). Ruff, formatação, mypy, ESLint e TypeScript
@@ -587,9 +588,80 @@ elenco e eventos). Ruff, formatação, mypy, ESLint e TypeScript passaram; Expo 
 20/20 e exportações Web/Android/iOS concluídas. A aplicação da `0005` comparou todas
 as linhas anteriores e preservou o Tabajara FC. Validação em aparelhos físicos permanece pendente.
 
+## Navegação e contexto do time
+
+**Meus Times → Abrir time → Início do time**. O Início mostra escudo, nome,
+cidade/UF, plano e atalhos para Jogos, Elenco e Perfil do time, além de **Trocar time**.
+Com time selecionado, a barra inferior contém **Início | Jogos | Elenco | Mais**.
+**Mais** reúne Meus Times/Trocar time, Notificações e Perfil pessoal. Sem time,
+as abas pessoais dão acesso à criação; convites/entrada em novos times seguem fora do escopo.
+
+Jogos, detalhes/formulário de evento e todas as telas de Elenco mantêm cabeçalho
+compacto do time. Nenhum formulário pede nova seleção: o `team_id` vem exclusivamente
+do `TeamContext` já existente. Ao trocar time, os painéis são remontados, descartando
+rascunhos e resultados do contexto anterior. A persistência e revalidação por User
+continuam iguais, e a API continua validando vínculo, permissão e isolamento.
+Nenhuma migration ou alteração de regra de negócio foi necessária.
+
+Para validar: abra Tabajara FC, confira Início/Jogos/Elenco, use Trocar time,
+confira os dados do segundo time e recarregue. Os testes de navegador usam somente
+banco isolado e cobrem troca, persistência, formulários e seleção manipulada.
+Não há módulos futuros exibidos como funcionalidades disponíveis.
+
+## Foto de perfil e escudo
+
+Em **Perfil → Alterar foto**, selecione a imagem, confira a prévia e clique em
+**Salvar foto**. Substituição e remoção também exigem salvar. Foto aparece no Perfil,
+cabeçalho pessoal e perfil do jogador no elenco, usando o componente `Avatar`.
+Em **Meus Times → Criar time** ou **Início → Perfil do time → Editar time**, selecione um escudo opcional e salve o time.
+`TeamBadge` preserva a proporção e é reutilizado no perfil, lista e Home do time.
+Se o time for salvo mas o upload falhar, o formulário permite repetir o envio ou
+continuar sem alterar o escudo; não cria um segundo time. O escudo é reutilizado na navegação do time.
+
+São aceitos **JPEG/JPG, PNG e WebP estáticos**, até **5 MB** e **20 megapixels**.
+O backend decodifica o conteúdo real, sem confiar na extensão/MIME do cliente,
+corrige orientação EXIF, remove metadados e limita o lado maior a **512 pixels**,
+sem ampliar imagens menores. Saída JPEG qualidade 85; PNG quando há transparência.
+Multipart tem limite de corpo inclusive para envio sem `Content-Length`.
+
+Os campos existentes `Player.photo_url` e `Team.crest_url` guardam referências
+relativas `/v1/media/{identificador}.jpg|png`. **Não foi necessária migration 0006**;
+`0001`–`0005` permanecem intactas. Arquivos não ficam em Base64 no PostgreSQL.
+`ImageStorage` é a interface de armazenamento; `LocalImageStorage` usa
+**`.local/media` na raiz**, ignorada pelo Git. `MEDIA_ROOT` aceita caminho absoluto
+ou relativo à raiz e pode apontar para um volume persistente. O adaptador pode ser
+substituído por object storage sem mudar as regras de autorização/substituição.
+
+Arquivos recebem UUID, sem reaproveitar nome do upload. Só imagens processadas e
+ainda referenciadas são servidas, por URL aleatória pública; não há listagem ou
+exposição dos diretórios internos. Substituição grava o novo arquivo antes do commit
+e remove o anterior depois; falha de banco remove o novo. Falha na exclusão gera log
+e deixa um órfão inacessível pela API, sem quebrar a imagem atual. Produção precisa
+de armazenamento durável/backup e rotina de limpeza de órfãos após falhas/interrupções,
+ou adaptador object storage; o adaptador cloud não foi implementado nesta etapa.
+
+| Método | Endpoint | Ação |
+| --- | --- | --- |
+| POST | `/v1/me/photo` | Envia/substitui a própria foto; multipart com campo `file` |
+| POST | `/v1/me/photo/remove` | Remove a própria foto |
+| POST | `/v1/teams/{team_id}/crest` | Envia/substitui escudo; multipart com campo `file` |
+| POST | `/v1/teams/{team_id}/crest/remove` | Remove escudo |
+| GET | `/v1/media/{key}` | Retorna apenas imagem processada ainda referenciada |
+
+Escritas exigem sessão válida. Foto identifica Player pelo User autenticado, sem
+ID de destino no payload. Escudo exige vínculo ativo e `manage_team`; no Free,
+somente Presidente. As policies e limites anteriores não mudaram.
+
+Seleção usa [Expo ImagePicker SDK 55](https://docs.expo.dev/versions/v55.0.0/sdk/imagepicker/);
+processamento usa [Pillow](https://pillow.readthedocs.io/en/stable/reference/Image.html).
+O app nativo usa a biblioteca de fotos, sem solicitar câmera ou microfone.
+Após instalar dependências atualizadas, inicie os comandos usuais na porta 8011/8081.
+Teste isolado de navegador (API/banco `_test` e arquivos temporários próprios):
+`uv run --with playwright pytest tests/browser_images_flow.py -q -s`, em `apps/api`.
+
 ## Próxima etapa
 
-Definir provedor de verificação para publicação, armazenamento de fotos e futura
+Definir provedor de verificação para publicação, armazenamento durável de imagens e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
 Convites para contas, placar, financeiro e assinaturas continuam fora deste escopo.
 

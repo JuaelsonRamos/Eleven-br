@@ -19,7 +19,8 @@
     },
     "plugins": [
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      ["expo-image-picker", { "photosPermission": "Permitir que o ELEVEN BR selecione sua foto ou escudo.", "cameraPermission": false, "microphonePermission": false }]
     ]
   }
 }

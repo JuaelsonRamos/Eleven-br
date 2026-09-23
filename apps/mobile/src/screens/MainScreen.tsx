@@ -8,13 +8,7 @@ import { useTeams } from '../teams/TeamContext';
 import { TeamSummary } from '../teams/TeamSummary';
 import { theme } from '../theme';
 import type { TabParams } from '../navigation';
-
-const content = {
-  Jogos: { title: 'O próximo encontro começa aqui', description: 'Seus jogos aparecerão neste espaço. A organização de partidas estará disponível em uma próxima etapa.', icon: 'football-outline' },
-  Times: { title: 'Um espaço para o seu time', description: 'Aqui você poderá acompanhar os times dos quais participa. O cadastro de times estará disponível em breve.', icon: 'shield-outline' },
-  Notificações: { title: 'Tudo em dia por aqui', description: 'Quando as notificações estiverem disponíveis, você encontrará os avisos dos seus times neste espaço.', icon: 'notifications-outline' },
-  Perfil: { title: 'Sua identidade dentro de campo', description: 'Seu perfil esportivo terá seu próprio espaço. O acesso à conta será disponibilizado em uma próxima etapa.', icon: 'person-outline' },
-} as const;
+import { TextAction } from '../components/AuthLayout';
 
 export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams>) {
   const name = route.name;
@@ -25,7 +19,7 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
       <View style={styles.container}>
         <AppHeader />
         <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.pageTitle}>{name}</Text>
+          <Text accessibilityRole="header" style={styles.pageTitle}>{name === 'Início' && selected ? 'Início do time' : name}</Text>
           <Text style={styles.pageDescription}>{name === 'Início' ? 'Mais futebol. Menos burocracia.' : 'Seu futebol, mais organizado.'}</Text>
         </View>
         {name === 'Início' ? <>
@@ -39,10 +33,11 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
             <View style={{ gap: 16 }}>
               <Badge label="TIME SELECIONADO" />
               <TeamSummary team={selected} />
-              <Text style={styles.pageDescription}>A estrutura do seu time está pronta. Seu futebol começa aqui.</Text>
+              <TextAction label="Trocar time" onPress={() => navigation.navigate('Times', { view: 'list' })} />
               <Text style={styles.pageDescription}>{selected.active_player_count} jogadores ativos</Text>
-              <Button label="Elenco" onPress={() => navigation.navigate('Times', { rosterFor: selected.id })} />
-              <Button label="Ver meus times" onPress={() => navigation.navigate('Times')} />
+              <Button label="Jogos" onPress={() => navigation.navigate('Jogos')} />
+              <Button label="Elenco" onPress={() => navigation.navigate('Elenco')} />
+              <TextAction label="Perfil do time" onPress={() => navigation.navigate('Times', { view: 'detail' })} />
             </View>
           </Card> : <Card>
             <Badge label="BEM-VINDO AO ELEVEN BR" />
@@ -50,7 +45,7 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
               <Button label="Conhecer a área de times" onPress={() => navigation.navigate('Times')} />
             </EmptyState>
           </Card>}
-        </> : <Card><EmptyState {...content[name]} /></Card>}
+        </> : <Card><EmptyState title="Tudo em dia por aqui" description="Quando as notificações estiverem disponíveis, você encontrará os avisos dos seus times neste espaço." icon="notifications-outline" /></Card>}
         <Text style={styles.footer}>ELEVEN BR · Feito para o nosso futebol</Text>
       </View>
     </ScrollView>

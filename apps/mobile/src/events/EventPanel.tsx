@@ -64,7 +64,6 @@ export function EventPanel({ team }: { team: Team }) {
     onCancel={back} onDenied={back} onDone={saved => { setEvent(saved); setMode('detail'); setSuccess('Evento salvo.'); }} />;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.title}>{mode === 'detail' && event ? event.title : 'Jogos'}</Text>
-    <Text style={styles.note}>{team.name}</Text>
     <FormError message={error} />
     {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
     {!page && <Button label="Tentar novamente" onPress={() => void load()} />}

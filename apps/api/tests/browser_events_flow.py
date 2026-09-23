@@ -302,7 +302,80 @@ def test_browser_events_flow(engine: Engine) -> None:
             ).to_be_visible()
             page.set_viewport_size({"width": 1280, "height": 900})
             page.screenshot(path=str(artifacts / "events-desktop.png"), animations="disabled")
-            page.get_by_role("tab", name="Perfil", exact=True).click()
+            # The same session switches team context; no form asks for a team ID.
+            with httpx.Client(base_url=f"http://127.0.0.1:{port}") as api:
+                second = api.post(
+                    "/v1/teams",
+                    headers=owner,
+                    json={
+                        "name": "Segundo time",
+                        "city": "Serra",
+                        "state": "ES",
+                        "modalities": ["society"],
+                    },
+                ).json()
+                player = api.post(
+                    f"/v1/teams/{second['id']}/players",
+                    headers=owner,
+                    json={"name": "Jogador exclusivo do segundo"},
+                )
+                assert player.status_code == 201, player.text
+            page.get_by_role("tab", name="Início", exact=True).click()
+            expect(visible_text("Tabajara FC")).to_be_visible()
+            expect(page.get_by_role("tab")).to_have_count(4)
+            page.get_by_role("button", name="Elenco", exact=True).click()
+            expect(visible_text("Tabajara FC")).to_be_visible()
+            expect(visible_text("Jogador dos eventos")).to_be_visible()
+            expect(visible_text("Jogador exclusivo do segundo")).not_to_be_visible()
+            page.get_by_role("tab", name="Jogos", exact=True).click()
+            page.get_by_role("button", name="Criar evento", exact=True).click()
+            expect(visible_text("Tabajara FC")).to_be_visible()
+            page.get_by_label("Título do evento", exact=True).fill("Rascunho do Tabajara")
+            page.get_by_role("tab", name="Início", exact=True).click()
+            page.get_by_role("button", name="Trocar time", exact=True).click()
+            page.get_by_role("button", name="Abrir Segundo time", exact=True).click()
+            expect(visible_text("Segundo time")).to_be_visible()
+            expect(visible_text("Tabajara FC")).not_to_be_visible()
+            page.get_by_role("tab", name="Elenco", exact=True).click()
+            expect(visible_text("Jogador exclusivo do segundo")).to_be_visible()
+            expect(visible_text("Jogador dos eventos")).not_to_be_visible()
+            page.get_by_role("button", name="Adicionar jogador", exact=True).click()
+            expect(visible_text("Segundo time")).to_be_visible()
+            page.get_by_role("tab", name="Jogos", exact=True).click()
+            expect(visible_text("Segundo time")).to_be_visible()
+            expect(page.get_by_role("button", name="Abrir Amistoso", exact=False)).to_have_count(0)
+            page.get_by_role("button", name="Criar evento", exact=True).click()
+            expect(page.get_by_label("Título do evento", exact=True)).to_have_value("")
+            page.get_by_label("Título do evento", exact=True).fill("Jogo do segundo")
+            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("30/09/2026")
+            page.get_by_label("Horário (HH:MM)", exact=True).fill("09:00")
+            page.get_by_label("Local", exact=True).fill("Quadra do segundo")
+            with page.expect_response(
+                lambda response: (
+                    response.request.method == "POST"
+                    and urlsplit(response.url).path == f"/v1/teams/{second['id']}/events"
+                )
+            ) as saved:
+                page.get_by_role("button", name="Salvar evento", exact=True).click()
+            assert saved.value.status == 201
+            assert saved.value.json()["team_id"] == second["id"]
+            page.reload(wait_until="domcontentloaded")
+            expect(visible_text("Segundo time")).to_be_visible()
+            page.get_by_role("tab", name="Jogos", exact=True).click()
+            expect(
+                page.get_by_role("button", name="Abrir Jogo do segundo", exact=False)
+            ).to_be_visible()
+            page.get_by_role("tab", name="Início", exact=True).click()
+            page.get_by_role("button", name="Trocar time", exact=True).click()
+            page.get_by_role("button", name="Abrir Tabajara FC", exact=True).click()
+            expect(visible_text("Tabajara FC")).to_be_visible()
+            page.get_by_role("tab", name="Jogos", exact=True).click()
+            expect(page.get_by_role("button", name="Abrir Amistoso", exact=False)).to_be_visible()
+            expect(
+                page.get_by_role("button", name="Abrir Jogo do segundo", exact=False)
+            ).to_have_count(0)
+            page.get_by_role("tab", name="Mais", exact=True).click()
+            page.get_by_role("button", name="Perfil", exact=True).click()
             page.get_by_role("button", name="Sair da conta", exact=True).click()
             login("member-events@example.com")
             page.get_by_role(

@@ -11,20 +11,28 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AuthScreens } from './screens/AuthScreens';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { TeamsScreen } from './screens/TeamsScreen';
-import { TeamProvider } from './teams/TeamContext';
+import { TeamProvider, useTeams } from './teams/TeamContext';
 import { GamesScreen } from './screens/GamesScreen';
+import { RosterScreen } from './screens/RosterScreen';
+import { MoreScreen } from './screens/MoreScreen';
 
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
   Início: 'home-outline', Jogos: 'football-outline', Times: 'shield-outline',
   Notificações: 'notifications-outline', Perfil: 'person-outline',
+  Elenco: 'people-outline', Mais: 'menu-outline',
 };
 
 function MainNavigation() {
   const insets = useSafeAreaInsets();
-  return <Tab.Navigator screenOptions={({ route }) => ({
+  const { teams } = useTeams();
+  // Keep routes mounted during selection revalidation; operational screens gate data themselves.
+  const visible: MainTab[] = teams.length ? ['Início', 'Jogos', 'Elenco', 'Mais'] : ['Times', 'Notificações', 'Perfil'];
+  return <Tab.Navigator backBehavior="history" screenOptions={({ route }) => ({
     headerShown: false,
-    tabBarAccessibilityLabel: route.name,
+    tabBarAccessibilityLabel: route.name === 'Times' ? 'Meus Times' : route.name,
+    tabBarLabel: route.name === 'Times' ? 'Meus Times' : route.name,
+    ...(!visible.includes(route.name) ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' as const } } : {}),
     tabBarActiveTintColor: theme.colors.green,
     tabBarInactiveTintColor: theme.colors.muted,
     tabBarLabelPosition: 'below-icon',
@@ -32,7 +40,7 @@ function MainNavigation() {
     tabBarStyle: { height: 66 + insets.bottom, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), borderTopColor: theme.colors.border },
     tabBarIcon: ({ color, size }) => <Ionicons name={icons[route.name]} color={color} size={size} />,
   })}>
-    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : name === 'Jogos' ? GamesScreen : MainScreen} />)}
+    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : name === 'Jogos' ? GamesScreen : name === 'Elenco' ? RosterScreen : name === 'Mais' ? MoreScreen : MainScreen} />)}
   </Tab.Navigator>;
 }
 

@@ -27,14 +27,15 @@ export class ApiError extends Error {
 export function setExpiryHandler(handler: () => void) { onExpired = handler; }
 
 async function request<T>(path: string, body?: unknown, token?: string | null, method = 'POST'): Promise<T> {
+  const multipart = body instanceof FormData;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), multipart ? 60000 : 15000);
   try {
     const response = await fetch(`${API_URL}${path}`, {
       method, signal: controller.signal, credentials: web ? 'include' : 'omit',
-      headers: { 'Content-Type': 'application/json', 'X-Eleven-Client': web ? 'web' : 'native',
+      headers: { ...(!multipart ? { 'Content-Type': 'application/json' } : {}), 'X-Eleven-Client': web ? 'web' : 'native',
         ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body === undefined ? {} : { body: multipart ? body : JSON.stringify(body) }),
     });
     const data = response.status === 204 ? null : await response.json();
     if (!response.ok) {

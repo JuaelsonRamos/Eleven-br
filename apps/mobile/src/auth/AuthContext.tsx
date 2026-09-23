@@ -7,6 +7,7 @@ type AuthState = {
   restore: () => Promise<void>; finish: (result: api.AuthResult) => Promise<void>;
   setTicket: (ticket: api.Verification | null) => void; signOut: () => Promise<void>;
   complete: (name: string) => Promise<void>;
+  updateProfile: (updated: api.Profile) => void;
 };
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -45,8 +46,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setStartAtLogin(true); setProfile(null); setTicket(null); setBootError(null);
   }
   async function complete(name: string) { setProfile(await api.saveProfile(name)); }
+  function updateProfile(updated: api.Profile) { setProfile(current => current?.user_id === updated.user_id ? updated : current); }
 
-  return <AuthContext.Provider value={{ profile, ticket, booting, bootError, startAtLogin, restore, finish, setTicket, signOut, complete }}>
+  return <AuthContext.Provider value={{ profile, ticket, booting, bootError, startAtLogin, restore, finish, setTicket, signOut, complete, updateProfile }}>
     {children}
   </AuthContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Badge, TeamBadge } from '../components/ui';
 import { theme } from '../theme';
 import { modalityLabels, roles, type Team } from './api';
@@ -7,7 +7,7 @@ import { useTeams } from './TeamContext';
 export function TeamSummary({ team, detail = false }: { team: Team; detail?: boolean }) {
   const { options } = useTeams();
   return <View style={styles.summary}>
-    {team.crest_url ? <Image source={{ uri: team.crest_url }} accessibilityLabel={`Escudo de ${team.name}`} style={styles.crest} /> : <TeamBadge name={team.name} />}
+    <TeamBadge name={team.name} crestUrl={team.crest_url} />
     <Text accessibilityRole="header" style={styles.title}>{team.name}</Text>
     <Text style={styles.text}>{team.city} · {team.state}</Text>
     <Text style={styles.text}>{modalityLabels(team.modalities, options.modalities)}</Text>

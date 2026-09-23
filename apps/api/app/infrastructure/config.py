@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     jwt_audience: str = "eleven-mobile"
     cors_origins: list[str] = []
     dev_verification_codes: bool = False
+    media_root: Path = ROOT / ".local" / "media"
+
+    @field_validator("media_root")
+    @classmethod
+    def resolve_media_root(cls, value: Path) -> Path:
+        return value if value.is_absolute() else ROOT / value
 
     @model_validator(mode="after")
     def secure_configuration(self) -> Self:

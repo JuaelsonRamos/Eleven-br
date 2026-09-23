@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Image, Pressable, Text, View } from 'react-native';
+import { BackHandler, Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Avatar, Badge, Button, Card, EmptyState, LoadingState } from '../components/ui';
 import { FormError, TextAction } from '../components/AuthLayout';
@@ -63,7 +63,6 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
   const full = page ? page.active_count >= page.active_limit : false;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.heading}>Elenco</Text>
-    <Text style={styles.label}>{team.name}</Text>
     {loading ? <LoadingState /> : <>
       <FormError message={error} />
       {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
@@ -112,7 +111,7 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
 function PersonSummary({ player }: { player: RosterPerson }) {
   return <View style={styles.stack}>
     <View style={styles.row}>
-      {player.photo_url ? <Image source={{ uri: player.photo_url }} style={styles.photo} accessibilityLabel={`Foto de ${player.name}`} /> : <Avatar name={player.name} />}
+      <Avatar name={player.name} photoUrl={player.photo_url} />
       <Text style={styles.label}>{player.name}</Text>
     </View>
     <View style={styles.row}><Badge label={player.status === 'active' ? 'Ativo' : 'Inativo'} />{player.is_president && <Badge label="Presidente" />}</View>

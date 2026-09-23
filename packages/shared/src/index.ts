@@ -1,6 +1,6 @@
 /** Public vocabulary only. Authorization and plan limits are enforced by the API. */
 export type TeamPlan = 'free' | 'pro';
-export type MainTab = 'Início' | 'Jogos' | 'Times' | 'Notificações' | 'Perfil';
+export type MainTab = 'Início' | 'Jogos' | 'Elenco' | 'Mais' | 'Times' | 'Notificações' | 'Perfil';
 
 export const brand = {
   name: 'ELEVEN BR',

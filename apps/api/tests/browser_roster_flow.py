@@ -129,7 +129,8 @@ def test_browser_roster_flow(engine: Engine) -> None:
                 page.get_by_label("Telefone ou e-mail", exact=True).fill(email)
                 page.get_by_label("Senha", exact=True).fill("roster-test-123")
                 page.get_by_role("button", name="Entrar", exact=True).click()
-                page.get_by_role("tab", name="Times", exact=True).click()
+                page.get_by_role("tab", name="Mais", exact=True).click()
+                page.get_by_role("button", name="Meus Times / Trocar time", exact=True).click()
                 page.get_by_role("button", name="Abrir Tabajara FC", exact=True).click()
                 page.get_by_role("button", name="Elenco", exact=True).click()
 
@@ -203,7 +204,8 @@ def test_browser_roster_flow(engine: Engine) -> None:
             expect(
                 page.get_by_role("button", name="Adicionar jogador", exact=True)
             ).to_be_disabled()
-            page.get_by_role("tab", name="Perfil", exact=True).click()
+            page.get_by_role("tab", name="Mais", exact=True).click()
+            page.get_by_role("button", name="Perfil", exact=True).click()
             page.get_by_role("button", name="Sair da conta", exact=True).click()
             login("member-roster@example.com")
             expect(active_text("24 de 24 jogadores ativos · 0 inativos")).to_be_visible()

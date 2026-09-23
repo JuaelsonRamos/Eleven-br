@@ -1,18 +1,21 @@
-import type { PropsWithChildren } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState, type PropsWithChildren } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { brand } from '@eleven/shared';
 import { theme } from '../theme';
+import { imageUrl } from '../images/api';
+import { useAuth } from '../auth/AuthContext';
 
 export function AppHeader() {
+  const { profile } = useAuth();
   return <View style={styles.header}>
     <View>
       <Text accessibilityRole="header" style={styles.brand}>{brand.name}</Text>
       <Text style={styles.slogan}>{brand.slogan}</Text>
     </View>
-    <View accessible accessibilityLabel="Futebol brasileiro" style={styles.headerMark}>
+    {profile?.photo_url ? <Avatar name={profile.display_name || 'Jogador'} photoUrl={profile.photo_url} /> : <View accessible accessibilityLabel="Futebol brasileiro" style={styles.headerMark}>
       <Ionicons name="football-outline" size={26} color={theme.colors.green} />
-    </View>
+    </View>}
   </View>;
 }
 
@@ -60,15 +63,21 @@ export function Badge({ label }: { label: string }) {
   return <View style={styles.badge}><Text style={styles.badgeText}>{label}</Text></View>;
 }
 
-export function Avatar({ name }: { name: string }) {
+export function Avatar({ name, photoUrl, size = 48 }: { name: string; photoUrl?: string | null; size?: number }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (photoUrl && failed !== photoUrl) return <Image source={{ uri: imageUrl(photoUrl) }} accessibilityLabel={`Foto de ${name}`}
+    onError={() => setFailed(photoUrl)} resizeMode="cover" style={{ width: size, height: size, borderRadius: size / 2 }} />;
   const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('');
-  return <View accessible accessibilityLabel={name} style={styles.avatar}>
+  return <View accessible accessibilityLabel={name} style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
     <Text style={styles.initials}>{initials || '?'}</Text>
   </View>;
 }
 
-export function TeamBadge({ name }: { name: string }) {
-  return <View accessible accessibilityLabel={`Escudo de ${name}`} style={styles.icon}>
+export function TeamBadge({ name, crestUrl, size = 64 }: { name: string; crestUrl?: string | null; size?: number }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (crestUrl && failed !== crestUrl) return <Image source={{ uri: imageUrl(crestUrl) }} accessibilityLabel={`Escudo de ${name}`}
+    onError={() => setFailed(crestUrl)} resizeMode="contain" style={{ width: size, height: size, borderRadius: 20 }} />;
+  return <View accessible accessibilityLabel={`Escudo de ${name}`} style={[styles.icon, { width: size, height: size }]}>
     <Ionicons name="shield-outline" size={30} color={theme.colors.green} />
   </View>;
 }

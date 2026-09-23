@@ -6,10 +6,13 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.domain.auth import DeliveryUnavailable, InvalidVerification, RateLimited, Unauthorized
+from app.domain.images import ImageStorageUnavailable, InvalidImage
 from app.domain.policies import Conflict, DomainError, Forbidden, NotFound
 from app.infrastructure.config import get_settings
 from app.presentation.auth_routes import router as auth_router
 from app.presentation.event_routes import router as event_router
+from app.presentation.image_limits import ImageUploadLimit
+from app.presentation.image_routes import router as image_router
 from app.presentation.roster_routes import router as roster_router
 from app.presentation.routes import router
 
@@ -24,6 +27,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/openapi.json" if settings.app_env != "production" else None,
     )
+    app.add_middleware(ImageUploadLimit)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -64,6 +68,8 @@ def create_app() -> FastAPI:
             InvalidVerification: 400,
             RateLimited: 429,
             DeliveryUnavailable: 503,
+            InvalidImage: 422,
+            ImageStorageUnavailable: 503,
         }.get(type(error), 400)
         headers = {"Retry-After": str(error.retry_after)} if isinstance(error, RateLimited) else {}
         return JSONResponse(status_code=status, content={"detail": str(error)}, headers=headers)
@@ -72,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(roster_router)
     app.include_router(event_router)
+    app.include_router(image_router)
     return app
 
 

@@ -20,7 +20,7 @@ de uso não permite simplificar incorretamente regras de negócio.
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
 o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
 e o Prompt 05 (eventos, peladas e presença).
-As cinco abas exigem
+As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
 
@@ -35,7 +35,7 @@ UFs está em `app/domain/team_identity.py`, consumido pelo app via API. `modalit
 O seletor de UF pesquisa os 26 estados e o DF por nome/sigla e envia somente a
 sigla oficial. O backend também valida e normaliza a UF.
 O aviso de semelhança divulga somente identidade pública limitada e não impede
-nomes iguais. Upload de escudo segue pendente, com campo existente e placeholder.
+nomes iguais. Escudo opcional usa o upload de imagens e o campo `Team.crest_url` existente.
 
 `apps/mobile/src/teams` mantém o contexto de time. Persista somente o UUID,
 separado por User; restaure dados pela lista de vínculos ativos da API. Ao perder
@@ -100,6 +100,20 @@ respostas e convidados. Datas/horários são locais da partida; a janela usa a d
 local do servidor. Cancelamento encerra respostas; nenhuma ocorrência é apagada.
 Convidados não criam Player, User ou Membership. Não antecipar sorteio, placar,
 estatísticas, busca de adversários ou financeiro.
+
+Foto própria e escudo usam `Player.photo_url`/`Team.crest_url`, sem migration extra.
+Upload multipart aceita JPEG/PNG/WebP reais, até 5 MB e 20 megapixels, com orientação
+corrigida, metadados removidos e lado máximo 512 px. Só o titular altera sua foto;
+escudo exige `manage_team` pelas policies existentes. Nunca aceitar ID arbitrário
+para alterar foto global. Imagens ficam em `.local/media` (`MEDIA_ROOT` configurável),
+com nomes UUID e referências relativas `/v1/media/...`; nunca Base64 no banco.
+`ImageStorage` separa armazenamento da aplicação. Persistir arquivo novo antes do
+commit e apagar o antigo depois; em rollback remover o novo. Arquivos órfãos não
+são servidos. URLs de mídia são públicas para quem possui a URL aleatória, somente
+enquanto referenciadas, sem listagem de diretórios. Produção precisa de volume
+durável/backup ou adapter object storage e rotina de limpeza para órfãos após falhas.
+`ImageSelector`, `Avatar` e `TeamBadge` são reutilizáveis; preservar navegação atual.
+Na criação do time, falha no escudo permite repetir o envio sem criar outro time.
 
 Um usuário pode participar de vários times, ser jogador em um, administrador em
 outro e Presidente em outro, inclusive Presidente de vários times. Papéis,
@@ -196,9 +210,16 @@ em login público sem implementar o fluxo de autenticação solicitado.
 
 ## Mobile, UX, marca e acessibilidade
 
-As cinco abas aprovadas são **Início, Jogos, Times, Notificações e Perfil**.
-Não adicionar abas inferiores sem decisão explícita do produto. Administração
-fica dentro do contexto do time, conforme as permissões do usuário.
+Com time selecionado, as abas são **Início, Jogos, Elenco e Mais**. Mais dá acesso
+às áreas pessoais: Meus Times/Trocar time, Notificações e Perfil. Sem time, mostre
+Meus Times, Notificações e Perfil, com acesso à criação. Abrir um time leva ao seu
+Início. O painel identifica escudo, nome, cidade/UF e plano, com atalhos Jogos e Elenco.
+Use somente o `TeamContext` existente e sua persistência por User; não criar outra
+seleção. Telas operacionais recebem o time validado e usam seu ID em todas as operações.
+`TeamHeading` identifica o time inclusive nos formulários. Remonte os painéis por ID
+e bloqueie conteúdo durante revalidação/erro para não misturar dados ou rascunhos.
+As rotas pessoais permanecem acessíveis pelo menu sem ocupar abas do contexto do time.
+Administração fica dentro do time, conforme permissões. Não antecipar módulos futuros.
 
 Interface predominantemente clara: branco como base, verde como identidade,
 dourado moderado para destaques e azul de apoio. Áreas especiais podem usar

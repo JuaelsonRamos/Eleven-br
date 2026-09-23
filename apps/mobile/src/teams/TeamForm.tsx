@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Field, FormError, TextAction } from '../components/AuthLayout';
-import { Button, Card, TeamBadge } from '../components/ui';
+import { Button, Card } from '../components/ui';
+import { ImageSelector } from '../images/ImageSelector';
+import { saveCrest, type ImageChoice } from '../images/api';
 import { theme } from '../theme';
 import { findSimilar, modalityLabels, saveTeam, type PublicTeam, type Team, type TeamInput } from './api';
 import { useTeams } from './TeamContext';
@@ -14,6 +16,8 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [crest, setCrest] = useState<ImageChoice>(undefined);
+  const [persisted, setPersisted] = useState<Team | undefined>(team);
   const change = <K extends keyof TeamInput>(field: K, value: TeamInput[K]) => { setData(current => ({ ...current, [field]: value })); setSimilar(null); setError(null); };
 
   async function submit(confirmed = false) {
@@ -24,11 +28,20 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
     }
     locked.current = true; setBusy(true); setError(null);
     try {
-      if (!team && !confirmed) {
+      if (!persisted && !confirmed) {
         const matches = await findSimilar(clean);
         if (matches.length) { setSimilar(matches); return; }
       }
-      await saved(await saveTeam(clean, team?.id));
+      let updated = await saveTeam(clean, persisted?.id);
+      setPersisted(updated);
+      if (crest !== undefined) {
+        try { updated = await saveCrest(updated.id, crest); }
+        catch (cause) {
+          setError(`Time salvo. ${cause instanceof Error ? cause.message : 'Não foi possível salvar o escudo.'} Tente novamente ou continue sem alterar o escudo.`);
+          return;
+        }
+      }
+      await saved(updated);
       onDone();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar o time.');
@@ -38,8 +51,8 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
   }
 
   return <View style={styles.form}>
-    <TeamBadge name={data.name || 'seu time'} />
-    <Text style={styles.note}>Escudo opcional. A inclusão de imagens estará disponível em uma próxima etapa.</Text>
+    <ImageSelector kind="crest" name={data.name || 'seu time'} current={persisted?.crest_url || null} choice={crest}
+      disabled={busy} onChange={value => { setCrest(value); setError(null); }} />
     <Field label="Nome do time" value={data.name} onChangeText={value => change('name', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
     <Field label="Cidade" value={data.city} onChangeText={value => change('city', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
     <StateSelector value={data.state} options={options.states} onChange={value => change('state', value)} disabled={busy} />
@@ -59,8 +72,11 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
       {similar.map(item => <Text key={item.code} style={styles.note}>{item.name} · {item.city}/{item.state} · {modalityLabels(item.modalities, options.modalities)} · {item.code}</Text>)}
       <Button label={busy ? 'Salvando…' : 'Criar mesmo assim'} disabled={busy} onPress={() => void submit(true)} />
       <TextAction label="Voltar" disabled={busy} onPress={() => setSimilar(null)} />
-    </View></Card> : <Button label={busy ? 'Salvando…' : team ? 'Salvar alterações' : 'Criar time'} disabled={busy} onPress={() => void submit()} />}
-    <TextAction label="Cancelar" disabled={busy} onPress={onCancel} />
+    </View></Card> : <Button label={busy ? 'Salvando…' : persisted ? 'Salvar alterações' : 'Criar time'} disabled={busy} onPress={() => void submit()} />}
+    <TextAction label={persisted && !team ? 'Continuar sem alterar o escudo' : 'Cancelar'} disabled={busy} onPress={() => {
+      if (persisted) { void saved(persisted).then(() => { if (!team) onDone(); else onCancel(); }); }
+      else onCancel();
+    }} />
   </View>;
 }
 

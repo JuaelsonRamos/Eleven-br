@@ -118,7 +118,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             assert code
             page.get_by_label("Código de 6 dígitos").fill(code.group())
             page.get_by_role("button", name="Confirmar", exact=True).click()
-            page.get_by_role("tab", name="Times", exact=True).click()
+            page.get_by_role("tab", name="Meus Times", exact=True).click()
             expect(active_text("Seu time começa aqui")).to_be_visible()
             artifacts = Path(__file__).resolve().parents[3] / ".local"
             artifacts.mkdir(exist_ok=True)
@@ -201,7 +201,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(active_text("Tabajara FC")).to_be_visible()
             expect(active_text("Segundo time")).not_to_be_visible()
-            assert page.get_by_role("tab").count() == 5
+            assert page.get_by_role("tab").count() == 4
             page.screenshot(
                 path=str(artifacts / "teams-home-mobile.png"), full_page=True, animations="disabled"
             )
@@ -213,7 +213,8 @@ def test_browser_team_flow(engine: Engine) -> None:
             page = open_page(context)
             expect(active_text("Tabajara FC")).to_be_visible(timeout=30000)
             page.set_viewport_size({"width": 1280, "height": 900})
-            page.get_by_role("tab", name="Times", exact=True).click()
+            page.get_by_role("tab", name="Mais", exact=True).click()
+            page.get_by_role("button", name="Meus Times / Trocar time", exact=True).click()
             expect(
                 page.get_by_role("button", name="Abrir Segundo time", exact=True).filter(
                     visible=True
@@ -227,7 +228,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             page.get_by_role("button", name="Abrir Segundo time", exact=True).click()
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(active_text("Segundo time")).to_be_visible()
-            page.get_by_role("tab", name="Times", exact=True).click()
+            page.get_by_role("button", name="Perfil do time", exact=True).click()
             page.get_by_role("button", name="Editar time", exact=True).click()
             page.get_by_label("Nome do time", exact=True).fill("Não aplicar em outro time")
             # Revoke selected membership only in the isolated test schema.
@@ -240,25 +241,23 @@ def test_browser_team_flow(engine: Engine) -> None:
                 session.commit()
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(active_text("Tabajara FC")).to_be_visible()
-            page.get_by_role("tab", name="Times", exact=True).click()
-            expect(
-                active_text(
-                    "O acesso ao time mudou. Confira o time selecionado antes de continuar."
-                )
-            ).to_be_visible()
+            page.get_by_role("button", name="Perfil do time", exact=True).click()
+            expect(active_text("Tabajara FC")).to_be_visible()
             expect(page.get_by_label("Nome do time", exact=True)).to_have_count(0)
             page.get_by_role("tab", name="Início", exact=True).click()
             page.reload(wait_until="domcontentloaded")
             expect(active_text("Tabajara FC")).to_be_visible(timeout=30000)
             expect(active_text("Segundo time")).not_to_be_visible()
-            page.get_by_role("tab", name="Perfil", exact=True).click()
+            page.get_by_role("tab", name="Mais", exact=True).click()
+            page.get_by_role("button", name="Perfil", exact=True).click()
             page.get_by_role("button", name="Sair da conta", exact=True).click()
             page.get_by_label("Telefone ou e-mail", exact=True).fill("team-browser@example.com")
             page.get_by_label("Senha", exact=True).fill("futebol-teste-123")
             page.get_by_role("button", name="Entrar", exact=True).click()
             expect(active_text("Tabajara FC")).to_be_visible()
             # Another user on the same browser must not inherit the previous team's context.
-            page.get_by_role("tab", name="Perfil", exact=True).click()
+            page.get_by_role("tab", name="Mais", exact=True).click()
+            page.get_by_role("button", name="Perfil", exact=True).click()
             page.get_by_role("button", name="Sair da conta", exact=True).click()
             with httpx.Client(
                 base_url=f"http://127.0.0.1:{port}", headers={"X-Eleven-Client": "native"}

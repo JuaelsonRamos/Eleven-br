@@ -6,19 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
 import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
 import { TeamHeading } from '../teams/TeamHeading';
-import { EventPanel } from '../events/EventPanel';
+import { RosterPanel } from '../roster/RosterPanel';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
 
-export function GamesScreen({ navigation }: BottomTabScreenProps<TabParams>) {
+export function RosterScreen({ navigation }: BottomTabScreenProps<TabParams>) {
   const { selected, loading, error, reload } = useTeams();
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
         <AppHeader />
-        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><EventPanel team={selected} /></View> : <>
-          <EmptyState title="Selecione seu time" description="Abra um time para acompanhar os jogos e confirmar presença." icon="football-outline" />
+        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><RosterPanel team={selected} onBack={() => navigation.navigate('Início')} /></View> : <>
+          <EmptyState title="Selecione seu time" description="Abra um time para acompanhar o elenco." icon="people-outline" />
           <Button label="Meus times" onPress={() => navigation.navigate('Times')} />
         </>}
       </View></ScrollView>
