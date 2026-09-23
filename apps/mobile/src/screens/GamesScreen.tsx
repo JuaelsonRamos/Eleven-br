@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -11,13 +11,14 @@ import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
 
 export function GamesScreen({ navigation }: BottomTabScreenProps<TabParams>) {
+  const scroll = useRef<ScrollView>(null);
   const { selected, loading, error, reload } = useTeams();
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
+      <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
         <AppHeader />
-        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><EventPanel team={selected} /></View> : <>
+        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><EventPanel team={selected} onNavigate={() => scroll.current?.scrollTo({ y: 0, animated: false })} /></View> : <>
           <EmptyState title="Selecione seu time" description="Abra um time para acompanhar os jogos e confirmar presença." icon="football-outline" />
           <Button label="Meus times" onPress={() => navigation.navigate('Times')} />
         </>}

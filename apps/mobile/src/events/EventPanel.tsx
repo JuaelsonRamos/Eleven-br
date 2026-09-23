@@ -9,12 +9,13 @@ import type { Team } from '../teams/api';
 import { addGuest, cancelEvent, cancelSeries, eventWhen, getEvent, listEvents, removeGuest, respond, type Answer, type EventPage, type SportEvent } from './api';
 import { EventForm } from './EventForm';
 import { styles } from './styles';
+import { FormationPanel } from '../formations/FormationPanel';
 
-export function EventPanel({ team }: { team: Team }) {
+export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () => void }) {
   const { options } = useTeams();
   const [page, setPage] = useState<EventPage | null>(null);
   const [event, setEvent] = useState<SportEvent | null>(null);
-  const [mode, setMode] = useState<'list' | 'detail' | 'create' | 'edit'>('list');
+  const [mode, setMode] = useState<'list' | 'detail' | 'create' | 'edit' | 'formation'>('list');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
@@ -60,6 +61,8 @@ export function EventPanel({ team }: { team: Team }) {
       <Text style={styles.text}>{item.my_response === value ? '✓ ' : ''}{value === 'VOU' ? 'VOU' : 'NÃO VOU'}</Text></Pressable>)}
   </View>;
   if (loading) return <LoadingState />;
+  if (mode === 'formation' && event) return <FormationPanel key={event.id} team={team} event={event} onNavigate={onNavigate}
+    onBack={() => void run(() => getEvent(team.id, event.id))} />;
   if (mode === 'create' || (mode === 'edit' && event)) return <EventForm team={team} event={mode === 'edit' ? event! : undefined}
     onCancel={back} onDenied={back} onDone={saved => { setEvent(saved); setMode('detail'); setSuccess('Evento salvo.'); }} />;
   return <View style={styles.stack}>
@@ -83,6 +86,8 @@ export function EventPanel({ team }: { team: Team }) {
         {event.participants.filter(person => person.response === group.value).map(person => <Text key={person.membership_id} style={styles.text}>{person.name}</Text>)}
       </View>)}
       <Text style={styles.note}>A lista considera jogadores ativos do elenco. Convidados aparecem separadamente.</Text>
+      {event.kind === 'PELADA' && <Button label={event.can_manage && event.status === 'open' ? 'Montar times' : 'Ver times da pelada'} disabled={busy}
+        onPress={() => { setError(null); setSuccess(null); setMode('formation'); onNavigate?.(); }} />}
       <Text accessibilityRole="header" style={styles.heading}>Convidados: {event.guests.length}</Text>
       {event.guests.map(person => <View key={person.id} style={styles.row}><Text style={styles.text}>{person.name}</Text>{event.can_manage && event.status === 'open' && <TextAction label={`Remover ${person.name}`} disabled={busy} onPress={() => void run(() => removeGuest(team.id, event.id, person.id), 'Convidado removido.')} />}</View>)}
       {event.can_manage && event.status === 'open' && <>

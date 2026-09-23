@@ -67,4 +67,4 @@ def test_roster_downgrade_protects_unlinked_players(engine: Engine) -> None:
         command.downgrade(config, "0003")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT count(*) FROM players WHERE user_id IS NULL")) == 1
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006"

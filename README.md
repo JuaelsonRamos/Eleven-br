@@ -659,6 +659,50 @@ Após instalar dependências atualizadas, inicie os comandos usuais na porta 801
 Teste isolado de navegador (API/banco `_test` e arquivos temporários próprios):
 `uv run --with playwright pytest tests/browser_images_flow.py -q -s`, em `apps/api`.
 
+## Formação de times da pelada — Prompt 06
+
+Abra **Jogos → Pelada → Montar times** no time selecionado. O gestor confere os
+confirmados VOU e convidados, retira participantes somente deste sorteio, marca
+os goleiros e escolhe o número de equipes. A previsão mostra as quantidades antes
+de sortear. O recurso é **Free e Pro**, com as permissões de gestão de eventos atuais.
+Membros comuns têm acesso somente à consulta do resultado, por **Ver times da pelada**.
+
+O sorteio aleatório embaralha goleiros primeiro e os demais separadamente, distribuindo
+em rodízio. Totais e goleiros diferem por no máximo um entre as equipes. Falta de goleiro
+gera aviso, sem bloquear. Limites técnicos: **2–32 equipes e até 256 participantes**,
+sem permitir mais equipes que participantes. Os limites do elenco continuam 24/100.
+
+Resultado e ajustes persistem. **Mover → Time N** ajusta um participante, sem arrastar;
+ajustes manuais podem deixar quantidades diferentes. **Sortear novamente** permite
+revisar a configuração e exige confirmação antes de substituir a formação atual.
+Versão e bloqueio transacional impedem sobrescrever alterações concorrentes sem revisão.
+
+A lista atual é comparada com a assinatura dos IDs elegíveis na época do sorteio,
+incluindo quem foi excluído daquela formação. Mudanças de presença, atividade do elenco
+ou convidados exibem **“A lista de participantes mudou desde o último sorteio.”** ao
+consultar/atualizar. Use **Atualizar participantes** para conferir alterações de outras
+pessoas enquanto a tela está aberta; não há atualização em tempo real nesta etapa.
+O resultado anterior permanece até o gestor decidir refazer.
+
+`0006_event_formations` adiciona `event_formations`, `formation_squads` e
+`formation_participants`. Participantes referenciam Membership **ou** EventGuest,
+com nome e goleiro daquela formação; exclusões permanecem sem equipe atribuída.
+Equipes temporárias não são `Team`. Não se armazena a formação inteira em JSON.
+Convidados removidos recebem `removed_at`, saem da lista ativa e continuam referenciáveis
+no resultado salvo. Downgrade é bloqueado se perder formação ou restaurar convidados removidos.
+Migrations 0001–0005 não foram alteradas.
+
+Endpoints sob `/v1/teams/{team_id}/events/{event_id}/formation`:
+
+- `GET`: participantes atuais, resultado e aviso de mudança.
+- `POST /draw`: sorteio inicial/substituição confirmada.
+- `PUT /participants/{participant_id}`: move para equipe da mesma formação.
+
+Aplique `uv run alembic upgrade head` em `apps/api`. API permanece em **8011** e
+Web em **8081** (`npm.cmd run mobile:web` na raiz). Testes usam PostgreSQL isolado;
+com Expo ativo: `uv run --with playwright pytest tests/browser_formations_flow.py -q`.
+Não há sorteio por habilidade/posição, placar, estatísticas ou financeiro.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura

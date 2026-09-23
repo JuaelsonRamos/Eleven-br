@@ -1,11 +1,12 @@
 """Persistent occurrences, generated from a weekly template within a bounded window."""
 
-from datetime import date, time
+from datetime import date, datetime, time
 from uuid import UUID
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -91,4 +92,8 @@ class EventGuest(Entity, Base):
     __tablename__ = "event_guests"
     event_id: Mapped[UUID] = mapped_column(ForeignKey("events.id"), index=True)
     name: Mapped[str] = mapped_column(String(80))
-    __table_args__ = (CheckConstraint("length(trim(name)) > 0", name="name"),)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) > 0", name="name"),
+        UniqueConstraint("event_id", "id", name="uq_event_guests_scope"),
+    )

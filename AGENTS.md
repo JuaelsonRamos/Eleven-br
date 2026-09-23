@@ -19,7 +19,7 @@ de uso não permite simplificar incorretamente regras de negócio.
 
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
 o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
-e o Prompt 05 (eventos, peladas e presença).
+o Prompt 05 (eventos, peladas e presença) e o Prompt 06 (formação de times da pelada).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
@@ -98,8 +98,23 @@ Edição e cancelamento individuais valem só para a ocorrência. Encerrar recor
 impede novas datas e cancela ocorrências de hoje em diante, preservando histórico,
 respostas e convidados. Datas/horários são locais da partida; a janela usa a data
 local do servidor. Cancelamento encerra respostas; nenhuma ocorrência é apagada.
-Convidados não criam Player, User ou Membership. Não antecipar sorteio, placar,
+Convidados não criam Player, User ou Membership. Não antecipar placar,
 estatísticas, busca de adversários ou financeiro.
+
+Formações usam `Permission.MANAGE_EVENTS`, também no Free. `0006_event_formations`
+cria formação única por ocorrência, equipes temporárias e participantes relacionais,
+com FKs compostas para isolar time/evento/formação. Não criar Team permanente no sorteio.
+Pool inclui somente vínculos ativos com VOU e convidados não removidos. Exclusão e goleiro
+são locais à formação; não alteram presença nem Player. `event_guests.removed_at` preserva
+o convidado histórico; consultas de presenças e candidatos filtram removidos.
+Sorteio aleatório embaralha goleiros e demais separadamente e distribui em rodízio,
+com diferença máxima de um no total e nos goleiros. Limites: 2–32 equipes, até 256
+participantes; nunca mais equipes que selecionados. Nenhum bloqueio por falta de goleiros.
+Fingerprint do pool completo (inclusive excluídos) detecta mudança de elegibilidade sem
+alterar silenciosamente o resultado. Refazer exige confirmação e versão atual; mover
+exige participante e destino da mesma formação. Escritas usam o lock de Team existente.
+Membro ativo pode consultar; apenas gestores autorizados alteram pelada aberta.
+Não adicionar ranking, habilidade, cores/coletes, placar ou estatísticas nesta etapa.
 
 Foto própria e escudo usam `Player.photo_url`/`Team.crest_url`, sem migration extra.
 Upload multipart aceita JPEG/PNG/WebP reais, até 5 MB e 20 megapixels, com orientação

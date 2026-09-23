@@ -1,7 +1,7 @@
 """Team-scoped events; all writes serialize with roster changes on the team row."""
 
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -226,11 +226,15 @@ def remove_guest(
     event = find_event(session, team_id, event_id)
     require_open(event)
     guest = session.scalar(
-        select(EventGuest).where(EventGuest.id == guest_id, EventGuest.event_id == event.id)
+        select(EventGuest).where(
+            EventGuest.id == guest_id,
+            EventGuest.event_id == event.id,
+            EventGuest.removed_at.is_(None),
+        )
     )
     if guest is None:
         raise NotFound("Convidado não encontrado")
-    session.delete(guest)
+    guest.removed_at = datetime.now(UTC)
     session.commit()
     return event
 
@@ -265,7 +269,7 @@ def snapshots(
     }
     guests = session.scalars(
         select(EventGuest)
-        .where(EventGuest.event_id.in_(ids))
+        .where(EventGuest.event_id.in_(ids), EventGuest.removed_at.is_(None))
         .order_by(EventGuest.name, EventGuest.id)
     ).all()
     result: list[dict[str, object]] = []
