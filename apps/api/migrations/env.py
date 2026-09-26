@@ -5,6 +5,7 @@ from app.infrastructure import (  # noqa: F401
     auth_models,
     event_models,
     formation_models,
+    match_event_models,
     match_models,
 )
 from app.infrastructure.config import get_settings

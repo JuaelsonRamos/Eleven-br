@@ -764,6 +764,41 @@ Expo Doctor 20/20; bundles Web/Android/iOS gerados. Servidor Web: HTML e bundle 
 Web Bundled e navegação conferidos. API/ready/Swagger em 8011 responderam.
 Permanece o aviso já existente de depreciação Starlette/AnyIO nos testes.
 
+## Gols, assistências e cartões — Prompt 08
+
+Em **Jogos → Pelada → Partidas → Eventos da partida**, registre gols (assistência
+opcional) e cartões amarelos/vermelhos, edite ou remova com confirmação. Somente
+participantes salvos nas duas equipes da partida são oferecidos, incluindo convidados
+identificados como tais. Assistente é outro participante da mesma equipe; assistência
+pertence ao gol. Não há criação de identidades fictícias nem expulsão automática.
+
+O placar continua oficial e manual. O painel compara gols identificados por equipe
+com o placar, indica faltas/excessos e não bloqueia finalização ou correção do resultado.
+Presidente/gestores autorizados por `manage_events` escrevem em partidas iniciadas
+ou finalizadas; membros ativos consultam. Partida/ocorrência cancelada preserva
+registros e bloqueia escritas. Mudanças posteriores de presença ou elenco não apagam
+a participação histórica. Não inclui rankings nem agregações nos cards da formação.
+
+`0008_match_events` cria registros relacionais com tipo, participante, assistência,
+equipe, partida e contexto por FKs compostas. Guarda criador e último autor/data da
+alteração; remoção lógica preserva auditoria e sai das contagens. A versão da partida
+e o lock de Team também protegem estas escritas. Duplo envio com versão repetida e
+edição concorrente retornam 409; o app pede recarregamento sem reenviar automaticamente.
+Migrations 0001–0007 permanecem intactas; downgrade com registros é recusado.
+
+Sob `/v1/teams/{team_id}/events/{event_id}/matches/{match_id}/events`:
+
+- `GET`: registros, participantes válidos, versão e comparação com o placar.
+- `POST`: registra gol/cartão.
+- `PUT /{match_event_id}`: corrige registro.
+- `POST /{match_event_id}/remove`: remove com confirmação.
+
+Aplique `uv run alembic upgrade head` em `apps/api`, mantenha API em **8011** e
+`npm.cmd run mobile:web` na raiz. Para o fluxo isolado, com Expo em **8081**:
+`uv run --with playwright pytest tests/browser_match_events_flow.py -q` em `apps/api`.
+A aplicação local da migration comparou todas as linhas das 17 tabelas anteriores e
+preservou os dados, incluindo TABAJARA FC. Dados de testes ficam apenas no banco `_test`.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura

@@ -1,7 +1,15 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, String
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.models import Base, Entity
@@ -23,6 +31,9 @@ class EventMatch(Entity, Base):
     corrected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     corrected_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     __table_args__ = (
+        UniqueConstraint(
+            "team_id", "event_id", "formation_id", "id", name="uq_event_matches_scope"
+        ),
         ForeignKeyConstraint(
             ["team_id", "event_id", "formation_id"],
             ["event_formations.team_id", "event_formations.event_id", "event_formations.id"],

@@ -20,7 +20,7 @@ de uso não permite simplificar incorretamente regras de negócio.
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
 o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
 o Prompt 05 (eventos, peladas e presença), o Prompt 06 (formação de times da pelada)
-e o Prompt 07 (partidas e resultados da pelada).
+o Prompt 07 (partidas e resultados da pelada) e o Prompt 08 (gols, assistências e cartões).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
@@ -123,8 +123,20 @@ Primeira partida bloqueia refazer formação e mover participantes, inclusive se
 Consulta de participantes não modifica a formação. Placar 0–999; início obrigatório
 antes de finalizar. Finalização, cancelamento e correção final exigem confirmação.
 Cancelada é terminal e preservada; correção registra último autor/data e updated_at.
-Evento cancelado permite somente leitura de partidas. Não criar gols individuais,
-classificação ou estatísticas. Downgrade com partidas é bloqueado.
+Evento cancelado permite somente leitura de partidas. Downgrade com partidas é bloqueado.
+
+`0008_match_events` adiciona gols e cartões ligados ao participante salvo na formação,
+com assistência opcional no próprio gol. FKs compostas isolam partida/formação/equipe;
+backend restringe participantes às duas equipes da partida. Assistência exige outro
+participante da mesma equipe. Convidados usam FormationParticipant/EventGuest, sem
+criar conta/Player/vínculo. Participação histórica independe da presença/elenco atuais.
+MANAGE_EVENTS autoriza escritas em partidas iniciadas/finalizadas de ocorrência aberta;
+canceladas são somente leitura. Placar oficial nunca é derivado ou alterado pelos gols
+identificados; comparação é informativa. Todas as escritas usam lock de Team e a versão
+da partida, incrementada também pelos registros; envio repetido com versão antiga é 409.
+Remoção confirmada é lógica (`removed_at`); criação e última alteração guardam autor/data.
+Não implementar rankings, estatísticas consolidadas ou agregação na formação nesta etapa.
+Downgrade com registros, inclusive removidos, é bloqueado.
 
 Foto própria e escudo usam `Player.photo_url`/`Team.crest_url`, sem migration extra.
 Upload multipart aceita JPEG/PNG/WebP reais, até 5 MB e 20 megapixels, com orientação

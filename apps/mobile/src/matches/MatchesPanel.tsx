@@ -8,6 +8,7 @@ import type { SportEvent } from '../events/api';
 import { getFormation, type Formation } from '../formations/api';
 import { theme } from '../theme';
 import { changeMatch, createMatch, getMatches, type Match } from './api';
+import { MatchEventsPanel } from './MatchEventsPanel';
 
 const labels = { SCHEDULED: 'AGENDADA', IN_PROGRESS: 'EM ANDAMENTO', FINISHED: 'FINALIZADA', CANCELLED: 'CANCELADA' };
 type Confirmation = { match: Match; action: 'finish' | 'cancel' | 'score'; home: number; away: number };
@@ -23,6 +24,7 @@ export function MatchesPanel({ teamId, event }: { teamId: string; event: SportEv
   const [home, setHome] = useState('');
   const [away, setAway] = useState('');
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [eventsMatchId, setEventsMatchId] = useState<string | null>(null);
   const sending = useRef(false);
   const generation = useRef(0);
   const load = useCallback(async () => {
@@ -96,6 +98,9 @@ export function MatchesPanel({ teamId, event }: { teamId: string; event: SportEv
             onPress={() => void run(() => changeMatch(teamId, event.id, match, confirmation.action, true, confirmation.home, confirmation.away))} />
           <TextAction label="Voltar sem alterar" disabled={busy} onPress={() => setConfirmation(null)} />
         </View>}
+        {eventsMatchId === match.id ? <MatchEventsPanel teamId={teamId} eventId={event.id} match={match} disabled={disabled}
+          onMatchChange={updated => setItems(old => old.map(item => item.id === updated.id ? updated : item))}
+          onClose={() => setEventsMatchId(null)} /> : <Button label="Eventos da partida" disabled={disabled} onPress={() => setEventsMatchId(match.id)} />}
       </View>)}
       {canManage && formation && !creating && <Button label="Nova partida" disabled={disabled} onPress={() => setCreating(true)} />}
       {canManage && formation && creating && <View style={styles.stack}>

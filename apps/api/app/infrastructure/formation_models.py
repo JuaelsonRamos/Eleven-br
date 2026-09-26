@@ -52,6 +52,7 @@ class FormationParticipant(Entity, Base):
     name: Mapped[str] = mapped_column(String(80))
     goalkeeper: Mapped[bool] = mapped_column(Boolean)
     __table_args__ = (
+        UniqueConstraint("formation_id", "squad_id", "id", name="uq_formation_participants_scope"),
         ForeignKeyConstraint(
             ["team_id", "event_id", "formation_id"],
             ["event_formations.team_id", "event_formations.event_id", "event_formations.id"],
