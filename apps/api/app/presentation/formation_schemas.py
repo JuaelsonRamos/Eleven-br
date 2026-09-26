@@ -64,6 +64,7 @@ class FormationRead(BaseModel):
 
 
 class FormationPage(BaseModel):
+    locked_by_matches: bool
     can_manage: bool
     participants: list[CandidateRead]
     fingerprint: str

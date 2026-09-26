@@ -85,6 +85,7 @@ export function FormationPanel({ team, event, onBack, onNavigate }: { team: Team
     <Text style={styles.note}>{eventWhen(event)}</Text>
     <FormError message={error} />
     {loading ? <LoadingState /> : !page ? <Button label="Tentar novamente" onPress={() => void load()} /> : <>
+      {page.locked_by_matches && <Text style={styles.note}>Existem partidas vinculadas a esta formação. Os times não podem mais ser alterados.</Text>}
       {page.participants_changed && <Text accessibilityRole="alert" style={styles.note}>A lista de participantes mudou desde o último sorteio.</Text>}
       {editing && page.can_manage ? <>
         <View style={visual.summary}>

@@ -1,7 +1,12 @@
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from app.infrastructure import auth_models, event_models, formation_models  # noqa: F401
+from app.infrastructure import (  # noqa: F401
+    auth_models,
+    event_models,
+    formation_models,
+    match_models,
+)
 from app.infrastructure.config import get_settings
 from app.infrastructure.models import Base
 

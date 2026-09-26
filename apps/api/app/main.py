@@ -14,6 +14,7 @@ from app.presentation.event_routes import router as event_router
 from app.presentation.formation_routes import router as formation_router
 from app.presentation.image_limits import ImageUploadLimit
 from app.presentation.image_routes import router as image_router
+from app.presentation.match_routes import router as match_router
 from app.presentation.roster_routes import router as roster_router
 from app.presentation.routes import router
 
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(roster_router)
     app.include_router(event_router)
     app.include_router(formation_router)
+    app.include_router(match_router)
     app.include_router(image_router)
     return app
 

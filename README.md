@@ -4,7 +4,8 @@
 
 O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
 perfil inicial, gestão básica de times, elenco e eventos com confirmação de presença.
-As áreas pessoais e do time ficam na área autenticada. Não inclui placar, estatísticas, financeiro ou cobrança.
+As áreas pessoais e do time ficam na área autenticada. Inclui formação de equipes e partidas
+com placar por pelada. Não inclui estatísticas individuais, financeiro ou cobrança.
 
 ## Arquitetura
 
@@ -703,11 +704,71 @@ Web em **8081** (`npm.cmd run mobile:web` na raiz). Testes usam PostgreSQL isola
 com Expo ativo: `uv run --with playwright pytest tests/browser_formations_flow.py -q`.
 Não há sorteio por habilidade/posição, placar, estatísticas ou financeiro.
 
+## Partidas e resultados da pelada — Prompt 07
+
+Abra **Jogos → Pelada → Montar times**, salve a formação e volte à pelada.
+A seção **Partidas** permite escolher duas equipes salvas, criar e iniciar uma partida,
+controlar o placar com +/− e finalizar com confirmação. Revanche é permitida.
+Membros ativos consultam; Presidente e gestores com `manage_events` administram,
+conforme as policies Free/Pro existentes. O placar altera somente o total de gols.
+
+Cada linha de `event_matches` pertence a time, ocorrência e formação. FKs compostas
+impedem equipes de outra formação/evento/time; check impede jogar contra si mesmo.
+Placares inteiros vão de 0 a 999 e começam em 0 × 0. Histórico segue criação/ID.
+Estados: `SCHEDULED → IN_PROGRESS → FINISHED`; qualquer estado não cancelado pode
+ir para `CANCELLED`, sempre com confirmação. Cancelamento é terminal, preserva
+placar e histórico e não representa resultado válido. Não existe exclusão física.
+Finalização exige início e confirmação. Resultado final pode ser corrigido com
+confirmação, sem reabrir a partida; `corrected_at`, `corrected_by_user_id`, versão e
+`updated_at` identificam a última correção. A interface mostra quando foi corrigido.
+Ocorrência cancelada mantém consulta e bloqueia todas as escritas de partidas.
+
+A primeira partida, mesmo posteriormente cancelada, bloqueia refazer o sorteio e
+mover participantes. **Atualizar participantes** continua sendo uma consulta e não
+muda as equipes salvas. Presenças, convidados e elenco mantêm seus próprios fluxos;
+nenhuma mudança de elegibilidade modifica silenciosamente a formação ou resultados.
+O bloqueio evita destruir referências: o sorteio anterior substituía as equipes.
+
+Todas as escritas usam o lock de Team existente. Alterações exigem `expected_version`;
+criação exige `expected_formation_version`. Versão desatualizada retorna 409 e a
+interface pede recarregamento antes de novas ações, sem sobrescrever outro dispositivo.
+
+Endpoints sob `/v1/teams/{team_id}/events/{event_id}/matches`:
+
+| Método | Sufixo | Ação |
+| --- | --- | --- |
+| GET / POST | vazio | Histórico / criação |
+| GET | `/{match_id}` | Consulta individual |
+| POST | `/{match_id}/start` | Inicia |
+| PUT | `/{match_id}/score` | Placar ou correção confirmada |
+| POST | `/{match_id}/finish` | Finaliza com confirmação |
+| POST | `/{match_id}/cancel` | Cancela com confirmação |
+
+Migration incremental **0007_event_matches**; 0001–0006 permanecem intactas.
+Downgrade é recusado se houver partidas. A aplicação local comparou todas as linhas
+das 16 tabelas anteriores e preservou integralmente os dados, incluindo TABAJARA FC.
+Testes usam exclusivamente PostgreSQL `_test` e schemas descartáveis.
+
+Para validar manualmente: em `apps/api`, `uv run alembic upgrade head` e
+`uv run uvicorn app.main:app --reload --no-proxy-headers --port 8011`.
+Na raiz, `npm.cmd run mobile:web`. Abra a pelada, crie duas partidas, finalize uma,
+corrija seu resultado e cancele a outra; recarregue e confira o histórico.
+Com Expo em 8081, execute em `apps/api`:
+`uv run --with playwright pytest tests/browser_matches_flow.py -q`.
+O fluxo cobre também empate, seleção de equipes distintas e larguras 320/390/1280.
+Android/iOS têm bundles exportáveis; execução em aparelhos reais requer validação manual.
+
+Validação do Prompt 07: 157 testes backend e seis fluxos Chromium aprovados.
+Ruff, formatação, mypy, ESLint, TypeScript, Alembic check e git diff --check passaram.
+Expo Doctor 20/20; bundles Web/Android/iOS gerados. Servidor Web: HTML e bundle 200,
+Web Bundled e navegação conferidos. API/ready/Swagger em 8011 responderam.
+Permanece o aviso já existente de depreciação Starlette/AnyIO nos testes.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
-Convites para contas, placar, financeiro e assinaturas continuam fora deste escopo.
+Convites para contas, financeiro e assinaturas continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

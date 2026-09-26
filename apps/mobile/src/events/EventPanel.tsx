@@ -9,6 +9,7 @@ import type { Team } from '../teams/api';
 import { addGuest, cancelEvent, cancelSeries, eventWhen, getEvent, listEvents, removeGuest, respond, type Answer, type EventPage, type SportEvent } from './api';
 import { EventForm } from './EventForm';
 import { styles } from './styles';
+import { MatchesPanel } from '../matches/MatchesPanel';
 import { FormationPanel } from '../formations/FormationPanel';
 
 export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () => void }) {
@@ -88,6 +89,7 @@ export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () =
       <Text style={styles.note}>A lista considera jogadores ativos do elenco. Convidados aparecem separadamente.</Text>
       {event.kind === 'PELADA' && <Button label={event.can_manage && event.status === 'open' ? 'Montar times' : 'Ver times da pelada'} disabled={busy}
         onPress={() => { setError(null); setSuccess(null); setMode('formation'); onNavigate?.(); }} />}
+      {event.kind === 'PELADA' && <MatchesPanel key={event.id} teamId={team.id} event={event} />}
       <Text accessibilityRole="header" style={styles.heading}>Convidados: {event.guests.length}</Text>
       {event.guests.map(person => <View key={person.id} style={styles.row}><Text style={styles.text}>{person.name}</Text>{event.can_manage && event.status === 'open' && <TextAction label={`Remover ${person.name}`} disabled={busy} onPress={() => void run(() => removeGuest(team.id, event.id, person.id), 'Convidado removido.')} />}</View>)}
       {event.can_manage && event.status === 'open' && <>

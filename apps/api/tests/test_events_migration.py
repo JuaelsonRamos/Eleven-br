@@ -70,4 +70,4 @@ def test_events_downgrade_refuses_data_loss(engine: Engine) -> None:
         command.downgrade(config, "0004")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT count(*) FROM events")) == 1
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007"

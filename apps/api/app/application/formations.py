@@ -15,6 +15,7 @@ from app.domain.formations import MAX_PARTICIPANTS, Choice, random_teams
 from app.domain.policies import Conflict, NotFound, Permission
 from app.infrastructure.event_models import EventAttendance, EventGuest
 from app.infrastructure.formation_models import Formation, FormationParticipant, FormationSquad
+from app.infrastructure.match_models import EventMatch
 from app.infrastructure.models import Player, TeamMembership
 
 
@@ -60,6 +61,22 @@ def current(session: Session, event_id: UUID) -> Formation | None:
     )
 
 
+def has_matches(session: Session, formation_id: UUID) -> bool:
+    return (
+        session.scalar(
+            select(EventMatch.id).where(EventMatch.formation_id == formation_id).limit(1)
+        )
+        is not None
+    )
+
+
+def require_mutable(session: Session, formation_id: UUID) -> None:
+    if has_matches(session, formation_id):
+        raise Conflict(
+            "Existem partidas vinculadas a esta formação. Os times não podem mais ser alterados."
+        )
+
+
 def detail(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) -> dict[str, object]:
     team = authorize(session, user_id, team_id, write=True)
     event = find_event(session, team_id, event_id)
@@ -67,8 +84,13 @@ def detail(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) ->
     pool = candidates(session, team_id, event_id)
     value = fingerprint(pool)
     formation = current(session, event_id)
+    locked = bool(formation and has_matches(session, formation.id))
     result: dict[str, object] = {
-        "can_manage": permission and event.status == "open" and event.kind == "PELADA",
+        "locked_by_matches": locked,
+        "can_manage": permission
+        and event.status == "open"
+        and event.kind == "PELADA"
+        and not locked,
         "participants": pool,
         "fingerprint": value,
         "formation": None,
@@ -138,6 +160,7 @@ def draw(
     groups = random_teams(choices, team_count)
     formation = current(session, event_id)
     if formation:
+        require_mutable(session, formation.id)
         if not confirm_replace or expected_version != formation.version:
             raise Conflict(
                 "A formação já existe ou foi alterada. Atualize e confirme a substituição"
@@ -204,6 +227,7 @@ def move(
     formation = current(session, event_id)
     if formation is None or formation.id != formation_id:
         raise NotFound("Formação não encontrada")
+    require_mutable(session, formation.id)
     if formation.version != expected_version:
         raise Conflict("A formação foi alterada. Atualize antes de mover")
     person = session.scalar(

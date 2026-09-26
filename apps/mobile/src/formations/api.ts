@@ -5,7 +5,7 @@ export type Choice = Omit<Candidate, 'name'> & { goalkeeper: boolean };
 export type Participant = { id: string; membership_id: string | null; guest_id: string | null; name: string; goalkeeper: boolean };
 export type Formation = { id: string; version: number; method: string; team_count: number; updated_at: string;
   squads: { id: string; number: number; name: string; participants: Participant[] }[]; excluded: Participant[] };
-export type FormationPage = { can_manage: boolean; participants: Candidate[]; fingerprint: string;
+export type FormationPage = { locked_by_matches: boolean; can_manage: boolean; participants: Candidate[]; fingerprint: string;
   participants_changed: boolean; formation: Formation | null };
 export type DrawInput = { team_count: number; participants: Choice[]; expected_fingerprint: string;
   expected_version: number | null; confirm_replace: boolean };

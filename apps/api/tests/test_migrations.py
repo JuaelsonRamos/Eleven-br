@@ -38,6 +38,7 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "event_formations",
             "formation_squads",
             "formation_participants",
+            "event_matches",
         }
         command.check(config)
 

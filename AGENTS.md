@@ -19,7 +19,8 @@ de uso não permite simplificar incorretamente regras de negócio.
 
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
 o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
-o Prompt 05 (eventos, peladas e presença) e o Prompt 06 (formação de times da pelada).
+o Prompt 05 (eventos, peladas e presença), o Prompt 06 (formação de times da pelada)
+e o Prompt 07 (partidas e resultados da pelada).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
@@ -114,7 +115,16 @@ Fingerprint do pool completo (inclusive excluídos) detecta mudança de elegibil
 alterar silenciosamente o resultado. Refazer exige confirmação e versão atual; mover
 exige participante e destino da mesma formação. Escritas usam o lock de Team existente.
 Membro ativo pode consultar; apenas gestores autorizados alteram pelada aberta.
-Não adicionar ranking, habilidade, cores/coletes, placar ou estatísticas nesta etapa.
+Não adicionar ranking, habilidade, cores/coletes ou estatísticas nesta etapa.
+
+Partidas (`0007_event_matches`) pertencem à ocorrência e às equipes da formação por
+FKs compostas. Usam `MANAGE_EVENTS`, lock de Team e versão otimista em toda alteração.
+Primeira partida bloqueia refazer formação e mover participantes, inclusive se cancelada.
+Consulta de participantes não modifica a formação. Placar 0–999; início obrigatório
+antes de finalizar. Finalização, cancelamento e correção final exigem confirmação.
+Cancelada é terminal e preservada; correção registra último autor/data e updated_at.
+Evento cancelado permite somente leitura de partidas. Não criar gols individuais,
+classificação ou estatísticas. Downgrade com partidas é bloqueado.
 
 Foto própria e escudo usam `Player.photo_url`/`Team.crest_url`, sem migration extra.
 Upload multipart aceita JPEG/PNG/WebP reais, até 5 MB e 20 megapixels, com orientação
