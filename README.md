@@ -799,6 +799,58 @@ Aplique `uv run alembic upgrade head` em `apps/api`, mantenha API em **8011** e
 A aplicação local da migration comparou todas as linhas das 17 tabelas anteriores e
 preservou os dados, incluindo TABAJARA FC. Dados de testes ficam apenas no banco `_test`.
 
+## Estatísticas internas do time — Prompt 09
+
+Abra **Início → Estatísticas** no time selecionado. As quatro abas inferiores
+permanecem Início, Jogos, Elenco e Mais. Geral apresenta resumo, destaques e acesso
+aos jogadores; Artilharia, Assistências e Cartões apresentam as listas completas.
+O perfil mostra foto existente, totais, médias calculadas e histórico paginado com
+placar oficial. Não há edição direta de estatísticas.
+
+As consultas agregam no backend somente partidas `FINISHED`. Uma partida disputada
+corresponde ao participante salvo na formação da partida e associado a uma das
+duas equipes envolvidas; presença na pelada, isoladamente, não conta. Cancelar uma
+ocorrência preserva partidas já finalizadas e seu histórico; partidas canceladas,
+agendadas ou em andamento não entram. Gols e cartões removidos são desconsiderados,
+e assistência é derivada do vínculo no gol. Correções aparecem na próxima consulta.
+O placar oficial não gera gols individuais nem vitórias institucionais do clube.
+
+Jogadores são agrupados pelo vínculo com o time, mantendo `player_id` e sua foto.
+Inativos com participação no período continuam nas listas, identificados como tais.
+Membros ativos sem partidas também podem abrir o perfil vazio. Convidados mantêm
+seu ID exclusivo da ocorrência, com data e identificação visíveis: nomes iguais
+nunca são unidos, nem criam Player, User ou vínculo. Seu detalhe é restrito à pelada.
+
+Filtros: Todos, Este mês, Últimos 30 dias (hoje e os 29 dias anteriores), Este ano e
+modalidade. Períodos limitados vão até hoje, usando a data local da ocorrência,
+nunca a data de lançamento do gol/cartão. Modalidades incluem as habilitadas e as
+presentes no histórico. Artilharia desempata por assistências; assistências, por
+gols. Persistindo igualdade, compartilham posição (1, 1, 3), com ordem alfabética/ID
+estável. Cartões são listados alfabeticamente, sem posição competitiva.
+
+Endpoints de consulta, autenticados e restritos a membros ativos do próprio time:
+
+- `GET /v1/teams/{team_id}/statistics`: resumo, jogadores e listas agregadas.
+- `GET /v1/teams/{team_id}/statistics/players/{membership_id}`: perfil e histórico.
+- `GET /v1/teams/{team_id}/statistics/guests/{guest_id}`: detalhe do convidado.
+
+Todos aceitam `period=all|month|last30|year` e `modality=campo|society|futsal`.
+Perfis aceitam `offset` e `limit` (padrão 20, máximo 50). As consultas usam um número
+fixo de acessos ao banco, sem N+1, e o lock existente de Team para manter consistência
+com correções concorrentes. Não existem tabelas de totais, cache ou nova migration;
+o schema permanece em **0008**, com migrations 0001–0008 intactas.
+
+Validação manual: mantenha a API em **8011** e execute `npm.cmd run mobile:web` na
+raiz; abra um time, finalize uma partida com registros e consulte o atalho Estatísticas.
+Em `apps/api`, use `uv run pytest -q` para regressão e, com Expo em **8081**,
+`uv run --with playwright pytest tests/browser_statistics_flow.py -q` para o fluxo
+Web isolado. Ele cobre filtros, listas, perfis, histórico, atualização, contexto
+persistente, vazio, inativo, convidado e larguras 320/390/1280 px. Dados de teste
+ficam apenas em schemas temporários do banco `_test`.
+
+Intervalo personalizado, estatísticas globais, pontuações e ranking nacional ficam
+fora desta entrega. Bundles Android/iOS não substituem validação em aparelhos reais.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura

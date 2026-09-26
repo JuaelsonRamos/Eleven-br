@@ -18,6 +18,7 @@ from app.presentation.match_event_routes import router as match_event_router
 from app.presentation.match_routes import router as match_router
 from app.presentation.roster_routes import router as roster_router
 from app.presentation.routes import router
+from app.presentation.statistics_routes import router as statistics_router
 
 
 def create_app() -> FastAPI:
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(match_event_router)
     app.include_router(match_router)
     app.include_router(image_router)
+    app.include_router(statistics_router)
     return app
 
 

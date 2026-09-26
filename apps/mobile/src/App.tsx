@@ -15,12 +15,13 @@ import { TeamProvider, useTeams } from './teams/TeamContext';
 import { GamesScreen } from './screens/GamesScreen';
 import { RosterScreen } from './screens/RosterScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import { StatisticsScreen } from './screens/StatisticsScreen';
 
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
   Início: 'home-outline', Jogos: 'football-outline', Times: 'shield-outline',
   Notificações: 'notifications-outline', Perfil: 'person-outline',
-  Elenco: 'people-outline', Mais: 'menu-outline',
+  Elenco: 'people-outline', Mais: 'menu-outline', Estatísticas: 'stats-chart-outline',
 };
 
 function MainNavigation() {
@@ -40,7 +41,7 @@ function MainNavigation() {
     tabBarStyle: { height: 66 + insets.bottom, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), borderTopColor: theme.colors.border },
     tabBarIcon: ({ color, size }) => <Ionicons name={icons[route.name]} color={color} size={size} />,
   })}>
-    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : name === 'Jogos' ? GamesScreen : name === 'Elenco' ? RosterScreen : name === 'Mais' ? MoreScreen : MainScreen} />)}
+    {(Object.keys(icons) as MainTab[]).map(name => <Tab.Screen key={name} name={name} component={name === 'Estatísticas' ? StatisticsScreen : name === 'Perfil' ? ProfileScreen : name === 'Times' ? TeamsScreen : name === 'Jogos' ? GamesScreen : name === 'Elenco' ? RosterScreen : name === 'Mais' ? MoreScreen : MainScreen} />)}
   </Tab.Navigator>;
 }
 

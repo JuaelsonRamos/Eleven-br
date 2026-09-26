@@ -37,6 +37,7 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
               <Text style={styles.pageDescription}>{selected.active_player_count} jogadores ativos</Text>
               <Button label="Jogos" onPress={() => navigation.navigate('Jogos')} />
               <Button label="Elenco" onPress={() => navigation.navigate('Elenco')} />
+              <Button label="Estatísticas" onPress={() => navigation.navigate('Estatísticas')} />
               <TextAction label="Perfil do time" onPress={() => navigation.navigate('Times', { view: 'detail' })} />
             </View>
           </Card> : <Card>
