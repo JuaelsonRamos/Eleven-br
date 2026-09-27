@@ -2,14 +2,16 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[4]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=ROOT / ".env", extra="ignore", hide_input_in_errors=True
+    )
 
     app_env: Literal["development", "test", "production"] = "development"
     database_url: str
@@ -18,6 +20,14 @@ class Settings(BaseSettings):
     jwt_audience: str = "eleven-mobile"
     cors_origins: list[str] = []
     dev_verification_codes: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=465, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from_email: str = ""
+    smtp_from_name: str = "ELEVEN BR"
+    smtp_use_ssl: bool = True
+    smtp_timeout_seconds: float = Field(default=15, gt=0, le=60)
     media_root: Path = ROOT / ".local" / "media"
 
     @field_validator("media_root")

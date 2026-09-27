@@ -286,7 +286,19 @@ o cooldown e solicite outro. Não compartilhe esse ambiente de simulação publi
 `APP_ENV=production` rejeita a configuração `DEV_VERIFICATION_CODES=true` na
 inicialização. Sem adaptador configurado, o envio falha com 503; não existe fallback
 silencioso de produção para desenvolvimento. `VerificationSender` é o contrato
-para um futuro provedor, ainda não implementado.
+para adaptadores de entrega. `SMTPVerificationSender` envia e-mail real quando a
+simulação local está desativada. Telefone permanece indisponível nesse sender.
+
+Configure privadamente `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`, `SMTP_USE_SSL` e, opcionalmente,
+`SMTP_TIMEOUT_SECONDS` (15 por padrão). A senha usa SecretStr; não versionar `.env`.
+SSL implícito usa `SMTP_USE_SSL=true`; `false` exige STARTTLS antes de autenticar,
+sem fallback para conexão aberta. Certificados são validados. Falhas retornam 503
+genérico; logs registram somente a classe do erro, sem respostas do servidor,
+destinatário, código ou credenciais. O e-mail contém texto/HTML e usa `CODE_MINUTES`
+do domínio. Não há alteração de códigos, hash, validade, tentativas ou rate limits.
+Testes sem envio real: `uv run pytest -q tests/test_delivery.py tests/test_auth.py`
+em `apps/api`. Não há dependência nova nem migration.
 
 Para testar, inicie PostgreSQL, aplique `alembic upgrade head`, inicie API e execute
 `npm.cmd run mobile:web` na raiz. Então:
