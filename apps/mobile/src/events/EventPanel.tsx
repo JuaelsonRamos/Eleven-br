@@ -11,6 +11,7 @@ import { EventForm } from './EventForm';
 import { styles } from './styles';
 import { MatchesPanel } from '../matches/MatchesPanel';
 import { FormationPanel } from '../formations/FormationPanel';
+import { remindPending } from './api';
 
 export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed }: { team: Team; onNavigate?: () => void; initialEventId?: string; onInitialConsumed?: () => void }) {
   const initial = useRef(initialEventId);
@@ -62,6 +63,15 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
       if (err instanceof ApiError && [403, 404].includes(err.status)) { setPage(null); setEvent(null); setMode('list'); }
     } finally { sending.current = false; if (revision === generation.current) setBusy(false); }
   }
+  async function remind(item: SportEvent) {
+    if (sending.current) return;
+    const revision = generation.current; sending.current = true; setBusy(true); setError(null); setSuccess(null);
+    try {
+      const result = await remindPending(team.id, item.id);
+      if (revision === generation.current) setSuccess(result.count ? `${result.count} jogador${result.count === 1 ? ' foi lembrado' : 'es foram lembrados'}.` : 'Nenhum novo lembrete. Os pendentes já foram lembrados.');
+    } catch (cause) { if (revision === generation.current) setError(cause instanceof Error ? cause.message : 'Não foi possível enviar os lembretes.'); }
+    finally { sending.current = false; if (revision === generation.current) setBusy(false); }
+  }
   const answers = (item: SportEvent, open: boolean) => item.status === 'open' && <View style={styles.row}>
     {(['VOU', 'NAO_VOU'] as const).map(value => <FilterChip key={value} disabled={busy} label={value === 'VOU' ? 'VOU' : 'NÃO VOU'} selected={item.my_response === value}
       onPress={() => void run(() => respond(team.id, item.id, value), 'Presença atualizada.', open)} />)}
@@ -69,7 +79,7 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
   if (loading) return <LoadingState />;
   if (mode === 'formation' && event) return <FormationPanel key={event.id} team={team} event={event} onNavigate={onNavigate}
     onBack={() => void run(() => getEvent(team.id, event.id))} />;
-  if (mode === 'create' || (mode === 'edit' && event)) return <EventForm team={team} event={mode === 'edit' ? event! : undefined}
+  if (mode === 'create' || (mode === 'edit' && event)) return <EventForm team={team} creationKey={page?.creation_key} event={mode === 'edit' ? event! : undefined}
     onCancel={back} onDenied={back} onDone={saved => { setEvent(saved); setMode('detail'); setSuccess('Evento salvo.'); }} />;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.title}>{mode === 'detail' && event ? event.title : 'Jogos'}</Text>
@@ -92,6 +102,7 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
         {event.participants.filter(person => person.response === group.value).map(person => <Text key={person.membership_id} style={styles.text}>{person.name}</Text>)}
       </View>)}
       <Text style={styles.note}>A lista considera jogadores ativos do elenco. Convidados aparecem separadamente.</Text>
+      {event.can_manage && event.status === 'open' && <Button variant="secondary" label="Lembrar pendentes" disabled={busy} onPress={() => void remind(event)} />}
       {event.kind === 'PELADA' && <Button label={event.can_manage && event.status === 'open' ? 'Montar times' : 'Ver times da pelada'} disabled={busy}
         onPress={() => { setError(null); setSuccess(null); setMode('formation'); onNavigate?.(); }} />}
       {event.kind === 'PELADA' && <MatchesPanel key={event.id} teamId={team.id} event={event} />}

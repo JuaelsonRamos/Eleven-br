@@ -28,7 +28,10 @@ def create(team_id: UUID, data: EventCreate, session: SessionDep, user: CurrentU
         session,
         user_id=user.id,
         team_id=team_id,
-        draft=EventDraft(**data.model_dump(exclude={"recurring_until", "recurring_weekly"})),
+        draft=EventDraft(
+            **data.model_dump(exclude={"recurring_until", "recurring_weekly", "creation_key"})
+        ),
+        creation_key=data.creation_key,
         recurring_weekly=data.recurring_weekly,
         recurring_until=data.recurring_until,
     )

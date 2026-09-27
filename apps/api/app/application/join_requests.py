@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
+from app.application.notification_events import join_request, join_resolved
 from app.application.roster import authorized_team, member_in_team, roster_name
 from app.application.sessions import verified
 from app.application.teams import add_member
@@ -147,6 +148,7 @@ def request_entry(
     item = TeamJoinRequest(team_id=team_id, user_id=user_id)
     session.add(item)
     session.flush()
+    join_request(session, team, item)
     result = present(item, team)
     session.commit()
     return result
@@ -235,6 +237,7 @@ def reject(
         raise Conflict("Confirme a recusa da solicitação.")
     resolve(item, "REJECTED", user_id)
     session.flush()
+    join_resolved(session, team, item)
     result = present(item, team)
     session.commit()
     return result
@@ -349,6 +352,7 @@ def approve(
         item.membership_id = member.id
         resolve(item, "APPROVED", user_id)
         session.flush()
+        join_resolved(session, team, item)
         result = present(item, team)
         session.commit()
         return result

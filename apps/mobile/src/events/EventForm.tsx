@@ -17,8 +17,8 @@ function isoDate(input: string): string | null {
 }
 const displayDate = (iso: string) => iso.split('-').reverse().join('/');
 
-export function EventForm({ team, event, onDone, onCancel, onDenied }: {
-  team: Team; event?: SportEvent; onDone: (event: SportEvent) => void; onCancel: () => void; onDenied: () => void;
+export function EventForm({ team, event, creationKey, onDone, onCancel, onDenied }: {
+  team: Team; event?: SportEvent; creationKey?: string; onDone: (event: SportEvent) => void; onCancel: () => void; onDenied: () => void;
 }) {
   const { options } = useTeams();
   const modalities = options.modalities.filter(item => team.modalities.includes(item.value));
@@ -54,7 +54,7 @@ export function EventForm({ team, event, onDone, onCancel, onDenied }: {
     try {
       onDone(await saveEvent(team.id, { title: title.trim(), kind, modality: selectedModality, date: start, time: time.trim(),
         location: location.trim(), notes: notes.trim() || null, opponent: kind === 'JOGO' ? opponent.trim() || null : null,
-        ...(!event ? { recurring_weekly: weekly && kind === 'PELADA', recurring_until: weekly && kind === 'PELADA' ? end : null } : {}),
+        ...(!event ? { creation_key: creationKey, recurring_weekly: weekly && kind === 'PELADA', recurring_until: weekly && kind === 'PELADA' ? end : null } : {}),
       }, event?.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');

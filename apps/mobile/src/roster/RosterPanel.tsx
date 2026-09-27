@@ -10,7 +10,8 @@ import { PlayerForm } from './PlayerForm';
 import { rosterStyles as styles } from './styles';
 import { JoinAdminPanel } from '../join/JoinAdminPanel';
 
-export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }) {
+export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }: { team: Team; onBack: () => void; initialRequests?: boolean; onInitialConsumed?: () => void }) {
+  const initial = useRef(initialRequests), consumed = useRef(onInitialConsumed);
   const [filter, setFilter] = useState<RosterFilter>('active');
   const [page, setPage] = useState<RosterPage | null>(null);
   const [player, setPlayer] = useState<RosterPerson | null>(null);
@@ -25,7 +26,7 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
   const reload = useCallback(async () => {
     const current = ++generation.current;
     setLoading(true); setError(null);
-    try { const value = await listRoster(team.id, filter); if (current === generation.current) setPage(value); }
+    try { const value = await listRoster(team.id, filter); if (current === generation.current) { setPage(value); if (initial.current) { initial.current = false; if (value.can_manage) setMode('requests'); else setError('Você não possui permissão para tratar solicitações.'); consumed.current?.(); } } }
     catch (cause) { if (current === generation.current) { setPage(null); setPlayer(null); setMode('list'); setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o elenco.'); } }
     finally { if (current === generation.current) setLoading(false); }
   }, [filter, team.id]);

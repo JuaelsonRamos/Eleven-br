@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,9 +6,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { MainTab } from '@eleven/shared';
 import { theme } from '../theme';
 import type { IconName } from './design';
+import { useNotifications } from '../notifications/NotificationContext';
 
 export function BottomNavigation({ state, navigation, visible, icons }: BottomTabBarProps & { visible: MainTab[]; icons: Record<MainTab, IconName> }) {
   const insets = useSafeAreaInsets();
+  const { count, refresh } = useNotifications();
+  useEffect(() => { void refresh(); }, [state.index, refresh]);
   const [focused, setFocused] = useState<string | null>(null);
   const current = state.routes[state.index];
   const parent = current && !visible.includes(current.name as MainTab)
@@ -21,13 +24,15 @@ export function BottomNavigation({ state, navigation, visible, icons }: BottomTa
         const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
         if (current?.key !== route.key && !event.defaultPrevented) navigation.navigate(route.name, route.params);
       }} onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })} style={[s.item, focused === route.key && s.focus]}>
-        <View style={[s.indicator, active && s.active]}><Ionicons name={icons[route.name as MainTab]} size={theme.icon.medium} color={active ? theme.colors.green : theme.colors.muted} /></View>
+        <View style={[s.indicator, active && s.active]}><Ionicons name={icons[route.name as MainTab]} size={theme.icon.medium} color={active ? theme.colors.green : theme.colors.muted} />{!!count && ['Mais', 'Notificações'].includes(route.name) && <View style={s.counter} accessible accessibilityLabel={`${count} notificações não lidas`}><Text style={s.counterText}>{count > 99 ? '99+' : count}</Text></View>}</View>
         <Text style={[s.label, active && s.activeLabel]}>{label}</Text>
       </Pressable>;
     })}
   </View></View>;
 }
 const s = StyleSheet.create({
+  counter: { position: 'absolute', right: 0, top: 0, minWidth: 18, paddingHorizontal: 3, borderRadius: theme.radii.pill, backgroundColor: theme.colors.green, alignItems: 'center' },
+  counterText: { fontSize: 11, fontWeight: '700', color: theme.colors.white },
   surface: { backgroundColor: theme.colors.surface, paddingTop: theme.space.xs },
   bar: { flexDirection: 'row', width: '100%', maxWidth: theme.maxWidth, alignSelf: 'center', paddingHorizontal: theme.space.sm },
   item: { flex: 1, minHeight: 60, alignItems: 'center', justifyContent: 'center', gap: theme.space.xs, borderWidth: 2, borderColor: 'transparent', borderRadius: theme.radii.md },

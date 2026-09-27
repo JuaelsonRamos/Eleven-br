@@ -35,6 +35,7 @@ class EventInput(BaseModel):
 
 
 class EventCreate(EventInput):
+    creation_key: UUID | None = None
     recurring_weekly: bool = False
     recurring_until: Date | None = None
 
@@ -90,5 +91,6 @@ class EventRead(EventInput):
 
 
 class EventPage(BaseModel):
+    creation_key: UUID
     items: list[EventRead]
     can_manage: bool

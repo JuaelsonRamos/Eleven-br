@@ -9,19 +9,17 @@ import { TeamDashboard } from '../teams/TeamDashboard';
 import { theme } from '../theme';
 import type { TabParams } from '../navigation';
 
-export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams>) {
-  const name = route.name;
+export function MainScreen({ navigation }: BottomTabScreenProps<TabParams, 'Início'>) {
   const { selected, loading, error, reload } = useTeams();
-  useFocusEffect(useCallback(() => { if (name === 'Início') void reload(); }, [name, reload]));
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.container}>
         <AppHeader onProfile={() => navigation.navigate('Perfil')} />
         <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.pageTitle}>{name === 'Início' && selected ? 'Início do time' : name}</Text>
-          <Text style={styles.pageDescription}>{name === 'Início' ? 'Mais futebol. Menos burocracia.' : 'Seu futebol, mais organizado.'}</Text>
+          <Text accessibilityRole="header" style={styles.pageTitle}>{selected ? 'Início do time' : 'Início'}</Text>
+          <Text style={styles.pageDescription}>Mais futebol. Menos burocracia.</Text>
         </View>
-        {name === 'Início' ? <>
           {!selected && !loading && !error && <View style={styles.hero}>
             <Text style={styles.eyebrow}>DENTRO E FORA DE CAMPO</Text>
             <Text accessibilityRole="header" style={styles.heroTitle}>Seu time.{ '\n' }Seu jogo.</Text>
@@ -35,7 +33,6 @@ export function MainScreen({ route, navigation }: BottomTabScreenProps<TabParams
               <Button label="Entrar em um time" onPress={() => navigation.navigate('Times', { view: 'join' })} />
             </EmptyState>
           </Card>}
-        </> : <Card><EmptyState title="Tudo em dia por aqui" description="Quando as notificações estiverem disponíveis, você encontrará os avisos dos seus times neste espaço." icon="notifications-outline" /></Card>}
         <Text style={styles.footer}>ELEVEN BR · Feito para o nosso futebol</Text>
       </View>
     </ScrollView>

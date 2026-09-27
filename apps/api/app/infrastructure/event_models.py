@@ -43,6 +43,8 @@ class EventSeries(Entity, Base):
 class Event(Entity, Base):
     __tablename__ = "events"
     team_id: Mapped[UUID] = mapped_column(ForeignKey("teams.id"))
+    creation_key: Mapped[UUID | None]
+    creation_hash: Mapped[str | None] = mapped_column(String(64))
     series_id: Mapped[UUID | None]
     recurrence_date: Mapped[date | None] = mapped_column(Date)
     modality: Mapped[str] = mapped_column(String(40))
@@ -56,6 +58,8 @@ class Event(Entity, Base):
     status: Mapped[str] = mapped_column(String(16), server_default="open")
     __table_args__ = (
         UniqueConstraint("team_id", "id", name="uq_events_team_id"),
+        UniqueConstraint("team_id", "creation_key", name="uq_events_creation_key"),
+        CheckConstraint("(creation_key IS NULL) = (creation_hash IS NULL)", name="creation_key"),
         UniqueConstraint("series_id", "recurrence_date", name="uq_events_series_date"),
         ForeignKeyConstraint(["team_id", "series_id"], ["event_series.team_id", "event_series.id"]),
         CheckConstraint("kind IN ('PELADA', 'JOGO')", name="kind"),

@@ -395,5 +395,6 @@ def test_concurrent_materialization_keeps_one_occurrence_per_date(
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         pages = list(pool.map(load, [1, 2]))
-    assert pages[0] == pages[1]
+    assert pages[0]["items"] == pages[1]["items"]
+    assert pages[0]["can_manage"] == pages[1]["can_manage"]
     assert session.scalar(select(func.count()).select_from(Event)) == 18

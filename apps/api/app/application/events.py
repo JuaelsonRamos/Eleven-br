@@ -1,17 +1,21 @@
 """Team-scoped events; all writes serialize with roster changes on the team row."""
 
+import hashlib
+import json
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.application.notification_events import event_notice
 from app.application.roster import roster_name
 from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
 from app.domain.events import EventDraft
+from app.domain.notifications import NotificationType
 from app.domain.policies import Conflict, NotFound, Permission
 from app.infrastructure.event_models import Event, EventAttendance, EventGuest, EventSeries
 from app.infrastructure.models import Player, Team, TeamMembership
@@ -60,8 +64,27 @@ def create_event(
     draft: EventDraft,
     recurring_weekly: bool = False,
     recurring_until: date | None = None,
+    creation_key: UUID | None = None,
 ) -> Event:
     team = authorize(session, user_id, team_id, write=True, manage=True)
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            [str(user_id), asdict(draft), recurring_weekly, recurring_until],
+            sort_keys=True,
+            default=str,
+        ).encode()
+    ).hexdigest()
+    if creation_key:
+        previous = session.scalar(
+            select(Event).where(
+                Event.team_id == team_id,
+                Event.creation_key == creation_key,
+            )
+        )
+        if previous:
+            if previous.creation_hash != fingerprint:
+                raise Conflict("Este identificador já foi usado com outros dados.")
+            return previous
     validate_modality(team, draft)
     if recurring_weekly or recurring_until is not None:
         if draft.kind != "PELADA" or (
@@ -90,6 +113,10 @@ def create_event(
     else:
         first = Event(**asdict(draft), team_id=team.id)
         session.add(first)
+    if creation_key:
+        first.creation_key, first.creation_hash = creation_key, fingerprint
+    session.flush()
+    event_notice(session, team, first, user_id, NotificationType.EVENT_CREATED)
     session.commit()
     return first
 
@@ -142,22 +169,31 @@ def edit_event(
     validate_modality(team, draft)
     if event.series_id is not None and draft.kind != "PELADA":
         raise Conflict("Uma ocorrência de pelada deve continuar sendo pelada")
+    relevant = any(
+        getattr(event, field) != getattr(draft, field)
+        for field in ("date", "time", "location", "modality")
+    )
     for key, value in asdict(draft).items():
         setattr(event, key, value)
+    session.flush()
+    if relevant:
+        event_notice(session, team, event, user_id, NotificationType.EVENT_UPDATED)
     session.commit()
     return event
 
 
 def cancel_event(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) -> Event:
-    authorize(session, user_id, team_id, write=True, manage=True)
+    team = authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
+    if event.status != "cancelled":
+        event_notice(session, team, event, user_id, NotificationType.EVENT_CANCELLED)
     event.status = "cancelled"
     session.commit()
     return event
 
 
 def cancel_series(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) -> Event:
-    authorize(session, user_id, team_id, write=True, manage=True)
+    team = authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
     series = session.scalar(
         select(EventSeries).where(
@@ -167,6 +203,8 @@ def cancel_series(session: Session, *, user_id: UUID, team_id: UUID, event_id: U
     )
     if series is None:
         raise Conflict("Este evento não possui recorrência")
+    if series.status != "cancelled":
+        event_notice(session, team, event, user_id, NotificationType.EVENT_CANCELLED, series=True)
     series.status = "cancelled"
     session.execute(
         update(Event)
@@ -336,7 +374,7 @@ def list_events(session: Session, *, user_id: UUID, team_id: UUID) -> dict[str, 
     )
     can_manage, items = snapshots(session, team, user_id, events)
     session.commit()
-    return {"can_manage": can_manage, "items": items}
+    return {"can_manage": can_manage, "items": items, "creation_key": uuid4()}
 
 
 def detail(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) -> dict[str, object]:

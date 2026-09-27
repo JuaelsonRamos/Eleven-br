@@ -280,6 +280,10 @@ def test_0006_preserves_all_rows_and_protects_downgrade(engine: Engine, session:
             if table == "event_guests":
                 for row in rows:
                     assert row.pop("removed_at") is None
+            if table == "events":
+                for row in rows:
+                    assert row.pop("creation_key") is None
+                    assert row.pop("creation_hash") is None
             assert rows == before[table]
         command.check(config)
     path = event + "/formation"

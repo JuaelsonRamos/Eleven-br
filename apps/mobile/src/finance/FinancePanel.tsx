@@ -12,7 +12,8 @@ import { s } from './styles';
 
 type Mode = 'dues' | 'cash' | 'settings' | 'entry' | 'detail' | 'payment';
 type Action = { path: string; payload: object; title: string; reasonRequired: boolean };
-export function FinancePanel({ teamId, onBack, onNavigate }: { teamId: string; onBack: () => void; onNavigate: () => void }) {
+export function FinancePanel({ teamId, onBack, onNavigate, initialDuesId, onInitialConsumed }: { teamId: string; onBack: () => void; onNavigate: () => void; initialDuesId?: string; onInitialConsumed?: () => void }) {
+  const initial = useRef(initialDuesId), consumed = useRef(onInitialConsumed);
   const [context, setContext] = useState<api.Context | null>(null);
   const [mode, setMode] = useState<Mode>('dues');
   const [dues, setDues] = useState<api.DuesPage | null>(null);
@@ -61,7 +62,7 @@ export function FinancePanel({ teamId, onBack, onNavigate }: { teamId: string; o
       if (current === generation.current) { setError(cause instanceof Error ? cause.message : 'Não foi possível carregar.'); setDues(null); setCash(null); setDetail(null); setContext(null); }
     } finally { if (current === generation.current) setLoading(false); }
   }, [teamId]);
-  useEffect(() => { const counter = generation; void load(); return () => { counter.current++; }; }, [load]);
+  useEffect(() => { const counter = generation; const id = initial.current; initial.current = undefined; void load(id ? 'detail' : 'dues', 0, id).then(() => { if (id) consumed.current?.(); }); return () => { counter.current++; }; }, [load]);
   function navigate(target: Mode, id?: string) { setSuccess(null); onNavigate(); void load(target, 0, id, target === 'dues' ? month : undefined, filters); }
   async function save(path: string, payload: object, method: 'POST' | 'PUT' = 'POST') {
     if (sending.current) return;

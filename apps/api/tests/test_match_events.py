@@ -374,8 +374,13 @@ def test_incremental_upgrade_preserves_all_rows(engine, session):
         tables = [t for t in inspect(connection).get_table_names() if t != "alembic_version"]
 
         def snapshot(table):
+            value = (
+                "to_jsonb(t) - 'creation_key' - 'creation_hash'"
+                if table == "events"
+                else "to_jsonb(t)"
+            )
             return connection.execute(
-                text(f'SELECT to_jsonb(t)::text FROM "{table}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT ({value})::text FROM "{table}" t ORDER BY ({value})::text')
             ).all()
 
         before = {table: snapshot(table) for table in tables}

@@ -22,9 +22,10 @@ o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (ele
 o Prompt 05 (eventos, peladas e presença), o Prompt 06 (formação de times da pelada)
 o Prompt 07 (partidas e resultados da pelada), o Prompt 08 (gols, assistências e cartões),
 o Prompt 09 (estatísticas internas), o Prompt 10 (entrada por código e vinculação aprovada)
-e o Prompt 11 (mensalidades e caixa interno).
+o Prompt 11 (mensalidades e caixa interno), o Prompt 12 (design system mobile first)
+e o Prompt 13 (notificações internas persistentes).
 As áreas do aplicativo exigem
-autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
+autenticação; Jogos apresenta eventos do time selecionado e Notificações reúne avisos pessoais. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
 
 Times reutilizam a estrutura existente; a migration `0003_team_modalities` converte
@@ -196,6 +197,35 @@ explícita no elenco antes da aprovação, respeitando a capacidade do plano.
 Foto existente é preservada; se somente a conta tem foto, transfira a referência
 sem duplicar arquivo. Duas fotos diferentes bloqueiam vinculação até decisão
 explícita sobre a imagem; não sobrescrever nem apagar silenciosamente.
+
+## Notificações internas — Prompt 13
+
+`Notification` pertence a **User**, nunca a Player/Membership. Player sem User e
+convidado não recebem notificações; não criar identidade artificial nem usar contatos.
+Destinatários operacionais são contas/vínculos ativos; solicitações notificam somente
+quem pode gerenciar membros pelas policies do time. Não ampliar permissões.
+
+`notification_delivery.emit` não confirma transação: negócio e notificação devem
+concluir ou reverter juntos. Deduplicação obrigatória via constraint User/chave e
+INSERT ON CONFLICT; não confiar em duplo clique bloqueado na interface. Tipos e ações
+estáveis estão em `domain/notifications.py`. Ações são semânticas, sem URLs no banco.
+Listagem/leitura/read-all usam somente User autenticado; conteúdo operacional é
+ocultado após perda de acesso. Não apagar histórico nem implementar retenção automática.
+
+Evento notifica na criação explícita, alteração de data/horário/local/modalidade e
+cancelamento. Materialização de série por GET não emite; encerramento comunica uma
+vez por destinatário. Lembrete manual usa contexto `manual-v1` único por usuário/evento,
+apenas pendentes de evento aberto; não adicionar cron/scheduler. Mensalidade notifica
+após emissão efetiva, pagamento respeita saldo parcial e estorno mantém o aviso original.
+
+`0011_notifications` adiciona Notification e chave/hash de retry de criação de evento.
+O app guarda a chave da listagem durante o formulário. Reusar com outro conteúdo é
+conflito; clientes legados sem chave fazem operações independentes. Preservar 0001–0010.
+Ao abrir aviso de outro time, revalidar acesso e trocar **o TeamContext existente**
+antes de navegar. Não criar seleção paralela; IDs de evento/cobrança continuam validados
+na API. Central usa design system do Prompt 12, contador do backend e paginação.
+Push/e-mail/WhatsApp/SMS e Delivery não foram implementados. Canais futuros devem
+consumir a mesma identidade da Notification, sem acoplar emissão à interface.
 
 ## Planos e permissões
 

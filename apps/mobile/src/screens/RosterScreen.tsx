@@ -10,14 +10,15 @@ import { RosterPanel } from '../roster/RosterPanel';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
 
-export function RosterScreen({ navigation }: BottomTabScreenProps<TabParams>) {
+export function RosterScreen({ navigation, route }: BottomTabScreenProps<TabParams, 'Elenco'>) {
   const { selected, loading, error, reload } = useTeams();
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
+  const consume = useCallback(() => navigation.setParams({ teamId: undefined, view: undefined }), [navigation]);
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
         <AppHeader />
-        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><RosterPanel team={selected} onBack={() => navigation.navigate('Início')} /></View> : <>
+        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><RosterPanel team={selected} initialRequests={route.params?.teamId === selected.id && route.params.view === 'requests'} onInitialConsumed={consume} onBack={() => navigation.navigate('Início')} /></View> : <>
           <EmptyState title="Selecione seu time" description="Abra um time para acompanhar o elenco." icon="people-outline" />
           <Button label="Meus times" onPress={() => navigation.navigate('Times')} />
         </>}

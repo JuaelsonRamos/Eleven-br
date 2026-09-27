@@ -17,7 +17,9 @@ from app.application.finance_commands import (
     PaymentInput,
     SettingsInput,
 )
+from app.application.notification_events import finance_notice
 from app.application.roster import roster_name
+from app.domain.notifications import NotificationType
 from app.domain.policies import Conflict, NotFound
 from app.infrastructure.finance_models import CashEntry, DuesSettings, FinanceAudit, MonthlyDues
 from app.infrastructure.models import Player, TeamMembership
@@ -134,6 +136,7 @@ def generate(
         session.add(item)
         session.flush()
         audit(session, team_id, user_id, "GENERATED", dues_id=item.id)
+        finance_notice(session, item, NotificationType.FINANCE_CHARGE_CREATED)
     session.flush()
     return preview
 
@@ -195,6 +198,13 @@ def pay(
     item.status = "PAID" if paid + data.amount == item.amount else "PENDING"
     item.version += 1
     session.flush()
+    finance_notice(
+        session,
+        item,
+        NotificationType.FINANCE_PAYMENT_REGISTERED,
+        entry=entry,
+        remaining=item.amount - paid - data.amount,
+    )
     audit(
         session, team_id, user_id, "PAYMENT", dues_id=item.id, entry_id=entry.id, reason=data.note
     )
@@ -285,4 +295,6 @@ def cancel_entry(
         reason=data.reason,
     )
     session.flush()
+    if dues:
+        finance_notice(session, dues, NotificationType.FINANCE_PAYMENT_REVERSED, entry=item)
     return f.entry_read(item)

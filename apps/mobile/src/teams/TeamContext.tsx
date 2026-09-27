@@ -6,7 +6,7 @@ import { readSelection, storeSelection } from './selection';
 type State = {
   teams: api.Team[]; selected: api.Team | null; options: api.Options;
   loading: boolean; error: string | null; warning: string | null;
-  reload: () => Promise<void>; select: (id: string) => Promise<void>;
+  reload: () => Promise<void>; select: (id: string) => Promise<api.Team | null>;
   saved: (team: api.Team) => Promise<void>;
 };
 const Context = createContext<State | null>(null);
@@ -65,14 +65,16 @@ export function TeamProvider({ userId, children }: PropsWithChildren<{ userId: s
     setLoading(true); setError(null); setSelected(null);
     try {
       const team = await api.getTeam(id);
-      if (current !== revision.current) return;
+      if (current !== revision.current) return null;
       selection.current = team.id; setSelected(team);
-      setTeams(list => list.map(item => item.id === team.id ? team : item));
+      setTeams(list => [...list.filter(item => item.id !== team.id), team].sort((a, b) => a.name.localeCompare(b.name)));
       await persist(team.id);
+      return current === revision.current ? team : null;
     } catch (cause) {
-      if (current !== revision.current) return;
+      if (current !== revision.current) return null;
       selection.current = null; await persist(null);
       setError(cause instanceof Error ? cause.message : 'Não foi possível selecionar o time.');
+      return null;
     } finally { if (current === revision.current) setLoading(false); }
   }
 

@@ -152,7 +152,7 @@ O aplicativo restaura a sessão antes de mostrar login ou abas. Cadastro pede no
 telefone OU e-mail e senha com confirmação. A verificação cria o Player com o nome
 já informado, sem TeamMembership e sem exigir time. Contas existentes sem Player
 recebem apenas a complementação de nome. Times permitem criação, consulta, edição
-e seleção; Jogos apresenta eventos do time selecionado e Notificações continua placeholder.
+e seleção; Jogos apresenta eventos do time selecionado e Notificações reúne avisos internos persistentes.
 
 A API deve estar executando junto com o Expo. Web usa por padrão o hostname do
 navegador na porta 8011; celular usa o host LAN anunciado pelo Expo. Para aparelho
@@ -1019,7 +1019,7 @@ não inclui fotos de jogadores.
 Jogos, Elenco, Estatísticas, Mais, Meus Times, Perfil e formulários reutilizam essa
 base. Conteúdo centralizado até 760 px e formulários até 520 px; cards e ações
 quebram em linhas no celular. Não há dependência nova, alteração de regra de
-negócio, contrato ou migration. O head continua `0010`.
+negócio, contrato ou migration nesse redesign. O head daquele Prompt permaneceu `0010`.
 
 Para conferir manualmente, use `npm.cmd run mobile:web` na raiz e navegue em
 320/390/768/1280 px. Com Expo ativo, a regressão Web completa roda em `apps/api`:
@@ -1034,6 +1034,48 @@ uma paga fora da primeira página. Capturas ficam em `.local`, sem dados de prod
 Os fluxos anteriores continuam validando pagamentos, presença, formação, partidas,
 gols/cartões, entrada, isolamento e fotos. Os testes usam somente schemas descartáveis
 do banco `_test`; exportar Android/iOS não equivale a validar em aparelho físico.
+
+## Notificações internas — Prompt 13
+
+**Mais → Notificações** reúne avisos destinados ao User autenticado, agrupados por
+dia, com nome do time, estado de leitura, contador do backend e paginação. As quatro
+abas principais permanecem iguais. Tocar marca como lida, revalida o acesso ao time
+e usa o TeamContext para selecionar e abrir evento, cobrança, solicitações ou Início.
+O histórico permanece; conteúdo operacional de acesso revogado é ocultado.
+
+Geram avisos: solicitação de entrada (somente gestores autorizados), aprovação e
+recusa; criação, alteração relevante e cancelamento de evento; mensalidade criada,
+pagamento parcial/quitação e estorno. Prévia financeira e materialização automática
+de recorrência não enviam avisos. Encerrar uma série gera um único aviso por pessoa.
+Players sem User, convidados e vínculos inativos não recebem avisos operacionais.
+O autor não recebe os próprios avisos de evento. Não há envio externo nem retroativo.
+
+Em um evento aberto, o gestor pode **Lembrar pendentes**: somente usuários ativos
+sem resposta recebem o lembrete. O contexto manual Beta é único por usuário/evento;
+repetir a ação não repete avisos, inclusive se alguém respondeu e depois ficou pendente.
+
+Migration **0011_notifications** cria `notifications` e acrescenta chave/hash opcionais
+à criação de eventos, preservando dados e migrations 0001–0010. O app reutiliza a
+`creation_key` recebida da listagem em retries do formulário; a mesma chave com outro
+conteúdo retorna conflito. Clientes legados sem chave continuam aceitos, mas cada
+POST representa uma criação distinta. A constraint `(user_id, dedup_key)` e INSERT
+ON CONFLICT impedem notificações duplicadas. Emissão ocorre na transação do negócio,
+sem commit próprio, fila ou tabela de canais. O head atual é **0011**.
+
+API pessoal: GET `/v1/me/notifications?limit=20&cursor=<id>` (máximo 50), GET
+`/unread-count`, GET `/{id}`, POST `/{id}/read` e POST `/read-all` sob esse prefixo.
+Lembretes: POST `/v1/teams/{team_id}/events/{event_id}/attendance-reminders`.
+Nenhum endpoint aceita destinatário arbitrário; IDs e permissões são revalidados.
+
+Testes: `uv run pytest -q tests/test_notifications.py`; com Expo em 8081,
+`uv run --with playwright pytest -q tests/browser_notifications_flow.py`, em `apps/api`.
+O fluxo Web cobre vazio, badge, leitura, troca de time, evento, cobrança, solicitações
+e 320/390/768/1280 px, somente em banco `_test`. Para validar manualmente, use duas
+contas vinculadas a um time: uma cria o evento e a outra abre o aviso em Mais.
+
+Push permanece futuro: será necessário cadastrar dispositivos, política de entrega
+e adaptador/provedor de canais. Notification continua sendo a mensagem do usuário;
+nenhuma tabela Delivery, token de dispositivo, scheduler ou integração foi antecipada.
 
 ## Próxima etapa
 

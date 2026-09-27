@@ -45,6 +45,7 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "monthly_dues",
             "cash_entries",
             "finance_audit",
+            "notifications",
         }
         command.check(config)
 

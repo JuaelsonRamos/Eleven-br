@@ -1,17 +1,18 @@
 import { authenticated } from '../auth/api';
 
 export type Answer = 'VOU' | 'NAO_VOU' | 'PENDENTE';
-export type EventInput = { modality: string; kind: 'PELADA' | 'JOGO'; title: string; date: string;
+export type EventInput = { creation_key?: string; modality: string; kind: 'PELADA' | 'JOGO'; title: string; date: string;
   time: string; location: string; notes: string | null; opponent: string | null; recurring_weekly?: boolean; recurring_until?: string | null };
 export type SportEvent = EventInput & { id: string; team_id: string; series_id: string | null;
   status: 'open' | 'cancelled'; recurrence_status: 'active' | 'cancelled' | null; can_manage: boolean; my_response: Answer; going: number; not_going: number; pending: number;
   participants: { membership_id: string; player_id: string; name: string; response: Answer }[];
   guests: { id: string; name: string }[] };
-export type EventPage = { items: SportEvent[]; can_manage: boolean };
+export type EventPage = { items: SportEvent[]; can_manage: boolean; creation_key: string };
 const base = (team: string) => `/v1/teams/${encodeURIComponent(team)}/events`;
 const path = (team: string, id: string) => `${base(team)}/${encodeURIComponent(id)}`;
 export const listEvents = (team: string) => authenticated<EventPage>(base(team));
 export const getEvent = (team: string, id: string) => authenticated<SportEvent>(path(team, id));
+export const remindPending = (team: string, id: string) => authenticated<{ count: number }>(`${path(team, id)}/attendance-reminders`, {}, 'POST');
 export const saveEvent = (team: string, data: EventInput, id?: string) => authenticated<SportEvent>(id ? path(team, id) : base(team), data, id ? 'PUT' : 'POST');
 export const respond = (team: string, id: string, response: Exclude<Answer, 'PENDENTE'>) => authenticated<SportEvent>(`${path(team, id)}/attendance`, { response }, 'PUT');
 export const cancelEvent = (team: string, id: string) => authenticated<SportEvent>(`${path(team, id)}/cancel`, {}, 'POST');

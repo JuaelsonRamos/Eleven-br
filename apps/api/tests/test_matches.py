@@ -253,8 +253,13 @@ def test_upgrade_preserves_existing_formation(engine, session):
         ]
 
         def snapshot(table):
+            value = (
+                "to_jsonb(t) - 'creation_key' - 'creation_hash'"
+                if table == "events"
+                else "to_jsonb(t)"
+            )
             return connection.execute(
-                text(f"SELECT to_jsonb(t)::text FROM {table} t ORDER BY to_jsonb(t)::text")
+                text(f"SELECT ({value})::text FROM {table} t ORDER BY ({value})::text")
             ).all()
 
         before = {table: snapshot(table) for table in tables}

@@ -18,6 +18,8 @@ import { MoreScreen } from './screens/MoreScreen';
 import { FinanceScreen } from './screens/FinanceScreen';
 import { BottomNavigation } from './components/BottomNavigation';
 import { StatisticsScreen } from './screens/StatisticsScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
+import { NotificationProvider } from './notifications/NotificationContext';
 
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
@@ -44,7 +46,7 @@ function MainNavigation() {
     <Tab.Screen name="Início" component={MainScreen} />
     <Tab.Screen name="Jogos" component={GamesScreen} />
     <Tab.Screen name="Times" component={TeamsScreen} />
-    <Tab.Screen name="Notificações" component={MainScreen} />
+    <Tab.Screen name="Notificações" component={NotificationsScreen} />
     <Tab.Screen name="Perfil" component={ProfileScreen} />
     <Tab.Screen name="Elenco" component={RosterScreen} />
     <Tab.Screen name="Mais" component={MoreScreen} />
@@ -65,7 +67,7 @@ function AppContent() {
   if (booting || bootError || !profile?.player_id) return <AuthScreens />;
   return (
     <TeamProvider key={profile.user_id} userId={profile.user_id}><NavigationContainer theme={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, primary: theme.colors.green, background: theme.colors.background, text: theme.colors.graphite } }}>
-      <MainNavigation />
+      <NotificationProvider><MainNavigation /></NotificationProvider>
     </NavigationContainer></TeamProvider>
   );
 }
