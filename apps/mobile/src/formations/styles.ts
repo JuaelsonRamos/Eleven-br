@@ -3,12 +3,12 @@ import { theme } from '../theme';
 
 export const formationStyles = StyleSheet.create({
   summary: { gap: 4 },
-  list: { gap: 0 },
+  list: { gap: theme.space.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 60, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border },
   identity: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontFamily: theme.fontFamily, fontSize: 15, lineHeight: 21, color: theme.colors.graphite },
-  meta: { fontFamily: theme.fontFamily, fontSize: 12, lineHeight: 17, color: theme.colors.muted },
+  meta: { fontFamily: theme.fontFamily, fontSize: theme.type.small, lineHeight: 21, color: theme.colors.muted },
   guest: { color: theme.colors.blue },
   column: { width: 64, textAlign: 'center', fontFamily: theme.fontFamily, fontSize: 12, color: theme.colors.muted },
   toggle: { width: 64, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.white },
@@ -23,7 +23,7 @@ export const formationStyles = StyleSheet.create({
   preview: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   forecast: { flexGrow: 1, minWidth: 128, padding: 10, borderRadius: 10, backgroundColor: theme.colors.lightGreen },
   grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  card: { padding: 16, borderRadius: theme.radius, backgroundColor: theme.colors.white, borderWidth: 1, borderColor: theme.colors.border },
+  card: { padding: theme.space.lg, borderRadius: theme.radius, backgroundColor: theme.colors.surface },
   cardHeading: { gap: 3, marginBottom: 8 },
   player: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.border, paddingVertical: 4 },
   keeper: { color: theme.colors.green, fontWeight: '700' },

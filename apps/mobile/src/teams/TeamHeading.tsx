@@ -10,6 +10,6 @@ export function TeamHeading({ team }: { team: Team }) {
   </View>;
 }
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  name: { flex: 1, fontFamily: theme.fontFamily, fontWeight: '700', fontSize: 18, color: theme.colors.green },
+  row: { flexDirection: 'row', alignItems: 'center', gap: theme.space.md, backgroundColor: theme.colors.surface, padding: theme.space.md, borderRadius: theme.radii.md },
+  name: { flex: 1, minWidth: 0, fontFamily: theme.fontFamily, fontWeight: '700', fontSize: theme.type.body, color: theme.colors.green },
 });

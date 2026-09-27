@@ -1,0 +1,19 @@
+import { authenticated } from '../auth/api';
+
+export type JoinTeam = { id: string; name: string; code: string; city: string; state: string; modalities: string[]; crest_url: string | null };
+export type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export const statusLabels: Record<Status, string> = { PENDING: 'Aguardando aprovação', APPROVED: 'Aprovada', REJECTED: 'Recusada', CANCELLED: 'Cancelada' };
+export type JoinRequest = { id: string; team: JoinTeam; status: Status; created_at: string; updated_at: string; resolved_at: string | null };
+export type Lookup = { team: JoinTeam; membership_status: string | null; pending: boolean };
+export type AdminRequest = { id: string; name: string; masked_contact: string; created_at: string; status: Status };
+export type Candidate = { membership_id: string; name: string; status: string; photo_url: string | null; unavailable_reason: string | null };
+export type Detail = { request: AdminRequest; candidates: Candidate[]; identity_conflict: string | null };
+const root = (team: string) => `/v1/teams/${encodeURIComponent(team)}/join-requests`;
+export const lookup = (code: string) => authenticated<Lookup>('/v1/teams/join/lookup', { code }, 'POST');
+export const requestEntry = (team: JoinTeam) => authenticated<JoinRequest>(root(team.id), { code: team.code }, 'POST');
+export const mine = (offset = 0) => authenticated<JoinRequest[]>(`/v1/me/join-requests?offset=${offset}`);
+export const cancel = (id: string) => authenticated<JoinRequest>(`/v1/me/join-requests/${encodeURIComponent(id)}/cancel`, {}, 'POST');
+export const pending = (team: string) => authenticated<AdminRequest[]>(root(team));
+export const detail = (team: string, id: string) => authenticated<Detail>(`${root(team)}/${encodeURIComponent(id)}`);
+export const approve = (team: string, id: string, membership: string | null) => authenticated<JoinRequest>(`${root(team)}/${encodeURIComponent(id)}/approve`, { membership_id: membership, confirm: true }, 'POST');
+export const reject = (team: string, id: string) => authenticated<JoinRequest>(`${root(team)}/${encodeURIComponent(id)}/reject`, { confirm: true }, 'POST');

@@ -4,7 +4,9 @@ from sqlalchemy import create_engine, pool
 from app.infrastructure import (  # noqa: F401
     auth_models,
     event_models,
+    finance_models,
     formation_models,
+    join_models,
     match_event_models,
     match_models,
 )

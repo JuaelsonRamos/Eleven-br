@@ -148,7 +148,7 @@ def test_browser_events_flow(engine: Engine) -> None:
             def invalid_save(message):
                 previous = len(event_writes)
                 page.get_by_role("button", name="Salvar evento", exact=True).click()
-                expect(page.get_by_role("alert")).to_have_text(message)
+                expect(page.get_by_role("alert").get_by_text(message, exact=True)).to_be_visible()
                 assert len(event_writes) == previous, "Invalid form must not send POST/PUT"
 
             def create_and_check(title, modality, recurring, until=None):

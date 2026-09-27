@@ -132,6 +132,7 @@ class MembershipPermission(Entity, Base):
     __table_args__ = (
         UniqueConstraint("membership_id", "permission"),
         CheckConstraint(
-            "permission IN ('manage_team', 'manage_members', 'manage_events')", name="permission"
+            "permission IN ('manage_team', 'manage_members', 'manage_events', 'manage_finance')",
+            name="permission",
         ),
     )

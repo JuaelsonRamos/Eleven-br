@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Field, FormError, TextAction } from '../components/AuthLayout';
-import { Button, Card } from '../components/ui';
+import { FormSurface, Button, Card } from '../components/ui';
 import { ApiError } from '../auth/api';
 import { savePerson, similarPlayers, type RosterPerson, type PlayerInput, type SimilarPlayer } from './api';
 import { rosterStyles as styles } from './styles';
@@ -44,7 +44,7 @@ export function PlayerForm({ teamId, player, onSaved, onCancel, onDenied }: {
     } finally { locked.current = false; setBusy(false); }
   }
 
-  return <View style={styles.stack}>
+  return <FormSurface>
     <Text accessibilityRole="header" style={styles.heading}>{player ? 'Editar jogador' : 'Adicionar jogador'}</Text>
     {linked ? <Text style={styles.note}>Nome e contatos da conta são controlados pelo próprio jogador. Aqui você pode editar o apelido neste time.</Text> : <Field label="Nome do jogador" value={name} onChangeText={value => changed(setName, value)} maxLength={80} autoCapitalize="words" editable={!busy} />}
     <Field label="Apelido (opcional)" value={nickname} onChangeText={value => changed(setNickname, value)} maxLength={80} editable={!busy} />
@@ -62,5 +62,5 @@ export function PlayerForm({ teamId, player, onSaved, onCancel, onDenied }: {
       <TextAction label="Cancelar" onPress={() => setMatches(null)} disabled={busy} />
     </View></Card> : <Button label={busy ? 'Salvando…' : 'Salvar jogador'} disabled={busy} onPress={() => void submit()} />}
     <TextAction label="Voltar ao elenco" onPress={onCancel} disabled={busy} />
-  </View>;
+  </FormSurface>;
 }

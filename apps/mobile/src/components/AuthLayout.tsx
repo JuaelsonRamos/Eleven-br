@@ -2,6 +2,7 @@ import { useState, type PropsWithChildren } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from './ui';
+import { Feedback } from './design';
 import { theme } from '../theme';
 
 export function AuthLayout({ title, description, children }: PropsWithChildren<{ title: string; description?: string }>) {
@@ -23,11 +24,13 @@ export function AuthLayout({ title, description, children }: PropsWithChildren<{
 
 export function Field({ label, password = false, ...props }: TextInputProps & { label: string; password?: boolean }) {
   const [visible, setVisible] = useState(false);
+  const [focused, setFocused] = useState(false);
   return <View style={styles.field}>
     <Text style={styles.label}>{label}</Text>
-    <View style={styles.inputRow}>
+    <View style={[styles.inputRow, focused && styles.focus]}>
       <TextInput accessibilityLabel={label} placeholderTextColor={theme.colors.muted}
         autoCapitalize="none" autoCorrect={false} {...props}
+        onFocus={event => { setFocused(true); props.onFocus?.(event); }} onBlur={event => { setFocused(false); props.onBlur?.(event); }}
         secureTextEntry={password && !visible} style={[styles.input, props.style]} />
       {password && <Pressable onPress={() => setVisible(!visible)} accessibilityRole="button"
         accessibilityLabel={`${visible ? 'Ocultar' : 'Mostrar'} ${label.toLowerCase()}`} style={styles.reveal}>
@@ -38,14 +41,16 @@ export function Field({ label, password = false, ...props }: TextInputProps & { 
 }
 
 export function TextAction({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
+  const [focused, setFocused] = useState(false);
   return <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-    accessibilityState={{ disabled }} style={[styles.action, disabled && { opacity: 0.5 }]}>
+    onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+    accessibilityState={{ disabled }} style={({ pressed }) => [styles.action, focused && styles.focus, (disabled || pressed) && { opacity: 0.5 }]}>
     <Text style={styles.link}>{label}</Text>
   </Pressable>;
 }
 
 export function FormError({ message }: { message: string | null }) {
-  return message ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{message}</Text> : null;
+  return message ? <View accessibilityRole="alert"><Feedback message={message} tone="danger" /></View> : null;
 }
 
 export const authStyles = StyleSheet.create({
@@ -56,17 +61,18 @@ export const authStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
-  container: { width: '100%', maxWidth: 460, alignSelf: 'center', gap: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: theme.space.lg, paddingBottom: 32 },
+  container: { width: '100%', maxWidth: theme.formWidth, alignSelf: 'center', gap: theme.space.lg },
   heading: { gap: 10, paddingVertical: 16 },
-  title: { fontFamily: theme.fontFamily, fontSize: 34, fontWeight: '800', color: theme.colors.green },
+  title: { fontFamily: theme.fontFamily, fontSize: theme.type.title, fontWeight: '800', color: theme.colors.green },
   description: { fontFamily: theme.fontFamily, color: theme.colors.muted, fontSize: 16, lineHeight: 25 },
-  field: { gap: 8 },
+  field: { gap: theme.space.sm, width: '100%', maxWidth: theme.formWidth, alignSelf: 'center' },
   label: { fontFamily: theme.fontFamily, color: theme.colors.graphite, fontSize: 15, fontWeight: '600' },
-  inputRow: { flexDirection: 'row', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, backgroundColor: theme.colors.white },
+  inputRow: { flexDirection: 'row', borderWidth: 2, borderColor: theme.colors.border, borderRadius: theme.radii.md, backgroundColor: theme.colors.surface },
+  focus: { borderColor: theme.colors.green },
   input: { fontFamily: theme.fontFamily, flex: 1, minWidth: 0, minHeight: 52, padding: 14, fontSize: 16, color: theme.colors.graphite },
   reveal: { justifyContent: 'center', paddingHorizontal: 12, minWidth: 64, minHeight: 48 },
-  action: { minHeight: 48, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
+  action: { maxWidth: '100%', paddingVertical: theme.space.sm, minHeight: theme.touch, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.space.md, borderWidth: 2, borderColor: 'transparent', borderRadius: theme.radii.md, backgroundColor: theme.colors.surfaceMuted },
   link: { fontFamily: theme.fontFamily, color: theme.colors.green, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   error: { fontFamily: theme.fontFamily, color: theme.colors.error, fontSize: 14, lineHeight: 21 },
 });

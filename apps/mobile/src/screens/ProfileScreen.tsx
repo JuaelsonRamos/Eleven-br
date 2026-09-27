@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { AuthLayout, FormError, authStyles } from '../components/AuthLayout';
-import { Badge, Button } from '../components/ui';
+import { Badge, Button, Card, Feedback } from '../components/ui';
 import { ImageSelector } from '../images/ImageSelector';
 import { savePhoto, type ImageChoice } from '../images/api';
 
@@ -28,16 +28,16 @@ export function ProfileScreen() {
     finally { setBusy(false); }
   }
   return <AuthLayout title="Perfil" description="Sua identidade dentro de campo.">
-    <View style={authStyles.center}>
+    <Card><View style={authStyles.center}>
       <ImageSelector kind="photo" name={profile?.display_name || 'Jogador'} current={profile?.photo_url || null} choice={choice}
         disabled={busy || saving} onChange={value => { setChoice(value); setError(null); setSuccess(null); }} />
       <Text accessibilityRole="header" style={authStyles.note}>{profile?.display_name}</Text>
       <Text style={authStyles.note}>{profile?.email || profile?.phone}</Text>
       <Badge label="CONTATO VERIFICADO" />
-    </View>
+    </View></Card>
     <FormError message={error} />
-    {success && <Text accessibilityLiveRegion="polite" style={authStyles.note}>{success}</Text>}
+    <Feedback message={success} />
     {choice !== undefined && <Button label={saving ? 'Salvando…' : 'Salvar foto'} disabled={busy || saving} onPress={() => void save()} />}
-    <Button label={busy ? 'Saindo…' : 'Sair da conta'} disabled={busy || saving} onPress={() => void exit()} />
+    <Button variant="secondary" label={busy ? 'Saindo…' : 'Sair da conta'} disabled={busy || saving} onPress={() => void exit()} />
   </AuthLayout>;
 }

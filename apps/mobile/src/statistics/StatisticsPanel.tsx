@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Avatar, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
+import { Avatar, Button, EmptyState, ErrorState, LoadingState, FilterChip, StatCard } from '../components/ui';
 import { TextAction } from '../components/AuthLayout';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
@@ -15,7 +15,7 @@ function Totals({ value, individual = false }: { value: api.Totals; individual?:
   return <View style={s.totals}>{([
     [individual ? 'Partidas disputadas' : 'Partidas realizadas', value.matches], ['Gols identificados', value.goals], ['Assistências', value.assists],
     ['Cartões amarelos', value.yellow_cards], ['Cartões vermelhos', value.red_cards],
-  ] as const).map(([label, count]) => <View key={label} style={s.total}><Text style={s.number}>{count}</Text><Text style={s.muted}>{label}</Text></View>)}</View>;
+  ] as const).map(([label, count]) => <StatCard key={label} label={label} value={count} tone={label.includes('vermelhos') ? 'danger' : label.includes('amarelos') ? 'warning' : 'success'} />)}</View>;
 }
 
 function Identity({ person }: { person: api.Person }) {
@@ -123,7 +123,7 @@ export function StatisticsPanel({ teamId, onGames, onNavigate }: { teamId: strin
 }
 
 function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={selected ? undefined : onPress} style={[s.choice, selected && s.selected]}><Text style={[s.choiceText, selected && s.selectedText]}>{label}</Text></Pressable>;
+  return <FilterChip label={label} selected={selected} onPress={() => { if (!selected) onPress(); }} />;
 }
 
 const s = StyleSheet.create({
@@ -131,7 +131,7 @@ const s = StyleSheet.create({
   title: { fontFamily: theme.fontFamily, color: theme.colors.graphite, fontSize: 28, fontWeight: '800' },
   heading: { fontFamily: theme.fontFamily, color: theme.colors.graphite, fontSize: 20, fontWeight: '700' },
   body: { fontFamily: theme.fontFamily, color: theme.colors.graphite, fontSize: 15 },
-  muted: { fontFamily: theme.fontFamily, color: theme.colors.muted, fontSize: 13, lineHeight: 19 },
+  muted: { fontFamily: theme.fontFamily, color: theme.colors.muted, fontSize: theme.type.small, lineHeight: 21 },
   label: { fontFamily: theme.fontFamily, color: theme.colors.graphite, fontSize: 14, fontWeight: '600' },
   choice: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.white, justifyContent: 'center' },
   selected: { backgroundColor: theme.colors.green, borderColor: theme.colors.green },
@@ -139,7 +139,7 @@ const s = StyleSheet.create({
   totals: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   total: { flexGrow: 1, flexBasis: 115, padding: 12, backgroundColor: theme.colors.white, borderRadius: 12 },
   number: { fontFamily: theme.fontFamily, fontSize: 26, fontWeight: '800', color: theme.colors.green },
-  person: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderColor: theme.colors.border, minHeight: 64 },
+  person: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: theme.space.md, borderRadius: theme.radii.md, backgroundColor: theme.colors.surface, minHeight: 76 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   nameBlock: { flex: 1, minWidth: 0 }, name: { fontFamily: theme.fontFamily, fontSize: 15, fontWeight: '600', color: theme.colors.graphite, flexShrink: 1 },
   position: { fontFamily: theme.fontFamily, color: theme.colors.green, fontWeight: '700', width: 26 },

@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session
 from app.application.teams import create_team, require_membership
 from app.domain.policies import Conflict, Permission, Plan, Role, allows
 from app.domain.team_identity import generate_code, normalized
-from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership
+from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership, User
 
 
 def register_team(
     session: Session, *, user_id: UUID, name: str, city: str, state: str, modalities: list[str]
 ) -> Team:
+    # Serialize creation with replacement of an empty signup Player during approval.
+    session.execute(select(User).where(User.id == user_id).with_for_update())
     player = session.scalar(select(Player).where(Player.user_id == user_id))
     if player is None:
         raise Conflict("Complete seu perfil antes de criar um time")

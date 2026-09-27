@@ -119,7 +119,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             page.get_by_label("Código de 6 dígitos").fill(code.group())
             page.get_by_role("button", name="Confirmar", exact=True).click()
             page.get_by_role("tab", name="Meus Times", exact=True).click()
-            expect(active_text("Seu time começa aqui")).to_be_visible()
+            expect(active_text("Seu futebol começa aqui.")).to_be_visible()
             artifacts = Path(__file__).resolve().parents[3] / ".local"
             artifacts.mkdir(exist_ok=True)
 

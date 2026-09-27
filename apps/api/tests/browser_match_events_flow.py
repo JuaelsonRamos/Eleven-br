@@ -222,7 +222,7 @@ def test_browser_match_events_flow(engine: Engine) -> None:
             ).click()
             artifacts = Path(__file__).resolve().parents[3] / ".local"
             artifacts.mkdir(exist_ok=True)
-            for width in [320, 390, 1280]:
+            for width in [320, 390, 768, 1280]:
                 page.set_viewport_size({"width": width, "height": 900})
                 form.scroll_into_view_if_needed()
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
@@ -278,7 +278,7 @@ def test_browser_match_events_flow(engine: Engine) -> None:
             expect(
                 panel.get_by_text("Time 1: 1 de 3 gols identificados.", exact=True)
             ).to_be_visible()
-            for width in [320, 390, 1280]:
+            for width in [320, 390, 768, 1280]:
                 page.set_viewport_size({"width": width, "height": 900})
                 panel.scroll_into_view_if_needed()
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")

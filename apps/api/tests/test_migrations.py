@@ -40,6 +40,11 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "formation_participants",
             "event_matches",
             "match_events",
+            "team_join_requests",
+            "dues_settings",
+            "monthly_dues",
+            "cash_entries",
+            "finance_audit",
         }
         command.check(config)
 

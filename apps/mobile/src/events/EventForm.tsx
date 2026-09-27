@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 import { Field, FormError, TextAction } from '../components/AuthLayout';
-import { Button } from '../components/ui';
+import { FormSurface, Button } from '../components/ui';
 import { ApiError } from '../auth/api';
 import { useTeams } from '../teams/TeamContext';
 import type { Team } from '../teams/api';
@@ -61,7 +61,7 @@ export function EventForm({ team, event, onDone, onCancel, onDenied }: {
       if (err instanceof ApiError && [403, 404].includes(err.status)) onDenied();
     } finally { sending.current = false; setBusy(false); }
   }
-  return <View style={styles.stack}>
+  return <FormSurface>
     <Text accessibilityRole="header" style={styles.title}>{event ? 'Editar evento' : 'Criar evento'}</Text>
     {event?.series_id && <Text style={styles.note}>Esta edição vale somente para esta ocorrência. As demais datas permanecem iguais.</Text>}
     {!event?.series_id && <View style={styles.row}>{(['PELADA', 'JOGO'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="radio" accessibilityState={{ checked: kind === value }} aria-checked={kind === value}
@@ -81,5 +81,5 @@ export function EventForm({ team, event, onDone, onCancel, onDenied }: {
     <FormError message={error} />
     <Button label={busy ? 'Salvando…' : 'Salvar evento'} onPress={() => void save()} disabled={busy} />
     <TextAction label="Voltar aos jogos" onPress={onCancel} disabled={busy} />
-  </View>;
+  </FormSurface>;
 }

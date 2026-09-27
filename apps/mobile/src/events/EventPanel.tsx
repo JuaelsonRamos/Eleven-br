@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Pressable, Text, View } from 'react-native';
+import { BackHandler, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ApiError } from '../auth/api';
 import { Field, FormError, TextAction } from '../components/AuthLayout';
-import { Badge, Button, Card, EmptyState, LoadingState } from '../components/ui';
+import { Badge, Button, Card, EmptyState, LoadingState, FilterChip } from '../components/ui';
 import { useTeams } from '../teams/TeamContext';
 import type { Team } from '../teams/api';
 import { addGuest, cancelEvent, cancelSeries, eventWhen, getEvent, listEvents, removeGuest, respond, type Answer, type EventPage, type SportEvent } from './api';
@@ -12,7 +12,9 @@ import { styles } from './styles';
 import { MatchesPanel } from '../matches/MatchesPanel';
 import { FormationPanel } from '../formations/FormationPanel';
 
-export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () => void }) {
+export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed }: { team: Team; onNavigate?: () => void; initialEventId?: string; onInitialConsumed?: () => void }) {
+  const initial = useRef(initialEventId);
+  const consumed = useRef(onInitialConsumed);
   const { options } = useTeams();
   const [page, setPage] = useState<EventPage | null>(null);
   const [event, setEvent] = useState<SportEvent | null>(null);
@@ -27,11 +29,15 @@ export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () =
   const [cancelConfirm, setCancelConfirm] = useState<'event' | 'series' | null>(null);
   const load = useCallback(async () => {
     const revision = ++generation.current; setLoading(true); setError(null);
-    try { const data = await listEvents(team.id); if (revision === generation.current) { setPage(data); setMode('list'); setEvent(null); } }
+    try { const data = await listEvents(team.id); const requested = initial.current; const selected = requested ? await getEvent(team.id, requested) : null; if (revision === generation.current) { setPage(data); setMode(selected ? 'detail' : 'list'); setEvent(selected); initial.current = undefined; if (requested) consumed.current?.(); } }
     catch (err) { if (revision === generation.current) { setPage(null); setError(err instanceof Error ? err.message : 'Não foi possível carregar os jogos.'); } }
     finally { if (revision === generation.current) setLoading(false); }
   }, [team.id]);
   useEffect(() => { const currentGeneration = generation; void load(); return () => { currentGeneration.current++; }; }, [load]);
+  useEffect(() => {
+    consumed.current = onInitialConsumed;
+    if (initialEventId && initialEventId !== initial.current) { initial.current = initialEventId; void load(); }
+  }, [initialEventId, onInitialConsumed, load]);
   function back() { setCancelConfirm(null); setGuest(''); setSuccess(null); void load(); }
   useFocusEffect(useCallback(() => {
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -57,9 +63,8 @@ export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () =
     } finally { sending.current = false; if (revision === generation.current) setBusy(false); }
   }
   const answers = (item: SportEvent, open: boolean) => item.status === 'open' && <View style={styles.row}>
-    {(['VOU', 'NAO_VOU'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="button" accessibilityLabel={value === 'VOU' ? 'VOU' : 'NÃO VOU'} accessibilityState={{ selected: item.my_response === value, disabled: busy }}
-      style={[styles.chip, item.my_response === value && styles.selected]} onPress={() => void run(() => respond(team.id, item.id, value), 'Presença atualizada.', open)}>
-      <Text style={styles.text}>{item.my_response === value ? '✓ ' : ''}{value === 'VOU' ? 'VOU' : 'NÃO VOU'}</Text></Pressable>)}
+    {(['VOU', 'NAO_VOU'] as const).map(value => <FilterChip key={value} disabled={busy} label={value === 'VOU' ? 'VOU' : 'NÃO VOU'} selected={item.my_response === value}
+      onPress={() => void run(() => respond(team.id, item.id, value), 'Presença atualizada.', open)} />)}
   </View>;
   if (loading) return <LoadingState />;
   if (mode === 'formation' && event) return <FormationPanel key={event.id} team={team} event={event} onNavigate={onNavigate}
@@ -110,10 +115,10 @@ export function EventPanel({ team, onNavigate }: { team: Team; onNavigate?: () =
       {page?.can_manage && <Button label="Criar evento" disabled={busy} onPress={() => { setSuccess(null); setMode('create'); }} />}
       {page && !page.items.length && <EmptyState title="O próximo encontro começa aqui" description="Os eventos do time aparecerão nesta lista." icon="football-outline" />}
       {page?.items.map(item => <Card key={item.id}><View style={styles.stack}>
-        <Text style={styles.heading}>{item.title}</Text><Text style={styles.text}>{eventWhen(item)}</Text><Text style={styles.note}>{item.location}</Text>
-        {item.status === 'cancelled' ? <Badge label="CANCELADO" /> : <Text style={styles.text}>{item.going} confirmados</Text>}
+        <Badge label={item.kind === 'PELADA' ? 'PELADA' : 'JOGO'} tone="info" /><Text style={styles.heading}>{item.title}</Text><Text style={styles.text}>{eventWhen(item)}</Text><Text style={styles.note}>{item.location}</Text>
+        {item.status === 'cancelled' ? <Badge label="CANCELADO" tone="neutral" /> : <Badge label={`${item.going} confirmados`} />}
         {answers(item, false)}
-        <Button label={`Abrir ${item.title} • ${displayDay(item.date)}`} disabled={busy} onPress={() => void run(() => getEvent(team.id, item.id))} />
+        <Button variant="secondary" label="Ver detalhes" accessibilityLabel={`Abrir ${item.title} • ${displayDay(item.date)}`} disabled={busy} onPress={() => void run(() => getEvent(team.id, item.id))} />
       </View></Card>)}
     </>}
   </View>;

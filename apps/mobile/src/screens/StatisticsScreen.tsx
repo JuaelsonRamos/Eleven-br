@@ -27,6 +27,6 @@ export function StatisticsScreen({ navigation }: BottomTabScreenProps<TabParams>
 }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 },
-  container: { width: '100%', maxWidth: theme.maxWidth, alignSelf: 'center', gap: 20 },
+  scroll: { flexGrow: 1, paddingHorizontal: theme.space.lg, paddingBottom: 24 },
+  container: { width: '100%', maxWidth: theme.maxWidth, alignSelf: 'center', gap: theme.space.lg },
 });

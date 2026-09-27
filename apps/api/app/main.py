@@ -11,9 +11,11 @@ from app.domain.policies import Conflict, DomainError, Forbidden, NotFound
 from app.infrastructure.config import get_settings
 from app.presentation.auth_routes import router as auth_router
 from app.presentation.event_routes import router as event_router
+from app.presentation.finance_routes import router as finance_router
 from app.presentation.formation_routes import router as formation_router
 from app.presentation.image_limits import ImageUploadLimit
 from app.presentation.image_routes import router as image_router
+from app.presentation.join_routes import router as join_router
 from app.presentation.match_event_routes import router as match_event_router
 from app.presentation.match_routes import router as match_router
 from app.presentation.roster_routes import router as roster_router
@@ -78,6 +80,8 @@ def create_app() -> FastAPI:
         headers = {"Retry-After": str(error.retry_after)} if isinstance(error, RateLimited) else {}
         return JSONResponse(status_code=status, content={"detail": str(error)}, headers=headers)
 
+    app.include_router(join_router)
+    app.include_router(finance_router)
     app.include_router(router)
     app.include_router(auth_router)
     app.include_router(roster_router)

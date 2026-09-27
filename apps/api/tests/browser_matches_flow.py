@@ -241,7 +241,7 @@ def test_browser_matches_flow(engine: Engine) -> None:
             page.get_by_role("button", name="Atualizar partidas", exact=True).click()
             expect(first.get_by_label("Placar Time 1: 1", exact=True)).to_be_visible()
             artifacts = Path(__file__).resolve().parents[3] / ".local"
-            for width in [320, 390, 1280]:
+            for width in [320, 390, 768, 1280]:
                 page.set_viewport_size({"width": width, "height": 900})
                 first.scroll_into_view_if_needed()
                 assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")

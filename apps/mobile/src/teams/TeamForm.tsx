@@ -81,7 +81,7 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
 }
 
 const styles = StyleSheet.create({
-  form: { gap: 16 }, note: { fontFamily: theme.fontFamily, fontSize: 14, color: theme.colors.muted, lineHeight: 22 },
+  form: { gap: theme.space.lg, width: '100%', maxWidth: theme.formWidth, alignSelf: 'center' }, note: { fontFamily: theme.fontFamily, fontSize: 14, color: theme.colors.muted, lineHeight: 22 },
   label: { fontFamily: theme.fontFamily, fontSize: 16, fontWeight: '700', color: theme.colors.graphite },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   choice: { minHeight: 48, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, justifyContent: 'center' },

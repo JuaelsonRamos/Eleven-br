@@ -19,6 +19,7 @@ class Permission(StrEnum):
     MANAGE_TEAM = "manage_team"
     MANAGE_MEMBERS = "manage_members"
     MANAGE_EVENTS = "manage_events"
+    MANAGE_FINANCE = "manage_finance"
 
 
 @dataclass(frozen=True)

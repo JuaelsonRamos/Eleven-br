@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Pressable, Text, View } from 'react-native';
+import { BackHandler, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Avatar, Badge, Button, Card, EmptyState, LoadingState } from '../components/ui';
+import { Avatar, Badge, Button, Card, EmptyState, LoadingState, FilterChip, ListItem } from '../components/ui';
 import { FormError, TextAction } from '../components/AuthLayout';
 import { ApiError } from '../auth/api';
 import type { Team } from '../teams/api';
 import { changeStatus, getPerson, listRoster, type RosterFilter, type RosterPage, type RosterPerson } from './api';
 import { PlayerForm } from './PlayerForm';
 import { rosterStyles as styles } from './styles';
+import { JoinAdminPanel } from '../join/JoinAdminPanel';
 
 export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }) {
   const [filter, setFilter] = useState<RosterFilter>('active');
   const [page, setPage] = useState<RosterPage | null>(null);
   const [player, setPlayer] = useState<RosterPerson | null>(null);
-  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit'>('list');
+  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'requests'>('list');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -30,6 +31,7 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
   }, [filter, team.id]);
   useEffect(() => { const counter = generation; void reload(); return () => { counter.current++; }; }, [reload]);
   useFocusEffect(useCallback(() => {
+    if (mode === 'requests') return;
     const handler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (busy) return true;
       if (confirm) setConfirm(false);
@@ -61,6 +63,7 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
     } finally { mutation.current = false; setBusy(false); }
   }
   const full = page ? page.active_count >= page.active_limit : false;
+  if (mode === 'requests' && page?.can_manage) return <JoinAdminPanel teamId={team.id} onBack={() => { setMode('list'); void reload(); }} />;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.heading}>Elenco</Text>
     {loading ? <LoadingState /> : <>
@@ -90,17 +93,14 @@ export function RosterPanel({ team, onBack }: { team: Team; onBack: () => void }
             </>}
             <TextAction label="Voltar ao elenco" disabled={busy} onPress={() => { setMode('list'); setPlayer(null); setConfirm(false); setError(null); setSuccess(null); }} />
           </> : <>
-            <View style={styles.row}>{(['active', 'inactive', 'all'] as RosterFilter[]).map((value, index) => <Pressable key={value}
-              accessibilityRole="button" accessibilityLabel={['Ativos', 'Inativos', 'Todos'][index]} aria-pressed={filter === value}
-              accessibilityState={{ selected: filter === value }} style={[styles.filter, filter === value && styles.selected]}
-              onPress={() => { setFilter(value); setSuccess(null); setError(null); }}>
-              <Text style={styles.label}>{['Ativos', 'Inativos', 'Todos'][index]}</Text>
-            </Pressable>)}</View>
+            <View style={styles.row}>{(['active', 'inactive', 'all'] as RosterFilter[]).map((value, index) => <FilterChip key={value} label={['Ativos', 'Inativos', 'Todos'][index]!} selected={filter === value}
+              onPress={() => { setFilter(value); setSuccess(null); setError(null); }} />)}</View>
             {page.can_manage && <Button label="Adicionar jogador" disabled={full} onPress={() => { setPlayer(null); setSuccess(null); setMode('add'); }} />}
+            {page.can_manage && <Button variant="secondary" label="Solicitações de entrada" onPress={() => { setSuccess(null); setMode('requests'); }} />}
             {!page.items.length && <EmptyState title="Nenhum jogador neste filtro" description="Os jogadores deste time aparecerão aqui." icon="people-outline" />}
-            {page.items.map(item => <Pressable key={item.membership_id} accessibilityRole="button" accessibilityLabel={`Ver jogador ${item.name}`} onPress={() => void open(item.membership_id)}>
-              <Card><PersonSummary player={item} /></Card>
-            </Pressable>)}
+            {page.items.map(item => <ListItem key={item.membership_id} title={item.name} subtitle={item.account_linked ? 'Conta vinculada' : 'Ainda não possui conta'}
+              leading={<Avatar name={item.name} photoUrl={item.photo_url} />} accessibilityLabel={`Ver jogador ${item.name}`} onPress={() => void open(item.membership_id)}
+              trailing={<><Badge label={item.status === 'active' ? 'Ativo' : 'Inativo'} tone={item.status === 'active' ? 'success' : 'neutral'} />{item.is_president && <Badge label="Presidente" tone="info" />}</>} />)}
           </>}
       </>}
     </>}

@@ -258,7 +258,7 @@ def test_browser_statistics_flow(engine: Engine) -> None:
                 expect(visible_text("1 gol")).to_be_visible()
                 artifacts = Path(__file__).resolve().parents[3] / ".local"
                 artifacts.mkdir(exist_ok=True)
-                for width in [320, 390, 1280]:
+                for width in [320, 390, 768, 1280]:
                     page.set_viewport_size({"width": width, "height": 900})
                     assert page.evaluate(
                         "document.documentElement.scrollWidth <= window.innerWidth"
@@ -291,7 +291,7 @@ def test_browser_statistics_flow(engine: Engine) -> None:
                     )
                 ).to_be_visible()
                 expect(visible_text("Gols: 1,00 · Assistências: 0,00")).to_be_visible()
-                for width in [320, 390, 1280]:
+                for width in [320, 390, 768, 1280]:
                     page.set_viewport_size({"width": width, "height": 900})
                     assert page.evaluate(
                         "document.documentElement.scrollWidth <= window.innerWidth"

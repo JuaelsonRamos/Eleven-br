@@ -1,15 +1,20 @@
-import { brand } from '@eleven/shared';
+import { brand, designTokens } from '@eleven/shared';
 import { Platform } from 'react-native';
 
 export const theme = {
   fontFamily: Platform.OS === 'web' ? 'system-ui, -apple-system, Segoe UI, sans-serif' : undefined,
   colors: {
     ...brand.colors,
-    background: '#F6F8F7',
-    muted: '#53665E',
-    border: '#D9E4DF',
-    error: '#A12828',
+    ...designTokens.colors,
+    muted: designTokens.colors.textSecondary,
+    error: designTokens.colors.danger,
   },
-  radius: 20,
+  space: designTokens.space,
+  radii: designTokens.radii,
+  type: designTokens.type,
+  icon: designTokens.icon,
+  touch: designTokens.touch,
+  radius: designTokens.radii.lg,
   maxWidth: 760,
+  formWidth: 520,
 };

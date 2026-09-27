@@ -5,7 +5,8 @@
 O projeto entrega a fundação, cadastro, verificação de contato, login, sessão,
 perfil inicial, gestão básica de times, elenco e eventos com confirmação de presença.
 As áreas pessoais e do time ficam na área autenticada. Inclui formação de equipes e partidas
-com placar por pelada. Não inclui estatísticas individuais, financeiro ou cobrança.
+com placar por pelada, estatísticas internas e entrada por código com aprovação e
+vinculação ao elenco, mensalidades e caixa interno. Não inclui integração de pagamentos.
 
 ## Arquitetura
 
@@ -851,11 +852,195 @@ ficam apenas em schemas temporários do banco `_test`.
 Intervalo personalizado, estatísticas globais, pontuações e ranking nacional ficam
 fora desta entrega. Bundles Android/iOS não substituem validação em aparelhos reais.
 
+## Entrada por código e vinculação — Prompt 10
+
+Em **Meus Times → Entrar em um time**, informe o código existente, confira a
+identidade pública mínima e solicite entrada. Letras minúsculas e espaços nas
+extremidades são normalizados. O código não autoriza acesso ao elenco ou a qualquer
+dado privado. Busca e envio exigem conta autenticada/verificada e compartilham
+limites persistentes: 20 tentativas por conta e 60 por IP em 15 minutos.
+
+**Meus pedidos** permite atualizar, consultar estados e cancelar pedidos pendentes;
+histórico é paginado em lotes de 50. Em **Perfil do time → Convidar jogadores**, Web
+copia o código quando o navegador permite, com alternativa de seleção manual;
+Android/iOS usam o compartilhamento nativo, sem dependência adicional ou deep link.
+
+Presidente e gestores Pro com `manage_members` acessam **Elenco → Solicitações de
+entrada**. A tela mostra pendências, nome e contato mascarado. Primeiro oferece
+jogadores sem conta; depois, **Nenhum destes — adicionar ao elenco**. Aprovação e
+recusa exigem confirmação. Membro comum não acessa a gestão. Toda aprovação concede
+somente vínculo de jogador; não muda Presidente, papéis ou permissões existentes.
+
+**1 User → 1 Player → N Memberships** continua sendo a regra. Vinculação ao elenco
+mantém o Player de destino e o mesmo Membership, presenças, formações, partidas,
+gols, assistências, cartões e estatísticas. O Player inicial criado no cadastro é
+excluído apenas se não tiver nenhum Membership, inclusive inativo. Na estrutura
+atual, todos os demais vínculos esportivos passam por Membership; novas referências
+diretas futuras exigem ampliar a verificação. Nenhum histórico é copiado ou movido.
+O Player inicial vazio não fica órfão após a substituição.
+
+Se a conta já possuir Player com vínculos/histórico, vincular a outro Player retorna
+conflito e preserva ambos: **unificação de perfis não pertence a este Prompt**. Ao
+adicionar ao elenco de outro time, reutiliza-se o Player da conta e cria-se somente
+o Membership. Coincidência de nome, apelido ou contato nunca decide identidade.
+Guest não é convertido. Destino com vínculos em outros times ou responsabilidades
+administrativas exige revisão específica e não pode ser assumido por este fluxo.
+
+Inativos aparecem separados, indisponíveis para vinculação até reativação explícita
+no elenco. Nova entrada/reativação respeita 24 ativos Free e 100 Pro. Vincular um
+Player já ativo não consome nova vaga. Foto do destino permanece; quando só a conta
+possui foto, a referência é transferida sem copiar arquivo. Duas fotos diferentes
+bloqueiam a vinculação, preservando ambas até uma decisão explícita sobre a imagem.
+
+Migration **0009_team_join_requests** adiciona apenas solicitações: time, User,
+status `PENDING/APPROVED/REJECTED/CANCELLED`, criação/atualização, responsável/data
+de resolução e Membership resultante. Há índice único parcial para um pedido
+pendente por conta/time, checks de resolução e FK composta para o vínculo do próprio
+time. Downgrade com pedidos é bloqueado. Migrations 0001–0008 não foram alteradas.
+A aplicação local comparou as 18 tabelas de dados anteriores na mesma transação e
+preservou todas as linhas, incluindo TABAJARA FC; nenhum pedido fictício foi inserido.
+
+Escritas serializam no lock de Team existente; aprovação/cancelamento revalidam o
+pedido sob lock. Aprovação também bloqueia User e Players, revalida identidade/vaga,
+e efetiva vínculo e estado em uma transação com rollback integral em falha.
+Criação de time, edição de perfil e foto própria compartilham a serialização por
+User para não trabalhar sobre um Player substituído concorrentemente.
+
+Endpoints:
+
+- `POST /v1/teams/join/lookup` — descoberta por `{code}`.
+- `POST /v1/teams/{team_id}/join-requests` — solicitar, também exige `{code}`.
+- `GET /v1/me/join-requests?offset=0` — próprios pedidos.
+- `POST /v1/me/join-requests/{request_id}/cancel` — cancelar o próprio pedido.
+- `GET /v1/teams/{team_id}/join-requests` — pendências administrativas.
+- `GET /v1/teams/{team_id}/join-requests/{request_id}` — análise/candidatos.
+- `POST /v1/teams/{team_id}/join-requests/{request_id}/approve` —
+  `{confirm: true, membership_id: UUID|null}`; null adiciona o Player da conta.
+- `POST /v1/teams/{team_id}/join-requests/{request_id}/reject` — `{confirm: true}`.
+
+Para validar, API em **8011**, `npm.cmd run mobile:web` na raiz e duas contas:
+jogador solicita; Presidente aprova no Elenco; jogador atualiza Meus pedidos e abre
+Meus Times. Em `apps/api`, `uv run pytest -q` e, com Expo em **8081**,
+`uv run --with playwright pytest tests/browser_join_flow.py -q`. O fluxo isolado
+cobre código inválido/normalizado, cancelamento, vínculo com histórico, permissões,
+estatísticas, recarregamento, cópia e larguras 320/390/1280 px. Testes não usam dados reais.
+
+## Mensalidades e caixa interno — Prompt 11
+
+Abra **Início → Financeiro** no time selecionado. O Presidente configura valor,
+dia de vencimento e ativação da mensalidade, escolhe a competência **MM/AAAA** e
+confere quantidade/total antes de gerar. Todos os Memberships ativos são elegíveis,
+inclusive Presidente e jogadores sem conta; convidados e inativos não são incluídos.
+Vencimento em dia inexistente cai no último dia do mês. Configuração não altera
+cobranças anteriores. Repetição ignora cobranças existentes naquela competência,
+inclusive canceladas; alteração da prévia exige nova conferência.
+
+**Pagamentos parciais:** informe o valor recebido, data, PIX/Dinheiro/Cartão/Outro
+e observação opcional. Cada recebimento cria uma única receita pelo seu valor.
+A cobrança permanece pendente pelo restante e passa a paga apenas na quitação.
+Recebimento acima do saldo devedor é rejeitado. Atrasada é uma apresentação de
+pendente com vencimento anterior à data local atual. Não há cobrança automática,
+gateway, juros, QR Code ou taxa presumida de cartão.
+
+**Caixa** permite receitas/despesas manuais, categoria, descrição, data e observação.
+Saldo atual é a soma de receitas válidas menos despesas válidas em todo o histórico;
+os filtros de período, tipo e categoria afetam a listagem, não esse saldo global.
+Listagens são paginadas em 50 registros. Datas de recebimento/lançamento não podem
+ser futuras: são registros de operações já ocorridas, não previsões de caixa.
+
+Estorno exige motivo e confirmação, guarda autor/data e preserva o lançamento.
+Estornar um pagamento recalcula recebido/saldo e reabre a cobrança. Isenção não
+gera receita nem atraso e pode ser desfeita com auditoria. Cancelamento preserva
+a cobrança e exige motivo. Havendo pagamento válido, estorne antes de isentar ou
+cancelar. Valores de cobranças emitidas são preservados; não há edição silenciosa.
+
+O jogador ativo vê somente **Minhas mensalidades**, pagamentos e histórico próprios.
+O backend deriva seu Membership do User autenticado; não aceita IDs para consultar
+outro jogador. Caixa/configuração/gestão exigem `manage_finance` pela política
+central: Presidente no Free, Presidente ou administrador Pro com esse grant.
+Permissões de elenco/eventos não concedem acesso. As quatro abas continuam iguais.
+
+Migration **0010_team_finance** cria `dues_settings`, `monthly_dues`, `cash_entries`
+e `finance_audit`, e acrescenta `manage_finance` ao check existente de permissões.
+Cobrança referencia Membership por FK composta do time e é única por competência.
+Recebimento é o próprio lançamento de receita relacionado à cobrança, sem duas
+fontes monetárias concorrentes. Valores são BRL Decimal/numeric(10,2), enviados
+como strings decimais. Futuras taxas, acréscimos, bruto/líquido e parcelas poderão
+estender o recebimento ou referenciá-lo, sem reusar o valor da cobrança nem alterar
+competência. Nenhuma regra de operadora foi antecipada.
+
+Team lock serializa escritas com alterações do elenco. Versões rejeitam formulários
+desatualizados; UUID de operação único por time torna reenvio idempotente. Reusar
+uma chave com outros valores retorna conflito. Pagamento, status e auditoria são
+confirmados na mesma transação, com rollback integral em erro. Downgrade com dados
+financeiros ou grants é bloqueado. A aplicação local comparou as **19 tabelas
+anteriores**, preservando integralmente todas as linhas, incluindo TABAJARA FC.
+Migrations 0001–0009 ficaram intactas; nenhum dado financeiro fictício foi inserido.
+
+Endpoints sob `/v1/teams/{team_id}/finance`:
+
+| Método | Caminho | Finalidade |
+| --- | --- | --- |
+| GET | vazio | Permissão e, para gestores, configuração/saldo |
+| PUT | `/settings` | Configuração com versão |
+| POST | `/dues/preview`, `/dues/generate` | Prévia e geração confirmada |
+| GET | `/dues`, `/dues/{id}` | Lista por competência e detalhe autorizado |
+| POST | `/dues/{id}/payments` | Recebimento parcial/integral idempotente |
+| POST | `/dues/{id}/actions` | Isenção, desfazer isenção ou cancelamento |
+| GET / POST | `/cash` | Histórico filtrado / lançamento manual |
+| POST | `/cash/{id}/reverse` | Estorno com motivo e versão da cobrança, se houver |
+
+Validação manual: API **8011**, `npm.cmd run mobile:web` na raiz, duas contas do
+mesmo time. Presidente configura/gera, registra parte e restante, estorna um
+recebimento e confere o caixa; jogador abre somente suas mensalidades. Na API:
+`uv run pytest -q`; com Expo em 8081,
+`uv run --with playwright pytest tests/browser_finance_flow.py -q`.
+Testes usam PostgreSQL `_test` e API temporária, com fluxo Web em 320/390/768/1280 px.
+Bundles nativos não substituem validação em aparelho Android/iOS real.
+
+## Redesign mobile first — Prompt 12
+
+O design system compartilha tokens em `packages/shared/src/index.ts` e `theme.ts`.
+`components/design.tsx` reúne `SectionHeader`, `StatCard`, `StatusBadge`, `FilterChip`,
+`IconButton`, `ListItem`, `QuickAction`, `Feedback` e `FormSurface`. `ui.tsx` mantém
+`AppHeader`, `Card`, `Button` (primário/secundário/perigo), `SecondaryButton`, `Avatar`,
+`TeamBadge` e estados de carregamento, vazio e erro. `AuthLayout.Field` centraliza
+campos e foco; `TeamHeading` identifica o contexto e `BottomNavigation` respeita
+safe areas e as quatro abas existentes.
+
+A Home destaca escudo, identidade do time, atalhos reais e o próximo evento aberto
+da agenda. “Ver evento” abre seu detalhe em Jogos. Financeiro apresenta saldo,
+receitas e despesas da API; mensalidades têm seletor de competência, contadores,
+chips e lista com status, vencimento e saldo. Os filtros de status percorrem a
+paginação da API para considerar todo o período. Detalhes preservam pagamentos
+parciais, estornos e auditoria. A lista financeira usa iniciais: o contrato atual
+não inclui fotos de jogadores.
+
+Jogos, Elenco, Estatísticas, Mais, Meus Times, Perfil e formulários reutilizam essa
+base. Conteúdo centralizado até 760 px e formulários até 520 px; cards e ações
+quebram em linhas no celular. Não há dependência nova, alteração de regra de
+negócio, contrato ou migration. O head continua `0010`.
+
+Para conferir manualmente, use `npm.cmd run mobile:web` na raiz e navegue em
+320/390/768/1280 px. Com Expo ativo, a regressão Web completa roda em `apps/api`:
+
+```powershell
+uv run --with playwright pytest -q (Get-ChildItem tests/browser_*.py).FullName
+```
+
+`browser_redesign_flow.py` verifica Home e evento reais, navegação repetida ao
+detalhe, estado vazio, formulários e filtros financeiros com 52 cobranças, incluindo
+uma paga fora da primeira página. Capturas ficam em `.local`, sem dados de produção.
+Os fluxos anteriores continuam validando pagamentos, presença, formação, partidas,
+gols/cartões, entrada, isolamento e fotos. Os testes usam somente schemas descartáveis
+do banco `_test`; exportar Android/iOS não equivale a validar em aparelho físico.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura
 recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
-Convites para contas, financeiro e assinaturas continuam fora deste escopo.
+Unificação de Players com histórico, resolução de fotos conflitantes, integrações
+financeiras e assinaturas continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

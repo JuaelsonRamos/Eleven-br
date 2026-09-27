@@ -20,7 +20,9 @@ de uso não permite simplificar incorretamente regras de negócio.
 O estado atual inclui a fundação, o Prompt 02 (conta, verificação, sessão e perfil)
 o Prompt 03 (criação, perfil, edição e seleção de times), o Prompt 04 (elenco)
 o Prompt 05 (eventos, peladas e presença), o Prompt 06 (formação de times da pelada)
-o Prompt 07 (partidas e resultados da pelada) e o Prompt 08 (gols, assistências e cartões).
+o Prompt 07 (partidas e resultados da pelada), o Prompt 08 (gols, assistências e cartões),
+o Prompt 09 (estatísticas internas), o Prompt 10 (entrada por código e vinculação aprovada)
+e o Prompt 11 (mensalidades e caixa interno).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações continua placeholder. Verificação local é
 simulada com opção explícita; provedor de produção e cobrança não foram implementados.
@@ -164,7 +166,71 @@ vínculo do próprio time por FK composta, obrigatória e diferida até o commit
 Presidente é derivado dessa referência, não de um papel global nem de um segundo
 campo concorrente. Preserve essa integridade e a criação transacional de time/vínculo.
 
+## Entrada e vinculação de contas — Prompt 10
+
+A arquitetura é **1 User → 1 Player → N Memberships**. O código existente do time
+serve somente para descoberta; entrada exige solicitação persistente e aprovação
+por `MANAGE_MEMBERS`, respeitando Free/Pro. Nunca vincular automaticamente por
+nome, apelido, telefone ou e-mail. Nunca converter Guest automaticamente.
+
+Ao vincular uma conta nova a um Player manual do elenco, preserve o Player de
+destino, seu Membership e todas as referências esportivas. O Player inicial da
+conta pode ser substituído e excluído SOMENTE se não possuir nenhum Membership
+(inclusive inativo) nem qualquer referência esportiva. No modelo atual toda
+presença, formação, partida e estatística depende de Membership; se surgirem novas
+referências diretas a Player, ampliar essa validação antes de permitir a exclusão.
+Bloqueios de Team, solicitação, User e Players revalidam as condições na mesma
+transação. Criação de time, edição de perfil e foto própria devem respeitar a
+serialização por User para não usar uma identidade inicial substituída.
+
+Conta com Player que já possui vínculo/histórico NÃO pode ser ligada a outro Player
+por este fluxo. Retorne conflito claro e preserve ambos: unificação de identidades
+é uma funcionalidade futura, nunca um merge implícito. Para entrar em outro time,
+reutilize o mesmo Player da conta e crie somente o novo Membership. Não copiar,
+mover ou reconstruir histórico. Não deixar Player inicial vazio órfão após substituir.
+
+A vinculação não concede papéis administrativos nem altera Presidente. Destinos
+com responsabilidades administrativas ou vínculos em outros times exigem revisão
+específica e não podem ser assumidos por este fluxo. Inativo exige reativação
+explícita no elenco antes da aprovação, respeitando a capacidade do plano.
+Foto existente é preservada; se somente a conta tem foto, transfira a referência
+sem duplicar arquivo. Duas fotos diferentes bloqueiam vinculação até decisão
+explícita sobre a imagem; não sobrescrever nem apagar silenciosamente.
+
 ## Planos e permissões
+
+Financeiro básico usa `Permission.MANAGE_FINANCE` nas policies existentes: Presidente
+no Free e Presidente/gestor Pro com a permissão específica. `manage_team`,
+`manage_members` e `manage_events` não concedem acesso financeiro. Membro ativo
+consulta somente suas próprias cobranças, derivadas do User autenticado, sem caixa,
+configuração ou cobranças alheias. Não armazenar acesso financeiro global no User.
+
+`0010_team_finance` cria configuração por time, cobranças por Membership/competência,
+lançamentos de caixa e auditoria. Valores são BRL `numeric(10,2)`/Decimal e strings
+decimais na API; nunca usar float para cálculos monetários. Competência é o primeiro
+dia do mês; vencimentos 29–31 são limitados ao último dia desse mês. Geração manual
+inclui todos os vínculos ativos (inclusive Presidente e jogadores sem conta), nunca
+convidados. Prévia com assinatura deve ser revalidada sob lock; unicidade por
+time/Membership/competência ignora cobranças existentes, inclusive canceladas.
+Configuração nova não muda cobranças já geradas. Não antecipar geração automática.
+
+**Pagamentos parciais são permitidos.** Cada recebimento é um `CashEntry` de receita,
+ligado à cobrança, com data, forma, valor recebido e responsável. A própria linha é
+o registro do pagamento, sem outra receita duplicada. Soma dos recebimentos válidos
+determina saldo devedor; `PAID` somente quando atinge exatamente o valor devido.
+Bloquear valor acima do saldo. Estados restantes: `PENDING`, `EXEMPT`, `CANCELLED`;
+atraso é derivado da data local para pendente, inclusive parcialmente paga.
+
+Escritas financeiras usam lock de Team e versões da configuração/cobrança. Chave
+UUID de operação única por time garante idempotência de recebimento/lançamento;
+reuso com outros dados retorna conflito. FKs compostas isolam Membership, cobrança,
+caixa e auditoria por time. Não excluir lançamentos: estorno registra autor/data/
+motivo, preserva a linha e reabre o saldo da cobrança. Isentar/cancelar cobrança com
+recebimento válido exige estornar primeiro. Desfazer isenção é auditado. Saldo do
+time é soma de receitas válidas menos despesas válidas, nunca coluna mutável.
+Downgrade recusa dados financeiros ou grants a preservar. Futuros gateways/taxas/
+parcelas devem se ligar ao recebimento e manter competência/valor devido separados;
+cartão hoje é somente uma forma manual, sem taxa presumida, checkout ou integração.
 
 O plano e a futura assinatura pertencem ao **Team**, nunca ao User ou Presidente.
 
@@ -283,6 +349,27 @@ nem abstrações prematuras. Telas com dados devem considerar loading, vazio, er
 sucesso e sem permissão quando aplicável. Não esconder erros; mensagens devem
 ser curtas e claras. Preserve contraste, labels acessíveis, legibilidade, safe
 areas, áreas de toque apropriadas e suporte a diferentes tamanhos de tela.
+
+### Design system — Prompt 12
+
+Tokens de cores semânticas, superfícies, espaçamento, tipografia, radius e toque
+ficam em `packages/shared/src/index.ts`, consumidos por `theme.ts`. Reutilize
+`components/ui.tsx`, `components/design.tsx`, `AuthLayout.Field`, `TeamHeading`
+e `BottomNavigation`. Evite estilos paralelos para cards, chips, status e ações.
+Conteúdo operacional tem largura máxima de 760 px; formulários, 520 px.
+Valide 320/390/768/1280 px, nomes longos, foco Web e a barra inferior.
+
+`TeamDashboard` consulta a agenda existente para mostrar o próximo evento aberto
+com data/hora futura. O atalho passa evento e time para Jogos, que carrega o detalhe
+autorizado. Não criar nova agenda, seleção de time ou resumo persistido no cliente.
+As quatro abas do contexto continuam Início, Jogos, Elenco e Mais.
+
+Financeiro apresenta valores e status retornados pela API, sem recalcular dinheiro.
+O filtro visual de cobranças consulta todas as páginas autorizadas do período
+antes de aplicar um status; nunca filtrar somente os primeiros 50 registros.
+Pendente e atrasada seguem `overdue` e os contadores existentes da API.
+Cobranças usam iniciais como fallback de avatar, pois esse contrato não fornece foto.
+O redesign não altera contratos, permissões ou migrations.
 
 ## Forma de trabalhar e Git
 

@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Field, TextAction } from '../components/AuthLayout';
-import { Button } from '../components/ui';
+import { Button, FilterChip, FormSurface } from '../components/ui';
 import { styles } from '../events/styles';
-import { theme } from '../theme';
 import { incidentLabels, participantLabel, type IncidentDraft, type IncidentType, type MatchIncident, type MatchParticipant } from './eventsApi';
 
 export function MatchEventForm({ people, kind, item, busy, onSave, onCancel }: {
@@ -18,7 +17,7 @@ export function MatchEventForm({ people, kind, item, busy, onSave, onCancel }: {
   const assistants = people.filter(p => p.squad_id === selected?.squad_id && p.id !== participant);
   const squads = [...new Map(people.map(p => [p.squad_id, p.squad_name])).entries()];
   const filtered = people.filter(p => participantLabel(p).toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR')));
-  return <View testID="match-event-form" style={styles.stack}>
+  return <View testID="match-event-form"><FormSurface>
     <Text accessibilityRole="header" style={styles.heading}>{item ? 'Editar registro' : kind === 'goal' ? 'Registrar gol' : 'Registrar cartão'}</Text>
     {kind === 'card' && <View style={styles.row}>
       {(['YELLOW_CARD', 'RED_CARD'] as const).map(value => <Choice key={value} label={incidentLabels[value]} checked={type === value} disabled={busy} onPress={() => setType(value)} />)}
@@ -40,20 +39,11 @@ export function MatchEventForm({ people, kind, item, busy, onSave, onCancel }: {
     <Button label={busy ? 'Salvando registro…' : 'Salvar registro'} disabled={busy || !selected}
       onPress={() => onSave({ type, participant_id: participant, assist_participant_id: type === 'GOAL' ? assist : null })} />
     <TextAction label="Voltar sem salvar registro" disabled={busy} onPress={onCancel} />
-  </View>;
+  </FormSurface></View>;
 }
 
 function Choice({ label, accessibilityLabel = label, checked, disabled, onPress }: {
   label: string; accessibilityLabel?: string; checked: boolean; disabled: boolean; onPress: () => void;
 }) {
-  return <Pressable accessibilityRole="radio" accessibilityLabel={accessibilityLabel} accessibilityState={{ checked, disabled }}
-    disabled={disabled} onPress={onPress} style={[visual.option, checked && visual.selected, disabled && visual.disabled]}>
-    <Text style={visual.text}>{checked ? '✓ ' : ''}{label}</Text>
-  </Pressable>;
+  return <FilterChip role="radio" label={label} accessibilityLabel={accessibilityLabel} selected={checked} disabled={disabled} onPress={onPress} />;
 }
-const visual = StyleSheet.create({
-  option: { minHeight: 48, maxWidth: '100%', padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, justifyContent: 'center' },
-  selected: { borderColor: theme.colors.green, backgroundColor: theme.colors.lightGreen },
-  disabled: { opacity: 0.5 },
-  text: { fontFamily: theme.fontFamily, fontSize: 15, color: theme.colors.graphite, flexShrink: 1 },
-});

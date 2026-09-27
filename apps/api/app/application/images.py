@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from app.application.teams import require_membership
 from app.domain.images import IMAGE_PREFIX, ImageStorage, ImageStorageUnavailable, OptimizedImage
 from app.domain.policies import Conflict, NotFound, Permission
-from app.infrastructure.models import Player, Team
+from app.infrastructure.models import Player, Team, User
 
 logger = logging.getLogger(__name__)
 
 
 def own_player(session: Session, user_id: UUID, *, lock: bool = False) -> Player:
+    if lock:
+        session.execute(select(User).where(User.id == user_id).with_for_update())
     query = select(Player).where(Player.user_id == user_id)
     if lock:
         query = query.with_for_update().execution_options(populate_existing=True)

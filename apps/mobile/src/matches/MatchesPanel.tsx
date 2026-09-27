@@ -117,7 +117,7 @@ export function MatchesPanel({ teamId, event }: { teamId: string; event: SportEv
   </View>;
 }
 const visual = StyleSheet.create({
-  match: { borderTopWidth: 1, borderColor: theme.colors.border, paddingVertical: 20, gap: 14 },
+  match: { backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, padding: theme.space.lg, gap: theme.space.lg },
   scoreboard: { flexDirection: 'row', gap: 12, maxWidth: 500, width: '100%', alignSelf: 'center' },
   side: { flex: 1, alignItems: 'center', gap: 8 },
   name: { color: theme.colors.graphite, fontSize: 18, fontWeight: '700' },
