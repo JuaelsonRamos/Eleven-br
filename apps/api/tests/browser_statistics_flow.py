@@ -96,6 +96,7 @@ def test_browser_statistics_flow(engine: Engine) -> None:
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society", "futsal"],
+                    "category": "mixed",
                 },
             ).json()
             with Session(engine) as session:

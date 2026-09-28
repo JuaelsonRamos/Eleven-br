@@ -36,7 +36,11 @@ def search(
         for team_id, status in session.execute(
             select(TeamMembership.team_id, TeamMembership.status)
             .join(Player, Player.id == TeamMembership.player_id)
-            .where(TeamMembership.team_id.in_(ids), Player.user_id == user_id)
+            .where(
+                TeamMembership.team_id.in_(ids),
+                Player.user_id == user_id,
+                TeamMembership.status != "removed",
+            )
         ).all()
     }
     latest: dict[UUID, str] = {}

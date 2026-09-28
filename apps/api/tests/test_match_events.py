@@ -16,6 +16,7 @@ from app.domain.policies import Conflict, Permission, Plan, Role
 from app.infrastructure.match_event_models import MatchEvent
 from app.infrastructure.models import MembershipPermission, Player, TeamMembership, User
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_formations import draw_payload, setup_formation
 from tests.test_matches import action, create, setup_match
 from tests.test_team_profiles import client_for
@@ -375,9 +376,9 @@ def test_incremental_upgrade_preserves_all_rows(engine, session):
 
         def snapshot(table):
             value = (
-                "to_jsonb(t) - 'creation_key' - 'creation_hash'"
+                f"{LEGACY_JSON} - 'creation_key' - 'creation_hash'"
                 if table == "events"
-                else "to_jsonb(t)"
+                else f"{LEGACY_JSON}"
             )
             return connection.execute(
                 text(f'SELECT ({value})::text FROM "{table}" t ORDER BY ({value})::text')

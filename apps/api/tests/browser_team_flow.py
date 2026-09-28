@@ -126,6 +126,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             def fill_team(name):
                 page.get_by_role("button", name="Criar time", exact=True).click()
                 page.get_by_label("Nome do time", exact=True).fill(name)
+                page.get_by_role("radio", name="Misto", exact=True).click()
                 page.get_by_label("Cidade", exact=True).fill("Vitória")
                 page.get_by_role("button", name="UF", exact=True).click()
                 if name == "Tabajara":

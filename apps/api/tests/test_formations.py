@@ -18,6 +18,7 @@ from app.infrastructure.event_models import EventGuest
 from app.infrastructure.formation_models import Formation, FormationParticipant, FormationSquad
 from app.infrastructure.models import MembershipPermission
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_events import DATA, setup_events
 from tests.test_team_profiles import client_for
 
@@ -262,7 +263,7 @@ def test_0006_preserves_all_rows_and_protects_downgrade(engine: Engine, session:
         tables = [t for t in inspect(connection).get_table_names() if t != "alembic_version"]
         before = {
             t: connection.execute(
-                text(f'SELECT to_jsonb(t) FROM "{t}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT {LEGACY_JSON} FROM "{t}" t ORDER BY {LEGACY_JSON}::text')
             )
             .scalars()
             .all()
@@ -272,7 +273,7 @@ def test_0006_preserves_all_rows_and_protects_downgrade(engine: Engine, session:
         for table in tables:
             rows = (
                 connection.execute(
-                    text(f'SELECT to_jsonb(t) FROM "{table}" t ORDER BY to_jsonb(t)::text')
+                    text(f'SELECT {LEGACY_JSON} FROM "{table}" t ORDER BY {LEGACY_JSON}::text')
                 )
                 .scalars()
                 .all()

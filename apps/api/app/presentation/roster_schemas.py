@@ -1,9 +1,10 @@
-from typing import Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from app.domain.contacts import normalize_contact
+from app.domain.positions import Position
 
 
 class RosterFields(BaseModel):
@@ -59,7 +60,10 @@ class RosterRead(BaseModel):
     phone: str | None
     email: str | None
     photo_url: str | None
-    status: Literal["active", "inactive"]
+    status: Literal["active", "inactive", "removed"]
+    positions: list[str]
+    primary_position: str | None
+    roster_version: int
     account_linked: bool
     is_president: bool
 
@@ -81,3 +85,26 @@ class SimilarRead(BaseModel):
     status: str
     account_linked: bool
     reasons: list[str]
+
+
+class PositionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    positions: list[Position] = Field(max_length=10)
+    primary_position: Position | None
+    expected_version: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="after")
+    def consistent(self) -> Self:
+        if len(set(self.positions)) != len(self.positions):
+            raise ValueError("Não repita posições.")
+        if (self.positions and self.primary_position not in self.positions) or (
+            not self.positions and self.primary_position is not None
+        ):
+            raise ValueError("Selecione uma posição principal entre as posições cadastradas.")
+        return self
+
+
+class RemoveInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: bool = Field(strict=True)
+    expected_version: int = Field(ge=1, strict=True)

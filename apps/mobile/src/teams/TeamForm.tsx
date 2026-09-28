@@ -5,13 +5,13 @@ import { Button, Card } from '../components/ui';
 import { ImageSelector } from '../images/ImageSelector';
 import { saveCrest, type ImageChoice } from '../images/api';
 import { theme } from '../theme';
-import { findSimilar, modalityLabels, saveTeam, type PublicTeam, type Team, type TeamInput } from './api';
+import { categories, findSimilar, modalityLabels, saveTeam, type PublicTeam, type Team, type TeamInput } from './api';
 import { useTeams } from './TeamContext';
 import { StateSelector } from './StateSelector';
 
 export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () => void; onCancel: () => void }) {
   const { options, saved, reload } = useTeams();
-  const [data, setData] = useState<TeamInput>({ name: team?.name ?? '', city: team?.city ?? '', state: team?.state ?? '', modalities: team?.modalities ?? [] });
+  const [data, setData] = useState<TeamInput>({ name: team?.name ?? '', city: team?.city ?? '', state: team?.state ?? '', modalities: team?.modalities ?? [], category: team?.category ?? null });
   const [similar, setSimilar] = useState<PublicTeam[] | null>(null);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -23,6 +23,7 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
   async function submit(confirmed = false) {
     if (locked.current) return;
     const clean = { ...data, name: data.name.trim(), city: data.city.trim(), state: data.state.trim().toUpperCase() };
+    if (!clean.category) { setError('Selecione a categoria do time.'); return; }
     if (!clean.name || !clean.city || !options.states.some(item => item.value === clean.state) || !clean.modalities.length || !clean.modalities.every(value => options.modalities.some(item => item.value === value))) {
       setError('Preencha nome, cidade, UF válida e ao menos uma modalidade.'); return;
     }
@@ -56,6 +57,8 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
     <Field label="Nome do time" value={data.name} onChangeText={value => change('name', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
     <Field label="Cidade" value={data.city} onChangeText={value => change('city', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
     <StateSelector value={data.state} options={options.states} onChange={value => change('state', value)} disabled={busy} />
+    <Text style={styles.label}>Categoria</Text>
+    <View style={styles.choices}>{(Object.keys(categories) as (keyof typeof categories)[]).map(value => <Pressable key={value} accessibilityRole="radio" accessibilityLabel={categories[value]} accessibilityState={{ selected: data.category === value }} disabled={busy} onPress={() => change('category', value)} style={[styles.choice, data.category === value && styles.checked]}><Text style={styles.choiceText}>{categories[value]}{data.category === value ? ' ✓' : ''}</Text></Pressable>)}</View>
     <Text style={styles.label}>Modalidades</Text>
     <Text style={styles.note}>Selecione uma ou mais modalidades. Todas estão disponíveis no Free.</Text>
     <View style={styles.choices}>

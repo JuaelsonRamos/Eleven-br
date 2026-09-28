@@ -47,6 +47,25 @@ def test_production_cannot_enable_development_codes():
         settings(dev_verification_codes=True)
 
 
+def test_password_recovery_uses_existing_secure_mail_sender(monkeypatch):
+    factory = MagicMock()
+    smtp = factory.return_value.__enter__.return_value
+    smtp.send_message.return_value = {}
+    monkeypatch.setattr(smtplib, "SMTP_SSL", factory)
+    assert (
+        get_sender(settings()).send(
+            contact="recipient@example.com",
+            channel="email",
+            code="123456",
+            purpose="password_reset",
+        )
+        is None
+    )
+    message = smtp.send_message.call_args.args[0]
+    assert "recuperação de senha" in str(message["Subject"])
+    assert "123456" in message.get_body(preferencelist=("plain",)).get_content()
+
+
 @pytest.mark.parametrize("use_ssl", [True, False])
 def test_secure_delivery_message_and_no_returned_code(monkeypatch, use_ssl):
     factory = MagicMock()

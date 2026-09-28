@@ -5,7 +5,7 @@ import { Field, FormError, TextAction } from '../components/AuthLayout';
 import { getProfile } from '../auth/api';
 import { useAuth } from '../auth/AuthContext';
 import { useTeams } from '../teams/TeamContext';
-import { modalityLabels } from '../teams/api';
+import { categories, modalityLabels } from '../teams/api';
 import * as api from './api';
 import { styles as s } from './styles';
 
@@ -61,6 +61,7 @@ export function JoinPanel({ onBack, onTeams }: { onBack: () => void; onTeams: ()
       <TeamBadge name={found.team.name} crestUrl={found.team.crest_url} />
       <Text style={s.heading}>{found.team.name}</Text><Text style={s.note}>{found.team.city} · {found.team.state}</Text>
       <Text style={s.note}>{modalityLabels(found.team.modalities, options.modalities)}</Text>
+      <Text style={s.note}>{found.team.category ? categories[found.team.category] : 'Categoria não informada'}</Text>
       <Text selectable style={s.note}>ID: {found.team.code}</Text>
       {!found.pending && !found.membership_status && found.request_status === 'REJECTED' && <Text style={s.note}>Sua solicitação anterior não foi aprovada.</Text>}
       {found.membership_status ? <Text style={s.note}>{found.membership_status === 'active' ? 'Você já faz parte deste time.' : 'Seu vínculo está inativo. Peça ao responsável para reativá-lo no elenco.'}</Text> : found.pending ? <Text style={s.note}>Sua solicitação para este time já está aguardando aprovação.</Text> : <Button label="Solicitar entrada" disabled={busy} onPress={() => void run(async () => { await api.requestEntry(found.team); if (alive.current) { setFound({ ...found, pending: true }); setResults(current => current?.map(item => item.team.id === found.team.id ? { ...item, pending: true } : item) ?? null); setSuccess('Solicitação enviada. Aguardando aprovação do responsável pelo time.'); await load(); } })} />}

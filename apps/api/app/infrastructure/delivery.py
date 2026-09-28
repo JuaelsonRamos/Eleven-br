@@ -13,13 +13,17 @@ from app.infrastructure.config import Settings
 
 
 class VerificationSender(Protocol):
-    def send(self, *, contact: str, channel: str, code: str) -> str | None:
+    def send(
+        self, *, contact: str, channel: str, code: str, purpose: str = "verify_contact"
+    ) -> str | None:
         """Deliver a code. Only the explicit local adapter may return it for display."""
         ...
 
 
 class DevelopmentSender:
-    def send(self, *, contact: str, channel: str, code: str) -> str:
+    def send(
+        self, *, contact: str, channel: str, code: str, purpose: str = "verify_contact"
+    ) -> str:
         # No external delivery, plaintext database storage, file outbox or logging.
         return code
 
@@ -44,7 +48,9 @@ class SMTPVerificationSender:
                 "Envio de e-mail indisponível: configuração SMTP inválida."
             ) from None
 
-    def send(self, *, contact: str, channel: str, code: str) -> None:
+    def send(
+        self, *, contact: str, channel: str, code: str, purpose: str = "verify_contact"
+    ) -> None:
         if channel != "email":
             raise DeliveryUnavailable("Envio de código por este canal indisponível.")
         settings = self.settings
@@ -53,16 +59,17 @@ class SMTPVerificationSender:
             message = EmailMessage()
             message["From"] = formataddr((settings.smtp_from_name, self.from_email))
             message["To"] = recipient
-            message["Subject"] = "Seu código de verificação - ELEVEN BR"
+            label = "recuperação de senha" if purpose == "password_reset" else "verificação"
+            message["Subject"] = f"Seu código de {label} - ELEVEN BR"
             message.set_content(
-                "Olá!\n\nSeu código de verificação do ELEVEN BR é:\n\n"
+                f"Olá!\n\nSeu código de {label} do ELEVEN BR é:\n\n"
                 f"{code}\n\nO código expira em {CODE_MINUTES} minutos.\n\n"
                 "Se você não solicitou este código, ignore esta mensagem.\n\n"
                 "ELEVEN BR\nSeu time. Seu jogo.\n"
             )
             message.add_alternative(
                 '<!doctype html><html lang="pt-BR"><body>'
-                "<p>Olá!</p><p>Seu código de verificação do ELEVEN BR é:</p>"
+                f"<p>Olá!</p><p>Seu código de {label} do ELEVEN BR é:</p>"
                 '<p style="font-size:32px;font-weight:bold;letter-spacing:6px">'
                 f"{escape(code)}</p><p>O código expira em {CODE_MINUTES} minutos.</p>"
                 "<p>Se você não solicitou este código, ignore esta mensagem.</p>"

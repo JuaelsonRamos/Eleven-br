@@ -36,6 +36,7 @@ class JoinTeam(BaseModel):
     state: str
     modalities: list[str]
     crest_url: str | None
+    category: str | None = None
 
 
 class LookupRead(BaseModel):

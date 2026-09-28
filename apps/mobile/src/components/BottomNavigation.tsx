@@ -15,7 +15,7 @@ export function BottomNavigation({ state, navigation, visible, icons }: BottomTa
   const [focused, setFocused] = useState<string | null>(null);
   const current = state.routes[state.index];
   const parent = current && !visible.includes(current.name as MainTab)
-    ? (['Financeiro', 'Estatísticas'].includes(current.name) ? 'Início' : 'Mais') : undefined;
+    ? (['Financeiro', 'Estatísticas', 'Escalação'].includes(current.name) ? 'Início' : 'Mais') : undefined;
   return <View style={[s.surface, { paddingBottom: Math.max(insets.bottom, theme.space.sm) }]}><View style={s.bar}>
     {state.routes.filter(route => visible.includes(route.name as MainTab)).map(route => {
       const active = current?.key === route.key || parent === route.name;

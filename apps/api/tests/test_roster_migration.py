@@ -7,6 +7,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_team_profiles import DATA, client_for
 
 
@@ -17,9 +18,11 @@ def test_roster_migration_preserves_data_and_roundtrips(engine: Engine) -> None:
         original = client.post(
             "/v1/teams", json={**DATA, "name": "Tabajara FC", "modalities": ["society", "futsal"]}
         ).json()
+        original["category"] = None
         session.close()
         with engine.begin() as connection:
             config.attributes["connection"] = connection
+            connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
             command.downgrade(config, "0003")
             tables = [
                 "users",
@@ -30,7 +33,7 @@ def test_roster_migration_preserves_data_and_roundtrips(engine: Engine) -> None:
                 "team_memberships",
             ]
             before = {
-                table: connection.execute(text(f"SELECT to_jsonb(t) FROM {table} t ORDER BY id"))
+                table: connection.execute(text(f"SELECT {LEGACY_JSON} FROM {table} t ORDER BY id"))
                 .scalars()
                 .all()
                 for table in tables
@@ -38,7 +41,7 @@ def test_roster_migration_preserves_data_and_roundtrips(engine: Engine) -> None:
             command.upgrade(config, "head")
             for table in tables:
                 after = (
-                    connection.execute(text(f"SELECT to_jsonb(t) FROM {table} t ORDER BY id"))
+                    connection.execute(text(f"SELECT {LEGACY_JSON} FROM {table} t ORDER BY id"))
                     .scalars()
                     .all()
                 )
@@ -47,6 +50,7 @@ def test_roster_migration_preserves_data_and_roundtrips(engine: Engine) -> None:
                         for field in ["roster_name", "nickname", "contact_phone", "contact_email"]:
                             assert row.pop(field) is None
                 assert before[table] == after
+            connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
             command.downgrade(config, "0003")
             command.upgrade(config, "head")
             command.check(config)
@@ -64,7 +68,8 @@ def test_roster_downgrade_protects_unlinked_players(engine: Engine) -> None:
         assert created.status_code == 201
     with pytest.raises(RuntimeError, match="roster data"), engine.begin() as connection:
         config.attributes["connection"] = connection
+        connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
         command.downgrade(config, "0003")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT count(*) FROM players WHERE user_id IS NULL")) == 1
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0012"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0013"

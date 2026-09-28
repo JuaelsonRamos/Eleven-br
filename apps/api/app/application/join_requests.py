@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.application.notification_events import join_request, join_resolved
 from app.application.roster import authorized_team, member_in_team, roster_name
 from app.application.sessions import verified
-from app.application.teams import add_member
+from app.application.teams import add_member, ensure_active_slot
 from app.application.verification import mask_contact
 from app.domain.policies import Conflict, NotFound
 from app.domain.team_codes import normalize_code
@@ -36,7 +36,7 @@ def target_problem(
 ) -> str | None:
     if player.user_id:
         return "Este jogador já está vinculado a uma conta."
-    if member.status != "active":
+    if member.status == "inactive":
         return "Jogador inativo. Reative explicitamente no elenco antes de vincular."
     if (
         member.id == team.president_membership_id
@@ -79,7 +79,7 @@ def target_restrictions(
 def public_team(team: Team) -> dict[str, object]:
     return {
         key: getattr(team, key)
-        for key in ["id", "name", "code", "city", "state", "modalities", "crest_url"]
+        for key in ["id", "name", "code", "city", "state", "modalities", "crest_url", "category"]
     }
 
 
@@ -87,7 +87,11 @@ def own_membership(session: Session, user_id: UUID, team_id: UUID) -> TeamMember
     return session.scalar(
         select(TeamMembership)
         .join(Player, Player.id == TeamMembership.player_id)
-        .where(TeamMembership.team_id == team_id, Player.user_id == user_id)
+        .where(
+            TeamMembership.team_id == team_id,
+            Player.user_id == user_id,
+            TeamMembership.status != "removed",
+        )
     )
 
 
@@ -350,6 +354,10 @@ def approve(
                 session.delete(source)
                 session.flush()  # Free the unique User FK before assigning the existing Player.
             target.user_id = user.id
+            if member.status == "removed":
+                ensure_active_slot(session, team)
+                member.status = "active"
+                member.roster_version += 1
         item.membership_id = member.id
         resolve(item, "APPROVED", user_id)
         session.flush()

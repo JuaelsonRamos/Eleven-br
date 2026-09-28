@@ -15,7 +15,13 @@ from app.infrastructure.models import Player, Team, TeamMembership, User
 from app.main import create_app
 from tests.conftest import make_player
 
-DATA = {"name": "Tabajara", "city": "Vitória", "state": "ES", "modalities": ["society"]}
+DATA = {
+    "name": "Tabajara",
+    "city": "Vitória",
+    "state": "ES",
+    "modalities": ["society"],
+    "category": "mixed",
+}
 
 
 def client_for(session: Session, player: Player | None = None) -> TestClient:
@@ -71,7 +77,7 @@ def test_duplicate_advisory_is_public_limited_and_nonblocking(session: Session) 
     )
     assert similar.status_code == 200
     assert len(similar.json()) == 1
-    assert set(similar.json()[0]) == {"name", "code", "city", "state", "modalities"}
+    assert set(similar.json()[0]) == {"name", "code", "city", "state", "modalities", "category"}
     assert other.get(f"/v1/teams/{created['id']}").status_code == 404
     assert other.post("/v1/teams", json=DATA).status_code == 201
     assert other.post("/v1/teams/similar", json={**DATA, "modalities": ["futsal"]}).json() == []

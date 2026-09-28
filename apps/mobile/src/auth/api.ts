@@ -108,6 +108,11 @@ export async function authenticated<T>(path: string, body?: unknown, method = 'G
 export const register = (name: string, contact: string, password: string, confirmation: string) =>
   request<Verification>('/v1/auth/register', { name, contact, password, password_confirmation: confirmation });
 export const login = (contact: string, password: string) => request<AuthResult>('/v1/auth/login', { contact, password });
+export type RecoveryTicket = { message: string; recovery_token: string; development_code?: string };
+export const recoverPassword = (email: string) => request<RecoveryTicket>('/v1/auth/password-recovery', { email });
+export const resetPassword = (ticket: RecoveryTicket, code: string, password: string, confirmation: string) =>
+  request<{ message: string }>('/v1/auth/password-reset', { recovery_token: ticket.recovery_token, code, password, password_confirmation: confirmation });
+export const platformStats = () => request<{ teams: number; players: number }>('/v1/public/platform-stats', undefined, undefined, 'GET');
 export const verify = (ticket: Verification, code: string) =>
   request<Tokens>('/v1/auth/verify', { challenge_token: ticket.challenge_token, code });
 export const resend = (ticket: Verification, contact?: string) => request<Verification>(

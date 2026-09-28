@@ -1072,7 +1072,7 @@ Migration **0011_notifications** cria `notifications` e acrescenta chave/hash op
 conteúdo retorna conflito. Clientes legados sem chave continuam aceitos, mas cada
 POST representa uma criação distinta. A constraint `(user_id, dedup_key)` e INSERT
 ON CONFLICT impedem notificações duplicadas. Emissão ocorre na transação do negócio,
-sem commit próprio, fila ou tabela de canais. O head atual é **0011**.
+sem commit próprio, fila ou tabela de canais.
 
 API pessoal: GET `/v1/me/notifications?limit=20&cursor=<id>` (máximo 50), GET
 `/unread-count`, GET `/{id}`, POST `/{id}/read` e POST `/read-all` sob esse prefixo.
@@ -1114,10 +1114,45 @@ concorrentes exigem atualizar os valores antes de confirmar novamente.
 Validação isolada: `uv run pytest -q tests/test_team_discovery.py tests/test_statistic_adjustments.py`;
 com Expo Web ativo, `uv run --with playwright pytest -q tests/browser_join_flow.py`.
 
+## Ajustes de lançamento e escalação Pro
+
+Migration **0013_launch_essentials** (head anterior 0012): recuperação de senha,
+categoria, posições por vínculo, remoção lógica/auditoria e escalações visuais.
+Preserva migrations anteriores e dados. Categoria é obrigatória para novos times;
+times antigos mostram “Categoria não informada” até edição pelo responsável.
+
+**Login → Esqueci minha senha** envia código ao e-mail verificado pelo SMTP já
+configurado. Expira em 10 minutos, uso único, cinco tentativas, limites de envio e
+resposta genérica. Nova solicitação invalida a anterior; redefinição encerra sessões
+antigas e volta ao login. Contas sem e-mail verificado não podem usar esse canal.
+O envio usa BackgroundTasks após commit, sem fila durável; se o provedor falhar,
+o usuário pode solicitar outro código. Testes de envio simulam SMTP, sem e-mail real.
+
+**Elenco → jogador → Editar posições** permite múltiplas posições e uma principal,
+independentes por time, também no Free. Inativar mantém o vínculo para reativação;
+remover encerra a participação e requer nova entrada aprovada. Histórico esportivo,
+financeiro e identidade permanecem; antigos privilégios não são restaurados na reentrada.
+Aceitar/recusar continuam nas solicitações existentes, com notificação e auditoria.
+
+**Início → Escalação** permite aos gestores Pro salvar formações Campo (11), Society
+(7) e Futsal (5), com evento/jogo opcional. Membros consultam; a API bloqueia Free.
+Selecionar jogador fora da posição sugerida é permitido, duplicá-lo na escalação não.
+Trocar formação mantém posições compatíveis e avisa sobre jogadores sem novo lugar.
+O recurso não altera o sorteio da pelada. “Conhecer o Pro” é informativo; contratação
+e cobrança de assinatura ainda não existem.
+
+A abertura do app mostra contadores reais, sem dados privados, via
+`GET /v1/public/platform-stats`: times ativos e identidades Player, sem duplicar quem
+participa de vários times. Cache HTTP de 60 segundos e consulta única ao montar a tela.
+
+Validação em `apps/api`: `uv run pytest -q tests/test_launch_essentials.py`;
+com Expo Web em 8081: `uv run --with playwright pytest -q tests/browser_launch_flow.py`.
+Os testes usam exclusivamente schemas temporários em banco `_test`.
+
 ## Próxima etapa
 
-Definir provedor de verificação para publicação, armazenamento durável de imagens e futura
-recuperação de conta. Entregar assets oficiais e validar em Android/iOS reais.
+Validar a entrega SMTP no ambiente de publicação e o armazenamento durável de imagens.
+Entregar assets oficiais e validar em Android/iOS reais.
 Unificação de Players com histórico, resolução de fotos conflitantes, integrações
 financeiras e assinaturas continuam fora deste escopo.
 

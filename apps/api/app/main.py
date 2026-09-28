@@ -16,6 +16,7 @@ from app.presentation.formation_routes import router as formation_router
 from app.presentation.image_limits import ImageUploadLimit
 from app.presentation.image_routes import router as image_router
 from app.presentation.join_routes import router as join_router
+from app.presentation.lineup_routes import router as lineup_router
 from app.presentation.match_event_routes import router as match_event_router
 from app.presentation.match_routes import router as match_router
 from app.presentation.notification_routes import router as notification_router
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=status, content={"detail": str(error)}, headers=headers)
 
     app.include_router(join_router)
+    app.include_router(lineup_router)
     app.include_router(notification_router)
     app.include_router(finance_router)
     app.include_router(router)

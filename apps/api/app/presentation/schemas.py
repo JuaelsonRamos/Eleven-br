@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -12,6 +13,7 @@ class TeamInput(BaseModel):
     city: str = Field(min_length=1, max_length=100)
     state: str
     modalities: list[Modality] = Field(min_length=1)
+    category: Literal["male", "female", "mixed"] | None = None
 
     @field_validator("modalities")
     @classmethod
@@ -33,6 +35,10 @@ class TeamInput(BaseModel):
         return value
 
 
+class TeamCreate(TeamInput):
+    category: Literal["male", "female", "mixed"]
+
+
 class TeamPublicRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     name: str
@@ -40,6 +46,7 @@ class TeamPublicRead(BaseModel):
     city: str
     state: str
     modalities: list[str]
+    category: str | None = None
 
 
 class TeamRead(BaseModel):
@@ -50,6 +57,7 @@ class TeamRead(BaseModel):
     city: str
     state: str
     modalities: list[str]
+    category: str | None = None
     status: str
     plan: Plan
     crest_url: str | None = None

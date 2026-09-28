@@ -56,7 +56,7 @@ export function PlayerForm({ teamId, player, onSaved, onCancel, onDenied }: {
     <FormError message={error} />
     {matches ? <Card><View style={styles.stack}>
       <Text accessibilityRole="alert" style={styles.label}>Encontramos um jogador parecido neste elenco.</Text>
-      {matches.map(match => <Text key={match.membership_id} style={styles.note}>{match.name} · {match.status === 'active' ? 'Ativo' : 'Inativo'} · Coincidência: {match.reasons.join(', ')}</Text>)}
+      {matches.map(match => <Text key={match.membership_id} style={styles.note}>{match.name} · {match.status === 'active' ? 'Ativo' : match.status === 'inactive' ? 'Inativo' : 'Removido da equipe'} · Coincidência: {match.reasons.join(', ')}</Text>)}
       <Text style={styles.note}>Confira nome e contatos. Continuar cria ou mantém um cadastro separado, sem vincular contas.</Text>
       <Button label={busy ? 'Salvando…' : player ? 'Salvar mesmo assim' : 'Adicionar mesmo assim'} disabled={busy} onPress={() => void submit(true)} />
       <TextAction label="Cancelar" onPress={() => setMatches(null)} disabled={busy} />

@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import select, text
+from fastapi import APIRouter, HTTPException, Response
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.application.accounts import complete_profile
@@ -20,12 +20,25 @@ from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.schemas import (
     AdministrationRead,
     ProfileRead,
+    TeamCreate,
     TeamInput,
     TeamPublicRead,
     TeamRead,
 )
 
 router = APIRouter()
+
+
+@router.get("/v1/public/platform-stats", tags=["public"])
+def platform_stats(session: SessionDep, response: Response) -> dict[str, int]:
+    response.headers["Cache-Control"] = "public, max-age=60"
+    teams, players = session.execute(
+        select(
+            select(func.count()).select_from(Team).where(Team.status == "active").scalar_subquery(),
+            select(func.count()).select_from(Player).scalar_subquery(),
+        )
+    ).one()
+    return {"teams": teams, "players": players}
 
 
 @router.get("/health", tags=["health"])
@@ -93,7 +106,7 @@ def check_similar(data: TeamInput, session: SessionDep, user: CurrentUser) -> li
 
 
 @router.post("/v1/teams", response_model=TeamRead, status_code=201, tags=["teams"])
-def new_team(data: TeamInput, session: SessionDep, user: CurrentUser) -> TeamRead:
+def new_team(data: TeamCreate, session: SessionDep, user: CurrentUser) -> TeamRead:
     team = register_team(session, user_id=user.id, **data.model_dump())
     return team_response(team, session, user.id)
 

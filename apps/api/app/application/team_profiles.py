@@ -14,7 +14,14 @@ from app.infrastructure.models import MembershipPermission, Player, Team, TeamMe
 
 
 def register_team(
-    session: Session, *, user_id: UUID, name: str, city: str, state: str, modalities: list[str]
+    session: Session,
+    *,
+    user_id: UUID,
+    name: str,
+    city: str,
+    state: str,
+    modalities: list[str],
+    category: str | None = None,
 ) -> Team:
     # Serialize creation with replacement of an empty signup Player during approval.
     session.execute(select(User).where(User.id == user_id).with_for_update())
@@ -35,6 +42,7 @@ def register_team(
                     code=generate_code(),
                     plan=Plan.FREE,
                 )
+                team.category = category
             session.commit()
             return team
         except IntegrityError as error:
@@ -55,11 +63,14 @@ def edit_team(
     city: str,
     state: str,
     modalities: list[str],
+    category: str | None = None,
 ) -> Team:
     team = require_membership(
         session, user_id=user_id, team_id=team_id, permission=Permission.MANAGE_TEAM
     )
     team.name, team.city, team.state, team.modalities = name, city, state, modalities
+    if category is not None:
+        team.category = category
     session.commit()
     return team
 
@@ -100,7 +111,13 @@ def membership_context(
 
 
 def similar_teams(
-    session: Session, *, name: str, city: str, state: str, modalities: list[str]
+    session: Session,
+    *,
+    name: str,
+    city: str,
+    state: str,
+    modalities: list[str],
+    category: str | None = None,
 ) -> list[Team]:
     """Advisory public identity search; never return membership or administration data.
 

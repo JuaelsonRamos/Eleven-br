@@ -1,6 +1,6 @@
 import { authenticated } from '../auth/api';
 
-export type JoinTeam = { id: string; name: string; code: string; city: string; state: string; modalities: string[]; crest_url: string | null };
+export type JoinTeam = { id: string; name: string; code: string; city: string; state: string; modalities: string[]; category: 'male' | 'female' | 'mixed' | null; crest_url: string | null };
 export type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export const statusLabels: Record<Status, string> = { PENDING: 'Aguardando aprovação', APPROVED: 'Aprovada', REJECTED: 'Recusada', CANCELLED: 'Cancelada' };
 export type JoinRequest = { id: string; team: JoinTeam; status: Status; created_at: string; updated_at: string; resolved_at: string | null };

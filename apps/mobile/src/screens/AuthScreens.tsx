@@ -4,10 +4,12 @@ import { useAuth } from '../auth/AuthContext';
 import * as api from '../auth/api';
 import { AuthLayout, Field, FormError, TextAction, authStyles } from '../components/AuthLayout';
 import { Avatar, Badge, Button, LoadingState } from '../components/ui';
+import { PasswordRecovery } from './PasswordRecovery';
+import { PlatformStats } from '../components/PlatformStats';
 
 export function AuthScreens() {
   const auth = useAuth();
-  const [screen, setScreen] = useState<'welcome' | 'login' | 'register'>(auth.startAtLogin ? 'login' : 'welcome');
+  const [screen, setScreen] = useState<'welcome' | 'login' | 'register' | 'recovery'>(auth.startAtLogin ? 'login' : 'welcome');
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +92,9 @@ export function AuthScreens() {
     </AuthLayout>;
   }
 
+  if (screen === 'recovery') return <PasswordRecovery onBack={() => go('login')} />;
   if (screen === 'welcome') return <AuthLayout title="Entre em campo." description="Seu futebol, mais organizado. Faça parte do ELEVEN BR.">
+    <PlatformStats />
     <Button label="Criar minha conta" onPress={() => go('register')} />
     <TextAction label="Já tenho conta" onPress={() => go('login')} />
   </AuthLayout>;
@@ -117,6 +121,7 @@ export function AuthScreens() {
     </>}
     <FormError message={error} />
     <Button label={busy ? 'Aguarde…' : screen === 'register' ? 'Criar minha conta' : 'Entrar'} disabled={busy} onPress={() => void submit()} />
+    {screen === 'login' && <TextAction label="Esqueci minha senha" disabled={busy} onPress={() => go('recovery')} />}
     <TextAction label={screen === 'register' ? 'Já tenho conta' : 'Criar minha conta'} disabled={busy} onPress={() => go(screen === 'register' ? 'login' : 'register')} />
   </AuthLayout>;
 }

@@ -18,6 +18,7 @@ from app.application.teams import add_member
 from app.domain.policies import Conflict, Permission, Plan, Role
 from app.infrastructure.finance_models import CashEntry, MonthlyDues
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_foundation import make_team
 from tests.test_roster import setup_roster
 from tests.test_team_profiles import client_for
@@ -482,14 +483,14 @@ def test_migration_preservation_and_downgrade_guard(engine, session):
         tables = [t for t in inspect(connection).get_table_names() if t != "alembic_version"]
         before = {
             t: connection.execute(
-                text(f'SELECT to_jsonb(t)::text FROM "{t}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT {LEGACY_JSON}::text FROM "{t}" t ORDER BY {LEGACY_JSON}::text')
             ).all()
             for t in tables
         }
         command.upgrade(config, "head")
         assert all(
             connection.execute(
-                text(f'SELECT to_jsonb(t)::text FROM "{t}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT {LEGACY_JSON}::text FROM "{t}" t ORDER BY {LEGACY_JSON}::text')
             ).all()
             == rows
             for t, rows in before.items()
@@ -500,4 +501,4 @@ def test_migration_preservation_and_downgrade_guard(engine, session):
         config.attributes["connection"] = connection
         command.downgrade(config, "0009")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0012"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0013"

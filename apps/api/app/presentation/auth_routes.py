@@ -1,8 +1,9 @@
 from dataclasses import asdict
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response
 
+from app.application import password_recovery
 from app.application.accounts import login, register
 from app.application.sessions import TokenPair, logout_session, refresh_session
 from app.application.verification import (
@@ -18,8 +19,10 @@ from app.presentation.auth_schemas import (
     ChallengeInput,
     ChangeContactInput,
     LoginInput,
+    RecoveryInput,
     RefreshInput,
     RegisterInput,
+    ResetInput,
     SessionRead,
     VerificationRead,
     VerifyInput,
@@ -70,6 +73,30 @@ def auth_request(
 
 TransportDep = Annotated[str, Depends(auth_request)]
 router = APIRouter(prefix="/v1/auth", tags=["authentication"])
+
+
+@router.post("/password-recovery")
+def recover_password(
+    data: RecoveryInput,
+    session: SessionDep,
+    settings: SettingsDep,
+    transport: TransportDep,
+    tasks: BackgroundTasks,
+) -> dict[str, object]:
+    result, recipient, code = password_recovery.request(session, data.email, settings)
+    if recipient:
+        tasks.add_task(password_recovery.deliver, recipient, code, settings)
+    return result
+
+
+@router.post("/password-reset")
+def reset_password(
+    data: ResetInput, session: SessionDep, settings: SettingsDep, transport: TransportDep
+) -> dict[str, str]:
+    password_recovery.reset(
+        session, data.recovery_token, data.code, data.password.get_secret_value(), settings
+    )
+    return {"message": "Senha redefinida. Entre novamente com sua nova senha."}
 
 
 def present_session(

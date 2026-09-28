@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.application.team_audit import record
 from app.application.team_profiles import membership_context
 from app.application.teams import (
     add_member,
@@ -16,7 +17,7 @@ from app.application.teams import (
 )
 from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission, Plan, Role
 from app.domain.team_identity import normalized
-from app.infrastructure.models import Player, Team, TeamMembership
+from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership
 
 
 @dataclass
@@ -31,6 +32,9 @@ class RosterPerson:
     status: str
     account_linked: bool
     is_president: bool
+    positions: list[str]
+    primary_position: str | None
+    roster_version: int
 
 
 @dataclass
@@ -90,6 +94,9 @@ def person(
         membership.status,
         linked,
         membership.id == team.president_membership_id,
+        membership.positions,
+        membership.primary_position,
+        membership.roster_version,
     )
 
 
@@ -119,11 +126,15 @@ def list_roster(session: Session, *, user_id: UUID, team_id: UUID, status: str) 
     active = sum(item.status == "active" for item in items)
     return RosterSnapshot(
         sorted(
-            [item for item in items if status == "all" or item.status == status],
+            [
+                item
+                for item in items
+                if (status == "all" and item.status != "removed") or item.status == status
+            ],
             key=lambda item: (normalized(item.name), str(item.membership_id)),
         ),
         active,
-        len(items) - active,
+        sum(item.status == "inactive" for item in items),
         ENTITLEMENTS[Plan(team.plan)].active_players,
         can_manage,
         team.plan,
@@ -272,11 +283,108 @@ def change_status(
     member, player = member_in_team(session, team_id, membership_id)
     if not activate and member.id == team.president_membership_id:
         raise Conflict("Transfira a presidência antes de inativar este jogador.")
+    if member.status == "removed":
+        raise Conflict("Este jogador foi removido. Uma nova entrada exige aprovação.")
     if activate and member.status != "active":
         ensure_active_slot(session, team)
         if member.role == Role.ADMIN.value and member.id != team.president_membership_id:
             ensure_admin_slot(session, team)
+    previous = member.status
     member.status = "active" if activate else "inactive"
+    if previous != member.status:
+        member.roster_version += 1
+        record(
+            session,
+            team_id,
+            user_id,
+            member.id,
+            "MEMBER_REACTIVATED" if activate else "MEMBER_INACTIVATED",
+            {"status": previous},
+            {"status": member.status},
+        )
+    session.flush()
+    result = person(team, member, player, contacts=True)
+    session.commit()
+    return result
+
+
+def positions(
+    session: Session,
+    user_id: UUID,
+    team_id: UUID,
+    membership_id: UUID,
+    values: list[str],
+    primary: str | None,
+    version: int,
+) -> RosterPerson:
+    team = authorized_team(session, user_id, team_id, write=True)
+    member, player = member_in_team(session, team_id, membership_id)
+    if member.status == "removed":
+        raise Conflict("Este jogador não pertence mais ao elenco.")
+    if member.positions == values and member.primary_position == primary:
+        return person(team, member, player, contacts=True)
+    if member.roster_version != version:
+        raise Conflict("O cadastro mudou. Atualize antes de salvar.")
+    before: dict[str, object] = {
+        "positions": member.positions,
+        "primary_position": member.primary_position,
+    }
+    member.positions, member.primary_position = values, primary
+    member.roster_version += 1
+    record(
+        session,
+        team_id,
+        user_id,
+        member.id,
+        "POSITIONS_CHANGED",
+        before,
+        {"positions": values, "primary_position": primary},
+    )
+    session.flush()
+    result = person(team, member, player, contacts=True)
+    session.commit()
+    return result
+
+
+def remove(
+    session: Session, user_id: UUID, team_id: UUID, membership_id: UUID, confirm: bool, version: int
+) -> RosterPerson:
+    team = authorized_team(session, user_id, team_id, write=True)
+    member, player = member_in_team(session, team_id, membership_id)
+    if member.id == team.president_membership_id:
+        raise Conflict("Transfira a presidência antes de remover este jogador.")
+    if not confirm:
+        raise Conflict("Confirme a remoção da equipe.")
+    if member.status == "removed":
+        return person(team, member, player, contacts=True)
+    if member.roster_version != version:
+        raise Conflict("O cadastro mudou. Atualize antes de remover.")
+    grants = list(
+        session.scalars(
+            select(MembershipPermission.permission).where(
+                MembershipPermission.membership_id == member.id
+            )
+        )
+    )
+    record(
+        session,
+        team_id,
+        user_id,
+        member.id,
+        "MEMBER_REMOVED",
+        {
+            "status": member.status,
+            "role": member.role,
+            "permissions": grants,
+            "player_id": str(player.id),
+        },
+        {"status": "removed", "role": "member"},
+    )
+    member.status, member.role = "removed", "member"
+    member.roster_version += 1
+    session.execute(
+        delete(MembershipPermission).where(MembershipPermission.membership_id == member.id)
+    )
     session.flush()
     result = person(team, member, player, contacts=True)
     session.commit()

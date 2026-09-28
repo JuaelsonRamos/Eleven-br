@@ -4,8 +4,11 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.application import roster
+from app.domain.positions import POSITIONS
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.roster_schemas import (
+    PositionInput,
+    RemoveInput,
     RosterCreate,
     RosterPage,
     RosterRead,
@@ -14,6 +17,38 @@ from app.presentation.roster_schemas import (
 )
 
 router = APIRouter(prefix="/v1/teams/{team_id}/players", tags=["roster"])
+
+
+@router.get("/positions/options")
+def position_options(team_id: UUID, session: SessionDep, user: CurrentUser) -> dict[str, str]:
+    roster.authorized_team(session, user.id, team_id, write=False)
+    return POSITIONS
+
+
+@router.put("/{membership_id}/positions", response_model=RosterRead)
+def set_positions(
+    team_id: UUID, membership_id: UUID, data: PositionInput, session: SessionDep, user: CurrentUser
+) -> RosterRead:
+    return RosterRead.model_validate(
+        roster.positions(
+            session,
+            user.id,
+            team_id,
+            membership_id,
+            list(data.positions),
+            data.primary_position,
+            data.expected_version,
+        )
+    )
+
+
+@router.post("/{membership_id}/remove", response_model=RosterRead)
+def remove_player(
+    team_id: UUID, membership_id: UUID, data: RemoveInput, session: SessionDep, user: CurrentUser
+) -> RosterRead:
+    return RosterRead.model_validate(
+        roster.remove(session, user.id, team_id, membership_id, data.confirm, data.expected_version)
+    )
 
 
 @router.get("", response_model=RosterPage)

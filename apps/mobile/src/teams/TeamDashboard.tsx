@@ -27,6 +27,7 @@ export function TeamDashboard({ team, navigation }: { team: Team; navigation: Bo
       <QuickAction label="Elenco" description="Quem joga com você" icon="people-outline" onPress={() => navigation.navigate('Elenco')} />
       <QuickAction label="Estatísticas" description="Números do time" icon="stats-chart-outline" onPress={() => navigation.navigate('Estatísticas')} />
       <QuickAction label="Financeiro" description="Mensalidades e caixa" icon="wallet-outline" onPress={() => navigation.navigate('Financeiro')} />
+      <QuickAction label="Escalação" description="Seu time em campo · Pro" icon="football-outline" onPress={() => navigation.navigate('Escalação')} />
       <QuickAction label="Mais" description="Sua conta e seus times" icon="grid-outline" onPress={() => navigation.navigate('Mais')} />
     </View>
     <NextEvent teamId={team.id} onOpen={event => navigation.navigate('Jogos', { teamId: team.id, eventId: event.id })} />

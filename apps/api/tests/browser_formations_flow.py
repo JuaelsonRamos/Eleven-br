@@ -93,6 +93,7 @@ def test_browser_formations_flow(engine: Engine) -> None:
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society", "futsal"],
+                    "category": "mixed",
                 },
             ).json()
             profile = api.get("/v1/me", headers=member).json()
@@ -131,15 +132,21 @@ def test_browser_formations_flow(engine: Engine) -> None:
             context = browser.new_context(viewport={"width": 390, "height": 844})
             errors = []
             writes = []
+            pending_routes = 0
 
             def isolated(route):
-                source = urlsplit(route.request.url)
-                route.fulfill(
-                    response=route.fetch(
-                        url=f"http://127.0.0.1:{port}{source.path}"
-                        + (f"?{source.query}" if source.query else "")
+                nonlocal pending_routes
+                pending_routes += 1
+                try:
+                    source = urlsplit(route.request.url)
+                    route.fulfill(
+                        response=route.fetch(
+                            url=f"http://127.0.0.1:{port}{source.path}"
+                            + (f"?{source.query}" if source.query else "")
+                        )
                     )
-                )
+                finally:
+                    pending_routes -= 1
 
             context.route("**/v1/**", isolated)
             page = context.new_page()
@@ -416,7 +423,11 @@ def test_browser_formations_flow(engine: Engine) -> None:
             expect(page.get_by_role("button", name="Refazer sorteio", exact=True)).to_have_count(0)
             expect(page.get_by_role("button", name="Mover Bruno", exact=True)).to_have_count(0)
             assert not errors, errors
-            context.unroute_all(behavior="wait")
+            page.wait_for_load_state("networkidle")
+            deadline = time.monotonic() + 10
+            while pending_routes and time.monotonic() < deadline:
+                page.wait_for_timeout(20)
+            assert pending_routes == 0
             context.close()
             browser.close()
     finally:

@@ -7,6 +7,7 @@ from app.infrastructure import (  # noqa: F401
     finance_models,
     formation_models,
     join_models,
+    launch_models,
     match_event_models,
     match_models,
     notification_models,

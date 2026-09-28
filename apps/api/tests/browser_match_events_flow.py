@@ -93,6 +93,7 @@ def test_browser_match_events_flow(engine: Engine) -> None:
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society", "futsal"],
+                    "category": "mixed",
                 },
             ).json()
             profile = api.get("/v1/me", headers=member).json()

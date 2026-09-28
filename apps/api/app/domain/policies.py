@@ -27,12 +27,13 @@ class Entitlements:
     active_players: int
     administrators: int
     granular_permissions: bool
+    lineups: bool = False
 
 
 ENTITLEMENTS = MappingProxyType(
     {
         Plan.FREE: Entitlements(24, 0, False),
-        Plan.PRO: Entitlements(100, 5, True),
+        Plan.PRO: Entitlements(100, 5, True, True),
     }
 )
 

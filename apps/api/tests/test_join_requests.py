@@ -18,6 +18,7 @@ from app.infrastructure.event_models import EventAttendance, EventGuest
 from app.infrastructure.join_models import TeamJoinRequest
 from app.infrastructure.models import MembershipPermission, Player, TeamMembership
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_events import DATA
 from tests.test_formations import draw_payload
 from tests.test_foundation import make_team
@@ -98,7 +99,16 @@ def test_code_discovery_normalization_privacy_and_rate_limit(session):
     response = client.post("/v1/teams/join/lookup", json={"code": f"  {team.code.lower()}  "})
     assert response.status_code == 200
     data = response.json()
-    assert set(data["team"]) == {"id", "name", "code", "city", "state", "modalities", "crest_url"}
+    assert set(data["team"]) == {
+        "id",
+        "name",
+        "code",
+        "city",
+        "state",
+        "modalities",
+        "crest_url",
+        "category",
+    }
     assert data["team"]["code"] == team.code and not data["pending"]
     assert client.get(f"/v1/teams/{team.id}").status_code == 404
     assert (
@@ -417,7 +427,7 @@ def test_migration_incremental_preservation_constraints_and_guard(engine, sessio
         ]
         before = {
             name: connection.execute(
-                text(f'SELECT to_jsonb(t)::text FROM "{name}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT {LEGACY_JSON}::text FROM "{name}" t ORDER BY {LEGACY_JSON}::text')
             )
             .scalars()
             .all()
@@ -426,7 +436,7 @@ def test_migration_incremental_preservation_constraints_and_guard(engine, sessio
         command.upgrade(config, "head")
         assert all(
             connection.execute(
-                text(f'SELECT to_jsonb(t)::text FROM "{name}" t ORDER BY to_jsonb(t)::text')
+                text(f'SELECT {LEGACY_JSON}::text FROM "{name}" t ORDER BY {LEGACY_JSON}::text')
             )
             .scalars()
             .all()

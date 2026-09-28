@@ -70,6 +70,7 @@ class Team(Entity, Base):
     city: Mapped[str] = mapped_column(String(100))
     state: Mapped[str] = mapped_column(String(2))
     modalities: Mapped[list[str]] = mapped_column(ARRAY(String(40)))
+    category: Mapped[str | None] = mapped_column(String(16))
     crest_url: Mapped[str | None] = mapped_column(String(2048))
     status: Mapped[str] = mapped_column(String(16), server_default="active")
     plan: Mapped[str] = mapped_column(String(16), server_default="free")
@@ -86,6 +87,9 @@ class Team(Entity, Base):
         ),
         CheckConstraint("status IN ('active', 'inactive')", name="status"),
         CheckConstraint("plan IN ('free', 'pro')", name="plan"),
+        CheckConstraint(
+            "category IS NULL OR category IN ('male', 'female', 'mixed')", name="category"
+        ),
         ForeignKeyConstraint(
             ["id", "president_membership_id"],
             ["team_memberships.team_id", "team_memberships.id"],
@@ -107,11 +111,21 @@ class TeamMembership(Entity, Base):
     nickname: Mapped[str | None] = mapped_column(String(80))
     contact_phone: Mapped[str | None] = mapped_column(String(16))
     contact_email: Mapped[str | None] = mapped_column(String(254))
+    positions: Mapped[list[str]] = mapped_column(ARRAY(String(4)), server_default=text("'{}'"))
+    primary_position: Mapped[str | None] = mapped_column(String(4))
+    roster_version: Mapped[int] = mapped_column(server_default="1")
     __table_args__ = (
         UniqueConstraint("team_id", "player_id", name="uq_membership_team_player"),
         UniqueConstraint("team_id", "id", name="uq_membership_team_id"),
         CheckConstraint("role IN ('member', 'admin')", name="role"),
-        CheckConstraint("status IN ('active', 'inactive')", name="status"),
+        CheckConstraint("status IN ('active', 'inactive', 'removed')", name="status"),
+        CheckConstraint("roster_version > 0", name="roster_version"),
+        CheckConstraint(
+            "(cardinality(positions) = 0 AND primary_position IS NULL) OR "
+            "(cardinality(positions) > 0 AND primary_position IS NOT NULL "
+            "AND primary_position = ANY(positions))",
+            name="primary_position",
+        ),
         CheckConstraint("roster_name IS NULL OR length(trim(roster_name)) > 0", name="roster_name"),
         CheckConstraint(
             "contact_email IS NULL OR contact_email = lower(contact_email)", name="email_normalized"

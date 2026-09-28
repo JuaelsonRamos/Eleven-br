@@ -1,6 +1,7 @@
 import { authenticated } from '../auth/api';
 
-export type TeamInput = { name: string; city: string; state: string; modalities: string[] };
+export const categories = { male: 'Masculino', female: 'Feminino', mixed: 'Misto' };
+export type TeamInput = { name: string; city: string; state: string; modalities: string[]; category: keyof typeof categories | null };
 export type PublicTeam = TeamInput & { code: string };
 export type Team = PublicTeam & {
   id: string; status: string; plan: 'free' | 'pro'; crest_url: string | null;

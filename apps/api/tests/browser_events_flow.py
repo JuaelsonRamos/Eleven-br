@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -60,7 +61,7 @@ def test_browser_events_flow(engine: Engine) -> None:
         else:
             raise AssertionError("Isolated API did not start")
         with httpx.Client(
-            base_url=f"http://127.0.0.1:{port}", headers={"X-Eleven-Client": "native"}
+            base_url=f"http://127.0.0.1:{port}", headers={"X-Eleven-Client": "native"}, timeout=15
         ) as api:
 
             def register(email, name):
@@ -93,6 +94,7 @@ def test_browser_events_flow(engine: Engine) -> None:
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society", "futsal"],
+                    "category": "mixed",
                 },
             ).json()
             profile = api.get("/v1/me", headers=member).json()
@@ -281,7 +283,10 @@ def test_browser_events_flow(engine: Engine) -> None:
             page.get_by_role("button", name="Voltar aos jogos", exact=True).click()
             page.get_by_role("button", name="Criar evento", exact=True).click()
             page.get_by_label("Título do evento", exact=True).fill("Pelada sem fim")
-            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill("27/09/2026")
+            # Ending a series cancels future dates, never past occurrences.
+            page.get_by_label("Data (DD/MM/AAAA)", exact=True).fill(
+                (date.today() + timedelta(days=1)).strftime("%d/%m/%Y")
+            )
             page.get_by_label("Horário (HH:MM)", exact=True).fill("10:00")
             page.get_by_label("Local", exact=True).fill("Campo")
             page.get_by_label("Repetir semanalmente", exact=True).click()
@@ -312,6 +317,7 @@ def test_browser_events_flow(engine: Engine) -> None:
                         "city": "Serra",
                         "state": "ES",
                         "modalities": ["society"],
+                        "category": "mixed",
                     },
                 ).json()
                 player = api.post(

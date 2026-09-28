@@ -69,8 +69,8 @@ export function JoinAdminPanel({ teamId, onBack }: { teamId: string; onBack: () 
       </View></Card> : <>
         <Text style={s.text}>Vincular ao elenco</Text>
         {detail.identity_conflict && <Text style={s.note}>{detail.identity_conflict}</Text>}
-        {(['active', 'inactive'] as const).map(status => <View key={status} style={s.stack}>
-          {detail.candidates.some(item => item.status === status) && <Text style={s.note}>{status === 'active' ? 'Jogadores sem conta' : 'Jogadores inativos'}</Text>}
+        {(['active', 'inactive', 'removed'] as const).map(status => <View key={status} style={s.stack}>
+          {detail.candidates.some(item => item.status === status) && <Text style={s.note}>{status === 'active' ? 'Jogadores sem conta' : status === 'inactive' ? 'Jogadores inativos' : 'Jogadores removidos · aprovar retorno'}</Text>}
           {detail.candidates.filter(item => item.status === status).map(item => <Pressable key={item.membership_id} accessibilityRole="radio" accessibilityLabel={`Vincular a ${item.name}`} accessibilityState={{ checked: choice === item.membership_id, disabled: !!item.unavailable_reason }} disabled={!!item.unavailable_reason} onPress={() => setChoice(item.membership_id)} style={[s.choice, choice === item.membership_id && s.selected]}>
             <View style={s.row}><Avatar name={item.name} photoUrl={item.photo_url} size={36} /><Text style={[s.text, { flex: 1 }]}>{choice === item.membership_id ? '✓ ' : ''}{item.name}</Text></View>
             {item.unavailable_reason && <Text style={s.note}>{item.unavailable_reason}</Text>}

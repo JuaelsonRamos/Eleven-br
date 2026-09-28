@@ -86,6 +86,7 @@ def test_browser_images_flow(engine: Engine, storage: LocalImageStorage) -> None
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society"],
+                    "category": "mixed",
                 },
             ).json()
             team_path = f"/v1/teams/{team['id']}"
@@ -225,6 +226,7 @@ def test_browser_images_flow(engine: Engine, storage: LocalImageStorage) -> None
                 page.get_by_role("button", name="Voltar para meus times", exact=True).click()
                 page.get_by_role("button", name="Criar time", exact=True).click()
                 page.get_by_label("Nome do time", exact=True).fill("Time com escudo")
+                page.get_by_role("radio", name="Misto", exact=True).click()
                 page.get_by_label("Cidade", exact=True).fill("Vitória")
                 page.get_by_role("button", name="UF", exact=True).click()
                 page.get_by_label("Pesquisar UF", exact=True).fill("ES")

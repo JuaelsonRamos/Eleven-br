@@ -7,6 +7,7 @@ from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
 
 from tests.conftest import make_player
+from tests.migration_snapshot import LEGACY_JSON
 from tests.test_events import DATA as EVENT_DATA
 from tests.test_team_profiles import DATA, client_for
 
@@ -25,6 +26,7 @@ def test_events_upgrade_preserves_all_existing_data(engine: Engine) -> None:
         session.close()
         with engine.begin() as connection:
             config.attributes["connection"] = connection
+            connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
             command.downgrade(config, "0004")
             tables = [
                 table
@@ -33,7 +35,7 @@ def test_events_upgrade_preserves_all_existing_data(engine: Engine) -> None:
             ]
             before = {
                 table: connection.execute(
-                    text(f'SELECT to_jsonb(t) FROM "{table}" t ORDER BY to_jsonb(t)::text')
+                    text(f'SELECT {LEGACY_JSON} FROM "{table}" t ORDER BY {LEGACY_JSON}::text')
                 )
                 .scalars()
                 .all()
@@ -43,13 +45,14 @@ def test_events_upgrade_preserves_all_existing_data(engine: Engine) -> None:
             for table in tables:
                 assert (
                     connection.execute(
-                        text(f'SELECT to_jsonb(t) FROM "{table}" t ORDER BY to_jsonb(t)::text')
+                        text(f'SELECT {LEGACY_JSON} FROM "{table}" t ORDER BY {LEGACY_JSON}::text')
                     )
                     .scalars()
                     .all()
                     == before[table]
                 )
             command.check(config)
+            connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
             command.downgrade(config, "0004")
             command.upgrade(config, "head")
         assert client.get("/v1/me").status_code == 200
@@ -67,7 +70,8 @@ def test_events_downgrade_refuses_data_loss(engine: Engine) -> None:
         assert created.status_code == 201
     with pytest.raises(RuntimeError, match="event data"), engine.begin() as connection:
         config.attributes["connection"] = connection
+        connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
         command.downgrade(config, "0004")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT count(*) FROM events")) == 1
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0012"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0013"

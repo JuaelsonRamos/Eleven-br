@@ -23,10 +23,12 @@ o Prompt 05 (eventos, peladas e presença), o Prompt 06 (formação de times da 
 o Prompt 07 (partidas e resultados da pelada), o Prompt 08 (gols, assistências e cartões),
 o Prompt 09 (estatísticas internas), o Prompt 10 (entrada por código e vinculação aprovada)
 o Prompt 11 (mensalidades e caixa interno), o Prompt 12 (design system mobile first)
-e o Prompt 13 (notificações internas persistentes).
+o Prompt 13 (notificações internas persistentes), o Prompt 14 (busca e ajustes históricos)
+e o Prompt 15 (recuperação de senha, posições, remoção lógica e escalação Pro).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações reúne avisos pessoais. Verificação local é
-simulada com opção explícita; provedor de produção e cobrança não foram implementados.
+simulada com opção explícita; autenticação por e-mail usa SMTP configurável.
+Integrações de cobrança e contratação de assinatura não foram implementadas.
 
 Times reutilizam a estrutura existente; a migration `0003_team_modalities` converte
 a modalidade anterior em um array PostgreSQL não vazio, preservando o valor.
@@ -217,6 +219,40 @@ Usar lock de Team, fingerprint dos valores atuais e comando único por time para
 proteger concorrência/retry. Nunca sobrescrever MatchEvent, duplicar gols ou mover
 ajustes entre times. Downgrade com auditoria é bloqueado.
 
+## Pré-lançamento e escalações — Prompt 15
+
+`0013_launch_essentials` adiciona recuperação de senha, categoria nullable para times
+legados, posições locais a TeamMembership, auditoria e escalações. Novos times exigem
+categoria male/female/mixed; não atribuir uma categoria presumida aos antigos.
+O endpoint público de contadores retorna apenas totais de times ativos e Players
+globais (não Memberships), com cache HTTP de 60 segundos. Testes usam banco separado.
+
+Recuperação usa o e-mail verificado e o sender SMTP existente, sem autenticar nem
+verificar contato. Handle e código ficam como HMAC, expiram em 10 minutos; uma nova
+solicitação substitui a anterior. Limites por IP/e-mail/capability, cinco tentativas,
+lock de User e consumo único protegem abuso/concorrência. A resposta é genérica até
+para contas inexistentes/inativas. Redefinir revoga todas as sessões na transação.
+Envio ocorre após commit em BackgroundTasks; não há fila durável. Sem e-mail verificado,
+recuperação por telefone/suporte permanece futura. Nunca registrar código em logs.
+
+Posições e principal são locais ao vínculo, disponíveis no Free e geridas por
+MANAGE_MEMBERS; não editar Player global. Escritas usam lock de Team e roster_version.
+`removed` encerra participação; `inactive` mantém vínculo para reativação. Remoção
+confirmada preserva User, Player, Membership e referências históricas, registra
+autor/data/estado e retira grants administrativos atuais (preservados na auditoria).
+Presidente não pode ser removido. Nova solicitação aprovada reutiliza o MESMO vínculo
+removido, como membro, respeitando capacidade. Não realizar merge de identidades.
+
+Escalações visuais são independentes de EventFormation/sorteio. A capability `lineups`
+em ENTITLEMENTS autoriza Pro; edição exige também MANAGE_EVENTS, consulta vínculo ativo.
+Templates Campo/11, Society/7 e Futsal/5 pertencem ao código. Vínculo com evento é
+opcional e validado por time/modalidade. Somente membros ativos podem ser selecionados;
+posição cadastrada sugere, não restringe. FKs compostas, unicidade de slot/jogador,
+lock de Team, versão e command_id protegem isolamento, concorrência e retries.
+Posições/status/remoção/escalações geram TeamAudit na mesma transação. Aprovação e
+recusa continuam auditadas por TeamJoinRequest e notificam pelo mecanismo existente.
+Não implementar assinatura, contratação ou cobrança pelo CTA informativo do Pro.
+
 ## Notificações internas — Prompt 13
 
 `Notification` pertence a **User**, nunca a Player/Membership. Player sem User e
@@ -243,7 +279,7 @@ conflito; clientes legados sem chave fazem operações independentes. Preservar 
 Ao abrir aviso de outro time, revalidar acesso e trocar **o TeamContext existente**
 antes de navegar. Não criar seleção paralela; IDs de evento/cobrança continuam validados
 na API. Central usa design system do Prompt 12, contador do backend e paginação.
-Push/e-mail/WhatsApp/SMS e Delivery não foram implementados. Canais futuros devem
+Push/e-mail/WhatsApp/SMS de notificações e Delivery não foram implementados. Canais futuros devem
 consumir a mesma identidade da Notification, sem acoplar emissão à interface.
 
 ## Planos e permissões

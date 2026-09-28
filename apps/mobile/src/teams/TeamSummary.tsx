@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Badge, TeamBadge } from '../components/ui';
 import { theme } from '../theme';
-import { modalityLabels, roles, type Team } from './api';
+import { categories, modalityLabels, roles, type Team } from './api';
 import { useTeams } from './TeamContext';
 import { TeamPublicId } from './TeamPublicId';
 
@@ -12,6 +12,7 @@ export function TeamSummary({ team, detail = false }: { team: Team; detail?: boo
     <Text accessibilityRole="header" style={styles.title}>{team.name}</Text>
     <Text style={styles.text}>{team.city} · {team.state}</Text>
     <Text style={styles.text}>{modalityLabels(team.modalities, options.modalities)}</Text>
+    <Text style={styles.text}>{team.category ? categories[team.category] : 'Categoria não informada'}</Text>
     <View style={styles.badges}><Badge label={roles[team.my_role]} /><Badge label={team.plan === 'free' ? 'Free' : 'Pro'} /></View>
     {detail && <TeamPublicId code={team.code} />}
   </View>;

@@ -41,6 +41,33 @@ class LoginInput(BaseModel):
     password: SecretStr = Field(min_length=1, max_length=128)
 
 
+class RecoveryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    email: Contact
+
+    @field_validator("email")
+    @classmethod
+    def email_only(cls, value: str) -> str:
+        channel, contact = normalize_contact(value)
+        if channel != "email":
+            raise ValueError("Informe seu e-mail.")
+        return contact
+
+
+class ResetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recovery_token: ChallengeToken
+    code: str = Field(pattern=r"^\d{6}$")
+    password: SecretStr = Field(min_length=8, max_length=128)
+    password_confirmation: SecretStr = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def matching(self) -> Self:
+        if self.password != self.password_confirmation:
+            raise ValueError("As senhas não coincidem.")
+        return self
+
+
 class ChallengeInput(BaseModel):
     challenge_token: ChallengeToken
 

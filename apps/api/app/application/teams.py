@@ -76,6 +76,18 @@ def add_member(
         raise Conflict("Permissões administrativas exigem vínculo administrativo")
     if role == Role.ADMIN:
         ensure_admin_slot(session, team)
+    previous = session.scalar(
+        select(TeamMembership)
+        .where(TeamMembership.team_id == team_id, TeamMembership.player_id == player_id)
+        .execution_options(populate_existing=True)
+    )
+    if previous and previous.status == "removed":
+        if role != Role.MEMBER or permissions:
+            raise Conflict("Readmissão deve começar como jogador comum.")
+        previous.status, previous.role = "active", "member"
+        previous.roster_version += 1
+        session.flush()
+        return previous
     membership = TeamMembership(team_id=team_id, player_id=player_id, role=role.value)
     session.add(membership)
     session.flush()

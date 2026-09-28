@@ -16,6 +16,7 @@ import { TeamProvider, useTeams } from './teams/TeamContext';
 import { GamesScreen } from './screens/GamesScreen';
 import { RosterScreen } from './screens/RosterScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import { LineupsScreen } from './screens/LineupsScreen';
 import { FinanceScreen } from './screens/FinanceScreen';
 import { BottomNavigation } from './components/BottomNavigation';
 import { StatisticsScreen } from './screens/StatisticsScreen';
@@ -26,7 +27,7 @@ const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
   Início: 'home-outline', Jogos: 'football-outline', Times: 'shield-outline',
   Notificações: 'notifications-outline', Perfil: 'person-outline',
-  Elenco: 'people-outline', Mais: 'menu-outline', Estatísticas: 'stats-chart-outline', Financeiro: 'wallet-outline',
+  Elenco: 'people-outline', Mais: 'menu-outline', Estatísticas: 'stats-chart-outline', Financeiro: 'wallet-outline', Escalação: 'football-outline',
 };
 
 function MainNavigation() {
@@ -54,6 +55,7 @@ function MainNavigation() {
     <Tab.Screen name="Mais" component={MoreScreen} />
     <Tab.Screen name="Estatísticas" component={StatisticsScreen} />
     <Tab.Screen name="Financeiro" component={FinanceScreen} />
+    <Tab.Screen name="Escalação" component={LineupsScreen} />
   </Tab.Navigator>;
 }
 

@@ -99,6 +99,7 @@ def test_browser_roster_flow(engine: Engine) -> None:
                     "city": "Vitória",
                     "state": "ES",
                     "modalities": ["society", "futsal"],
+                    "category": "mixed",
                 },
             ).json()
             member = api.get("/v1/me", headers={"Authorization": f"Bearer {member_token}"}).json()

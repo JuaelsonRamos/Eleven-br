@@ -28,7 +28,16 @@ def test_search_public_identity_normalization_pagination_and_own_state(session):
     assert len(second["items"]) == 1 and not second["has_more"]
     assert second["items"][0]["team"]["id"] != data["items"][0]["team"]["id"]
     item = client.get(path, params={"q": team.code.lower()}).json()["items"][0]
-    assert set(item["team"]) == {"id", "name", "code", "city", "state", "modalities", "crest_url"}
+    assert set(item["team"]) == {
+        "id",
+        "name",
+        "code",
+        "city",
+        "state",
+        "modalities",
+        "crest_url",
+        "category",
+    }
     assert not item["pending"] and item["membership_status"] is None
     request(client, team)
     assert client.get(path, params={"q": team.code}).json()["items"][0]["pending"]
