@@ -28,9 +28,11 @@ class StatisticsPerson(BaseModel):
     totals: TotalsRead
     goals_position: int | None
     assists_position: int | None
+    manual_adjustments: dict[str, int]
 
 
 class StatisticsPage(BaseModel):
+    can_manage_statistics: bool
     summary: TotalsRead
     players: list[StatisticsPerson]
     scorers: list[StatisticsPerson]

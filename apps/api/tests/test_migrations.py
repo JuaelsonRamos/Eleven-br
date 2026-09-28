@@ -46,6 +46,7 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "cash_entries",
             "finance_audit",
             "notifications",
+            "statistic_adjustments",
         }
         command.check(config)
 

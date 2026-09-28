@@ -86,7 +86,7 @@ def test_browser_join_flow(engine: Engine) -> None:
             browser = playwright.chromium.launch()
             contexts, errors, bundles = [], [], []
 
-            def login(email):
+            def login(email, query=""):
                 context = browser.new_context(viewport={"width": 390, "height": 900})
                 contexts.append(context)
 
@@ -109,7 +109,7 @@ def test_browser_join_flow(engine: Engine) -> None:
                     ),
                 )
                 html = page.goto(
-                    "http://localhost:8081", wait_until="domcontentloaded", timeout=120000
+                    "http://localhost:8081" + query, wait_until="domcontentloaded", timeout=120000
                 )
                 assert html and html.status == 200
                 page.get_by_role("button", name="Já tenho conta", exact=True).click(timeout=120000)
@@ -145,8 +145,12 @@ def test_browser_join_flow(engine: Engine) -> None:
             ).to_be_visible()
             player_page.get_by_label("Código do time", exact=True).fill("ZZZZZZZZ")
             button(player_page, "Buscar time").click()
-            expect(visible(player_page, "Time não encontrado. Confira o código.")).to_be_visible()
-            player_page.get_by_label("Código do time", exact=True).fill(f" {code.lower()} ")
+            expect(
+                visible(player_page, "Time não encontrado. Confira o código ou procure pelo nome.")
+            ).to_be_visible()
+            player_page.get_by_label("Código do time", exact=True).fill(
+                f"https://example.com/?team_code={code.lower()}"
+            )
             button(player_page, "Buscar time").click()
             expect(visible(player_page, "Tabajara FC")).to_be_visible()
             capture(player_page, "lookup", button(player_page, "Solicitar entrada"))
@@ -154,11 +158,26 @@ def test_browser_join_flow(engine: Engine) -> None:
             expect(visible(player_page, "Aguardando aprovação")).to_be_visible()
             button(player_page, "Cancelar solicitação para Tabajara FC").click()
             expect(visible(player_page, "Cancelada")).to_be_visible()
+            button(player_page, "Encontrar um time").click()
+            player_page.get_by_label("Busque pelo nome ou ID do time", exact=True).fill("nãoexiste")
             button(player_page, "Buscar time").click()
+            expect(visible(player_page, "Nenhum time encontrado.")).to_be_visible()
+            capture(player_page, "empty-search", visible(player_page, "Nenhum time encontrado."))
+            player_page.get_by_label("Busque pelo nome ou ID do time", exact=True).fill(
+                "  tAbAjArA  "
+            )
+            button(player_page, "Buscar time").click()
+            expect(visible(player_page, f"ID: {code}")).to_be_visible()
+            capture(player_page, "search", button(player_page, "Solicitar entrada"))
             button(player_page, "Solicitar entrada").click()
             expect(visible(player_page, "Aguardando aprovação")).to_be_visible()
 
             owner_page = login("owner-join@example.com")
+            owner_page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+            button(owner_page, "Copiar ID").click()
+            expect(visible(owner_page, "ID copiado")).to_be_visible()
+            assert owner_page.evaluate("navigator.clipboard.readText()") == code
+            capture(owner_page, "public-id", button(owner_page, "Copiar ID"))
             button(owner_page, "Perfil do time").click()
             expect(button(owner_page, "Copiar código")).to_be_visible()
             # Chromium's clipboard permission is scoped to this disposable browser context.
@@ -184,6 +203,17 @@ def test_browser_join_flow(engine: Engine) -> None:
             button(owner_page, "Voltar ao elenco").click()
             button(owner_page, f"Ver jogador {long_name}").click()
             expect(visible(owner_page, "Conta vinculada")).to_be_visible()
+            expect(button(owner_page, "Adicionar jogador")).to_be_enabled()
+            button(owner_page, "Convidar jogadores").click()
+            button(owner_page, "Compartilhar convite").click()
+            expect(
+                visible(owner_page, "Convite copiado. Compartilhe com o jogador.")
+            ).to_be_visible()
+            assert f"team_code={code}" in owner_page.evaluate("navigator.clipboard.readText()")
+            button(owner_page, "Compartilhar convite").click()
+            expect(button(owner_page, "Adicionar jogador")).to_be_enabled()
+            button(owner_page, "Voltar ao elenco").click()
+            capture(owner_page, "roster-statistics", button(owner_page, f"Ver jogador {long_name}"))
 
             button(player_page, "Atualizar pedidos").click()
             expect(visible(player_page, "Aprovada")).to_be_visible()
@@ -214,7 +244,29 @@ def test_browser_join_flow(engine: Engine) -> None:
                 assert session.get(Player, source_id) is None
                 api_client = client_for(session, target)
                 assert api_client.get(stats_path).json() == stats_before
+            button(owner_page, f"Ver jogador {long_name}").click()
+            button(owner_page, "Editar estatísticas").click()
+            expect(owner_page.get_by_label("Gols", exact=True)).to_have_value("1")
+            capture(owner_page, "adjustments", button(owner_page, "Salvar estatísticas"))
+            owner_page.get_by_label("Gols", exact=True).fill("3")
+            owner_page.get_by_label("Cartões amarelos", exact=True).fill("0")
+            button(owner_page, "Salvar estatísticas").click()
+            button(owner_page, "Confirmar ajuste").click()
+            expect(
+                visible(owner_page, "Estatísticas atualizadas. Histórico das partidas preservado.")
+            ).to_be_visible()
+            expect(visible(owner_page, "3 gols · 0 amarelos · 1 vermelhos")).to_be_visible()
+            expect(button(owner_page, "Adicionar jogador")).to_be_enabled()
+            with Session(engine) as session:
+                target = session.get(Player, UUID(manual["player_id"]))
+                updated = client_for(session, target).get(stats_path).json()
+                assert updated["history"] == stats_before["history"]
+                assert updated["person"]["totals"]["goals"] == 3
             assert bundles and all(status == 200 for status in bundles)
+            link_page = login("player-join@example.com", f"/?team_code={code}")
+            expect(link_page.get_by_label("Código do time", exact=True)).to_have_value(code)
+            button(link_page, "Buscar time").click()
+            expect(visible(link_page, "Você já faz parte deste time.")).to_be_visible()
             assert not errors, errors
             for context in contexts:
                 context.unroute_all(behavior="wait")

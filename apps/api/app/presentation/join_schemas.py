@@ -4,17 +4,19 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.domain.team_codes import normalize_code
+
 JoinStatus = Literal["PENDING", "APPROVED", "REJECTED", "CANCELLED"]
 
 
 class CodeInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    code: str = Field(min_length=1, max_length=64)
+    code: str = Field(min_length=1, max_length=512)
 
     @field_validator("code")
     @classmethod
     def normalize(cls, value: str) -> str:
-        return value.strip().upper()
+        return normalize_code(value)
 
 
 class ConfirmInput(BaseModel):
@@ -40,6 +42,12 @@ class LookupRead(BaseModel):
     team: JoinTeam
     membership_status: str | None
     pending: bool
+    request_status: JoinStatus | None = None
+
+
+class SearchRead(BaseModel):
+    items: list[LookupRead]
+    has_more: bool
 
 
 class RequestRead(BaseModel):

@@ -90,6 +90,7 @@ export function StatisticsPanel({ teamId, onGames, onNavigate }: { teamId: strin
     {person && <TextAction label="Voltar para estatísticas" onPress={back} />}
     <Text accessibilityRole="header" style={s.title}>{person ? 'Perfil estatístico' : 'Estatísticas'}</Text>
     <Text style={s.muted}>Somente partidas finalizadas. Gols identificados podem diferir do placar oficial.</Text>
+    <Text style={s.muted}>Totais históricos incluem ajustes administrativos. Filtros por período/modalidade e médias usam apenas partidas.</Text>
     <Text style={s.label}>Período</Text><View style={s.wrap}>{api.periods.map(item => <Choice key={item.value} label={item.label} selected={period === item.value} onPress={() => { setLoading(true); setPeriod(item.value); }} />)}</View>
     <Text style={s.label}>Modalidade</Text><View style={s.wrap}>
       <Choice label="Todas" selected={!modality} onPress={() => { if (modality) { setLoading(true); setModality(''); } }} />
@@ -100,6 +101,7 @@ export function StatisticsPanel({ teamId, onGames, onNavigate }: { teamId: strin
       <Identity person={profile.person} />
       {person.kind === 'guest' && <Text style={s.muted}>Convidado desta pelada. Seu histórico é restrito a esta ocorrência.</Text>}
       <Totals value={profile.person.totals} individual />
+      {!!Object.keys(profile.person.manual_adjustments).length && <Text style={s.muted}>Ajustes históricos: {profile.person.manual_adjustments.goals ?? 0} gols · {profile.person.manual_adjustments.yellow_cards ?? 0} amarelos · {profile.person.manual_adjustments.red_cards ?? 0} vermelhos.</Text>}
       <Text accessibilityRole="header" style={s.heading}>Médias por partida</Text>
       <Text style={s.body}>Gols: {profile.goals_per_match.toFixed(2).replace('.', ',')} · Assistências: {profile.assists_per_match.toFixed(2).replace('.', ',')}</Text>
       <Text accessibilityRole="header" style={s.heading}>Histórico recente</Text>
@@ -113,9 +115,9 @@ export function StatisticsPanel({ teamId, onGames, onNavigate }: { teamId: strin
       {moreError && <Text style={s.error}>Não foi possível carregar mais partidas. Tente novamente.</Text>}
       {profile.has_more && <Button label={moreLoading ? 'Carregando…' : 'Carregar mais partidas'} disabled={moreLoading} onPress={() => void more()} />}
     </> : page ? <>
-      {!page.summary.matches && <EmptyState title="Ainda não há estatísticas." description="Finalize partidas e registre gols, assistências e cartões para começar. Confira também os filtros selecionados."><Button label="Ir para Jogos" onPress={onGames} /></EmptyState>}
+      {!Object.values(page.summary).some(Boolean) && <EmptyState title="Ainda não há estatísticas." description="Finalize partidas e registre gols, assistências e cartões para começar. Confira também os filtros selecionados."><Button label="Ir para Jogos" onPress={onGames} /></EmptyState>}
       {tab === 'Geral' ? <>
-        {!!page.summary.matches && <><Totals value={page.summary} /><People title="Artilheiros" people={page.scorers.slice(0, 5)} metric="Artilharia" open={open} /><People title="Assistências" people={page.assistants.slice(0, 5)} metric="Assistências" open={open} /><People title="Disciplina" people={page.discipline} metric="Cartões" open={open} /></>}
+        {!!Object.values(page.summary).some(Boolean) && <><Totals value={page.summary} /><People title="Artilheiros" people={page.scorers.slice(0, 5)} metric="Artilharia" open={open} /><People title="Assistências" people={page.assistants.slice(0, 5)} metric="Assistências" open={open} /><People title="Disciplina" people={page.discipline} metric="Cartões" open={open} /></>}
         <People title="Jogadores e convidados" people={page.players} open={open} />
       </> : <People title={tab === 'Cartões' ? 'Disciplina' : tab} people={tab === 'Artilharia' ? page.scorers : tab === 'Assistências' ? page.assistants : page.discipline} metric={tab} open={open} />}
     </> : null}

@@ -10,13 +10,14 @@ from sqlalchemy.sql.selectable import CTE
 
 from app.application.events import authorize
 from app.application.roster import roster_name
-from app.domain.policies import NotFound
+from app.application.statistic_adjustments import apply_to, sums
+from app.domain.policies import NotFound, Permission, Plan, Role, allows
 from app.domain.statistics import Period, PersonStatistics, Totals, period_start, ranking
 from app.infrastructure.event_models import Event, EventGuest
 from app.infrastructure.formation_models import FormationParticipant, FormationSquad
 from app.infrastructure.match_event_models import MatchEvent
 from app.infrastructure.match_models import EventMatch
-from app.infrastructure.models import Player, TeamMembership
+from app.infrastructure.models import MembershipPermission, Player, TeamMembership
 
 
 def today_local() -> date:
@@ -152,14 +153,35 @@ def overview(
         )
         for r in aggregates
     }
+    adjustments = sums(session, team_id) if period == "all" and modality is None else {}
+    for membership_id, adjustment in adjustments.items():
+        counts = totals.setdefault((membership_id, None), Totals())
+        apply_to(counts, adjustment)
     people: list[PersonStatistics] = []
-    for member, player in session.execute(
-        select(TeamMembership, Player)
+    can_manage = False
+    grant = (
+        select(MembershipPermission.membership_id)
+        .where(
+            MembershipPermission.membership_id == TeamMembership.id,
+            MembershipPermission.permission == Permission.MANAGE_EVENTS,
+        )
+        .exists()
+    )
+    for member, player, granted in session.execute(
+        select(TeamMembership, Player, grant)
         .join(Player, Player.id == TeamMembership.player_id)
         .where(TeamMembership.team_id == team_id)
     ):
+        if player.user_id == user_id and member.status == "active":
+            can_manage = allows(
+                Plan(team.plan),
+                is_president=member.id == team.president_membership_id,
+                role=Role(member.role),
+                grants={Permission.MANAGE_EVENTS} if granted else set(),
+                permission=Permission.MANAGE_EVENTS,
+            )
         counts = totals.get((member.id, None), Totals())
-        if member.status == "active" or counts.matches:
+        if member.status == "active" or counts.matches or member.id in adjustments:
             people.append(
                 PersonStatistics(
                     member.id,
@@ -169,6 +191,7 @@ def overview(
                     player.id,
                     player.photo_url,
                     member.status != "active",
+                    manual_adjustments=adjustments.get(member.id, {}),
                 )
             )
     guest_ids = [guest for _, guest in totals if guest]
@@ -195,6 +218,7 @@ def overview(
     )
     return {
         "summary": summary,
+        "can_manage_statistics": can_manage,
         "players": people,
         "scorers": ranking(people),
         "assistants": ranking(people, assists=True),
@@ -216,6 +240,7 @@ def profile(
     modality: str | None = None,
     offset: int = 0,
     limit: int = 20,
+    include_adjustments: bool = True,
 ) -> dict[str, object]:
     authorize(session, user_id, team_id, write=True)
     if kind == "member":
@@ -260,6 +285,9 @@ def profile(
             for key in ["matches", "goals", "assists", "yellow_cards", "red_cards"]
         }
     )
+    if include_adjustments and kind == "member" and period == "all" and modality is None:
+        person.manual_adjustments = sums(session, team_id).get(person_id, {})
+        apply_to(person.totals, person.manual_adjustments)
     home, away = aliased(FormationSquad), aliased(FormationSquad)
     history = (
         session.execute(
@@ -293,9 +321,7 @@ def profile(
     )
     return {
         "person": person,
-        "goals_per_match": person.totals.goals / person.totals.matches
-        if person.totals.matches
-        else 0,
+        "goals_per_match": counts["goals"] / person.totals.matches if person.totals.matches else 0,
         "assists_per_match": person.totals.assists / person.totals.matches
         if person.totals.matches
         else 0,

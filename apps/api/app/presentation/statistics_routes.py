@@ -3,13 +3,31 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.application import statistics
+from app.application import statistic_adjustments, statistics
 from app.domain.statistics import Period
 from app.domain.team_identity import Modality
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.statistics_schemas import StatisticsPage, StatisticsProfile
 
 router = APIRouter(prefix="/v1/teams/{team_id}/statistics", tags=["statistics"])
+
+
+@router.get("/players/{membership_id}/adjustments")
+def adjustments(
+    team_id: UUID, membership_id: UUID, session: SessionDep, user: CurrentUser
+) -> dict[str, object]:
+    return statistic_adjustments.detail(session, user.id, team_id, membership_id)
+
+
+@router.post("/players/{membership_id}/adjustments")
+def adjust(
+    team_id: UUID,
+    membership_id: UUID,
+    data: statistic_adjustments.AdjustInput,
+    session: SessionDep,
+    user: CurrentUser,
+) -> dict[str, object]:
+    return statistic_adjustments.adjust(session, user.id, team_id, membership_id, data)
 
 
 @router.get("", response_model=StatisticsPage)

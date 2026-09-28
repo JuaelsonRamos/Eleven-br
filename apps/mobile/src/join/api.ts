@@ -4,7 +4,8 @@ export type JoinTeam = { id: string; name: string; code: string; city: string; s
 export type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export const statusLabels: Record<Status, string> = { PENDING: 'Aguardando aprovação', APPROVED: 'Aprovada', REJECTED: 'Recusada', CANCELLED: 'Cancelada' };
 export type JoinRequest = { id: string; team: JoinTeam; status: Status; created_at: string; updated_at: string; resolved_at: string | null };
-export type Lookup = { team: JoinTeam; membership_status: string | null; pending: boolean };
+export type Lookup = { team: JoinTeam; membership_status: string | null; pending: boolean; request_status?: Status | null };
+export const search = (query: string, offset = 0) => authenticated<{ items: Lookup[]; has_more: boolean }>(`/v1/teams/join/search?q=${encodeURIComponent(query)}&offset=${offset}&limit=20`);
 export type AdminRequest = { id: string; name: string; masked_contact: string; created_at: string; status: Status };
 export type Candidate = { membership_id: string; name: string; status: string; photo_url: string | null; unavailable_reason: string | null };
 export type Detail = { request: AdminRequest; candidates: Candidate[]; identity_conflict: string | null };

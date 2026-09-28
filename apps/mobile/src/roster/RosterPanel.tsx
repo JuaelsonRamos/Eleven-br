@@ -9,13 +9,17 @@ import { changeStatus, getPerson, listRoster, type RosterFilter, type RosterPage
 import { PlayerForm } from './PlayerForm';
 import { rosterStyles as styles } from './styles';
 import { JoinAdminPanel } from '../join/JoinAdminPanel';
+import { InviteCode } from '../join/InviteCode';
+import * as statistics from '../statistics/api';
+import { StatisticAdjustmentForm } from './StatisticAdjustmentForm';
 
 export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }: { team: Team; onBack: () => void; initialRequests?: boolean; onInitialConsumed?: () => void }) {
   const initial = useRef(initialRequests), consumed = useRef(onInitialConsumed);
   const [filter, setFilter] = useState<RosterFilter>('active');
   const [page, setPage] = useState<RosterPage | null>(null);
   const [player, setPlayer] = useState<RosterPerson | null>(null);
-  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'requests'>('list');
+  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'requests' | 'invite' | 'statistics'>('list');
+  const [stats, setStats] = useState<statistics.Page | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -26,7 +30,7 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
   const reload = useCallback(async () => {
     const current = ++generation.current;
     setLoading(true); setError(null);
-    try { const value = await listRoster(team.id, filter); if (current === generation.current) { setPage(value); if (initial.current) { initial.current = false; if (value.can_manage) setMode('requests'); else setError('Você não possui permissão para tratar solicitações.'); consumed.current?.(); } } }
+    try { const [value, totals] = await Promise.all([listRoster(team.id, filter), statistics.overview(team.id, 'all', '')]); if (current === generation.current) { setPage(value); setStats(totals); if (initial.current) { initial.current = false; if (value.can_manage) setMode('requests'); else setError('Você não possui permissão para tratar solicitações.'); consumed.current?.(); } } }
     catch (cause) { if (current === generation.current) { setPage(null); setPlayer(null); setMode('list'); setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o elenco.'); } }
     finally { if (current === generation.current) setLoading(false); }
   }, [filter, team.id]);
@@ -64,7 +68,7 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
     } finally { mutation.current = false; setBusy(false); }
   }
   const full = page ? page.active_count >= page.active_limit : false;
-  if (mode === 'requests' && page?.can_manage) return <JoinAdminPanel teamId={team.id} onBack={() => { setMode('list'); void reload(); }} />;
+  const numbers = (id: string) => { const value = stats?.players.find(item => item.kind === 'member' && item.id === id)?.totals; return `${value?.goals ?? 0} gols · ${value?.yellow_cards ?? 0} amarelos · ${value?.red_cards ?? 0} vermelhos`; };
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.heading}>Elenco</Text>
     {loading ? <LoadingState /> : <>
@@ -73,15 +77,23 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
       {!page ? <Button label="Tentar novamente" onPress={() => void reload()} /> : <>
         <Text style={styles.note}>{page.active_count} de {page.active_limit} jogadores ativos · {page.inactive_count} inativos</Text>
         {full && <Text accessibilityRole="alert" style={styles.note}>Seu time atingiu o limite de {page.active_limit} jogadores ativos do plano {page.plan === 'free' ? 'Free' : 'Pro'}. Inative um jogador para liberar uma vaga.</Text>}
+        {page.can_manage && <>
+          <Button label="Adicionar jogador" disabled={full || busy || mode === 'add'} onPress={() => { setPlayer(null); setSuccess(null); setConfirm(false); setMode('add'); }} />
+          <Button variant="secondary" label="Convidar jogadores" disabled={busy} onPress={() => setMode('invite')} />
+          <Button variant="secondary" label="Solicitações de entrada" disabled={busy} onPress={() => { setSuccess(null); setMode('requests'); }} />
+        </>}
+        {mode === 'requests' && page.can_manage ? <JoinAdminPanel teamId={team.id} onBack={() => { setMode('list'); void reload(); }} /> : mode === 'invite' && page.can_manage ? <><InviteCode code={team.code} name={team.name} /><TextAction label="Voltar ao elenco" onPress={() => setMode('list')} /></> : mode === 'statistics' && player && stats?.can_manage_statistics ? <StatisticAdjustmentForm teamId={team.id} memberId={player.membership_id} name={player.name} onCancel={() => setMode('detail')} onSaved={() => { setMode('detail'); setSuccess('Estatísticas atualizadas. Histórico das partidas preservado.'); void reload(); }} /> : <>
         {(mode === 'add' || mode === 'edit') && page.can_manage ? <PlayerForm teamId={team.id}
           player={mode === 'edit' ? player ?? undefined : undefined} onCancel={() => setMode('list')} onDenied={denied}
           onSaved={person => { setPlayer(person); setMode('detail'); setSuccess(mode === 'add' ? 'Jogador adicionado.' : 'Jogador atualizado.'); void reload(); }} /> :
           mode === 'detail' && player ? <>
             <Card><PersonSummary player={player} />
+              <Text style={styles.note}>{numbers(player.membership_id)}</Text>
               {player.nickname && <Text style={styles.note}>Apelido: {player.nickname}</Text>}
               {player.phone && <Text style={styles.note}>Telefone: {player.phone}</Text>}
               {player.email && <Text style={styles.note}>E-mail: {player.email}</Text>}
             </Card>
+            {stats?.can_manage_statistics && <Button label="Editar estatísticas" onPress={() => { setSuccess(null); setMode('statistics'); }} />}
             {page.can_manage && <>
               <Button label="Editar jogador" disabled={busy} onPress={() => { setError(null); setSuccess(null); setMode('edit'); }} />
               {player.is_president ? <Text style={styles.note}>Transfira a presidência antes de inativar este jogador.</Text> : confirm ? <Card><View style={styles.stack}>
@@ -96,13 +108,11 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
           </> : <>
             <View style={styles.row}>{(['active', 'inactive', 'all'] as RosterFilter[]).map((value, index) => <FilterChip key={value} label={['Ativos', 'Inativos', 'Todos'][index]!} selected={filter === value}
               onPress={() => { setFilter(value); setSuccess(null); setError(null); }} />)}</View>
-            {page.can_manage && <Button label="Adicionar jogador" disabled={full} onPress={() => { setPlayer(null); setSuccess(null); setMode('add'); }} />}
-            {page.can_manage && <Button variant="secondary" label="Solicitações de entrada" onPress={() => { setSuccess(null); setMode('requests'); }} />}
             {!page.items.length && <EmptyState title="Nenhum jogador neste filtro" description="Os jogadores deste time aparecerão aqui." icon="people-outline" />}
-            {page.items.map(item => <ListItem key={item.membership_id} title={item.name} subtitle={item.account_linked ? 'Conta vinculada' : 'Ainda não possui conta'}
+            {page.items.map(item => <ListItem key={item.membership_id} title={item.name} subtitle={`${item.account_linked ? 'Conta vinculada' : 'Ainda não possui conta'}\n${numbers(item.membership_id)}`}
               leading={<Avatar name={item.name} photoUrl={item.photo_url} />} accessibilityLabel={`Ver jogador ${item.name}`} onPress={() => void open(item.membership_id)}
               trailing={<><Badge label={item.status === 'active' ? 'Ativo' : 'Inativo'} tone={item.status === 'active' ? 'success' : 'neutral'} />{item.is_president && <Badge label="Presidente" tone="info" />}</>} />)}
-          </>}
+          </>}</>}
       </>}
     </>}
     <TextAction label="Voltar ao time" disabled={busy} onPress={onBack} />

@@ -8,6 +8,7 @@ import type { TabParams } from '../navigation';
 import { theme } from '../theme';
 import { modalityLabels, roles, type Team } from './api';
 import { useTeams } from './TeamContext';
+import { TeamPublicId } from './TeamPublicId';
 
 export function TeamDashboard({ team, navigation }: { team: Team; navigation: BottomTabNavigationProp<TabParams> }) {
   const { options } = useTeams();
@@ -19,6 +20,7 @@ export function TeamDashboard({ team, navigation }: { team: Team; navigation: Bo
       <View style={s.row}><Badge label={roles[team.my_role]} /><Badge label={team.plan === 'free' ? 'Free' : 'Pro'} /><Text style={s.heroNote}>{team.active_player_count} jogadores ativos</Text></View>
       <Button variant="secondary" label="Perfil do time" onPress={() => navigation.navigate('Times', { view: 'detail' })} />
     </View>
+    <TeamPublicId code={team.code} />
     <SectionHeader title="Ações rápidas" subtitle="Tudo para o próximo jogo." />
     <View style={s.row}>
       <QuickAction label="Jogos" description="Agenda e presença" icon="football-outline" onPress={() => navigation.navigate('Jogos')} />

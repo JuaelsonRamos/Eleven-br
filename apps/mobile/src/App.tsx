@@ -1,6 +1,7 @@
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StatusBar } from 'expo-status-bar';
 import type { MainTab } from '@eleven/shared';
@@ -30,9 +31,10 @@ const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
 
 function MainNavigation() {
   const { teams } = useTeams();
+  const invitation = Platform.OS === 'web' && new URLSearchParams(window.location.search).has('team_code');
   // Keep routes mounted during selection revalidation; operational screens gate data themselves.
   const visible: MainTab[] = teams.length ? ['Início', 'Jogos', 'Elenco', 'Mais'] : ['Times', 'Notificações', 'Perfil'];
-  return <Tab.Navigator backBehavior="history" tabBar={props => <BottomNavigation {...props} visible={visible} icons={icons} />} screenOptions={({ route }) => ({
+  return <Tab.Navigator initialRouteName={invitation ? 'Times' : 'Início'} backBehavior="history" tabBar={props => <BottomNavigation {...props} visible={visible} icons={icons} />} screenOptions={({ route }) => ({
     headerShown: false,
     tabBarAccessibilityLabel: route.name === 'Times' ? 'Meus Times' : route.name,
     tabBarLabel: route.name === 'Times' ? 'Meus Times' : route.name,
@@ -45,7 +47,7 @@ function MainNavigation() {
   })}>
     <Tab.Screen name="Início" component={MainScreen} />
     <Tab.Screen name="Jogos" component={GamesScreen} />
-    <Tab.Screen name="Times" component={TeamsScreen} />
+    <Tab.Screen name="Times" component={TeamsScreen} initialParams={invitation ? { view: 'join' } : undefined} />
     <Tab.Screen name="Notificações" component={NotificationsScreen} />
     <Tab.Screen name="Perfil" component={ProfileScreen} />
     <Tab.Screen name="Elenco" component={RosterScreen} />

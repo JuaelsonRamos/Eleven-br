@@ -10,6 +10,7 @@ from app.infrastructure import (  # noqa: F401
     match_event_models,
     match_models,
     notification_models,
+    statistic_models,
 )
 from app.infrastructure.config import get_settings
 from app.infrastructure.models import Base

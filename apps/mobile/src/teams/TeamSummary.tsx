@@ -3,6 +3,7 @@ import { Badge, TeamBadge } from '../components/ui';
 import { theme } from '../theme';
 import { modalityLabels, roles, type Team } from './api';
 import { useTeams } from './TeamContext';
+import { TeamPublicId } from './TeamPublicId';
 
 export function TeamSummary({ team, detail = false }: { team: Team; detail?: boolean }) {
   const { options } = useTeams();
@@ -12,7 +13,7 @@ export function TeamSummary({ team, detail = false }: { team: Team; detail?: boo
     <Text style={styles.text}>{team.city} · {team.state}</Text>
     <Text style={styles.text}>{modalityLabels(team.modalities, options.modalities)}</Text>
     <View style={styles.badges}><Badge label={roles[team.my_role]} /><Badge label={team.plan === 'free' ? 'Free' : 'Pro'} /></View>
-    {detail && <Text selectable style={styles.text}>Código do time: {team.code}</Text>}
+    {detail && <TeamPublicId code={team.code} />}
   </View>;
 }
 

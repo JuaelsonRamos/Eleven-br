@@ -12,6 +12,7 @@ from app.application.sessions import verified
 from app.application.teams import add_member
 from app.application.verification import mask_contact
 from app.domain.policies import Conflict, NotFound
+from app.domain.team_codes import normalize_code
 from app.infrastructure.join_models import TeamJoinRequest
 from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership, User
 
@@ -102,10 +103,10 @@ def pending(session: Session, user_id: UUID, team_id: UUID) -> TeamJoinRequest |
 
 def lookup(session: Session, *, user_id: UUID, code: str) -> dict[str, object]:
     team = session.scalar(
-        select(Team).where(Team.code == code.strip().upper(), Team.status == "active")
+        select(Team).where(Team.code == normalize_code(code), Team.status == "active")
     )
     if team is None:
-        raise NotFound("Time não encontrado. Confira o código.")
+        raise NotFound("Time não encontrado. Confira o código ou procure pelo nome.")
     member = own_membership(session, user_id, team.id)
     return {
         "team": public_team(team),
@@ -130,7 +131,7 @@ def request_entry(
 ) -> dict[str, object]:
     team = session.scalar(
         select(Team)
-        .where(Team.id == team_id, Team.code == code.strip().upper(), Team.status == "active")
+        .where(Team.id == team_id, Team.code == normalize_code(code), Team.status == "active")
         .with_for_update()
         .execution_options(populate_existing=True)
     )

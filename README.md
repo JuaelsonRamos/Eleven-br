@@ -1089,6 +1089,31 @@ Push permanece futuro: será necessário cadastrar dispositivos, política de en
 e adaptador/provedor de canais. Notification continua sendo a mensagem do usuário;
 nenhuma tabela Delivery, token de dispositivo, scheduler ou integração foi antecipada.
 
+## Busca, convites e ajustes do elenco
+
+O ID público é o código de oito caracteres já existente do time: permanece igual
+após renomear e pode ser copiado no Início/perfil. Em **Entrar em um time**, use
+código/link ou busque por nome/ID; resultados são paginados e não expõem contatos
+ou dados privados. A entrada continua exigindo aprovação pelas solicitações existentes.
+O Elenco mantém adicionar, compartilhar convite e solicitações disponíveis após uso.
+Compartilhar pode ser repetido; não há convites individuais com histórico/cancelamento.
+Links Web usam `?team_code=` e preservam o código até o login. Em builds nativas,
+`EXPO_PUBLIC_APP_URL` opcional fornece a origem pública do link; sem ela compartilha-se
+nome e código. Copiar usa `expo-clipboard`, compatível com o SDK do projeto.
+
+**Elenco → jogador → Editar estatísticas** permite ajustar gols/amarelos/vermelhos
+com confirmação, para Presidente e gestores autorizados por `MANAGE_EVENTS`.
+A migration aditiva `0012_statistic_adjustments` mantém auditoria de autor, data,
+valores anteriores/novos e deltas. Não altera partidas: novas partidas continuam
+somando ao total. Ajustes valem só no histórico completo, sem filtro de modalidade;
+períodos/modalidades e médias continuam derivados exclusivamente das partidas.
+Se remover um gol de partida tornar um total ajustado negativo, a exibição usa piso
+zero e a edição avisa, preservando os registros. Reenvios usam chave única e mudanças
+concorrentes exigem atualizar os valores antes de confirmar novamente.
+
+Validação isolada: `uv run pytest -q tests/test_team_discovery.py tests/test_statistic_adjustments.py`;
+com Expo Web ativo, `uv run --with playwright pytest -q tests/browser_join_flow.py`.
+
 ## Próxima etapa
 
 Definir provedor de verificação para publicação, armazenamento durável de imagens e futura

@@ -51,7 +51,7 @@ export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParam
               onCancel={() => setMode(mode === 'edit' ? 'detail' : 'list')} /> :
             !list && selected ? <>
               <Card><TeamSummary team={selected} detail /></Card>
-              <InviteCode key={selected.id} code={selected.code} />
+              <InviteCode key={selected.id} code={selected.code} name={selected.name} />
               <Badge label="TIME SELECIONADO" />
               <Button label="Início do time" onPress={() => navigation.navigate('Início')} />
               <Button label="Elenco" onPress={() => navigation.navigate('Elenco')} />

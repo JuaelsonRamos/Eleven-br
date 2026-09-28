@@ -168,7 +168,11 @@ def test_browser_team_flow(engine: Engine) -> None:
             expect(active_text("Time criado. Você é o Presidente!")).to_be_visible()
             expect(active_text("Presidente")).to_be_visible()
             expect(active_text("Society / Fut7 • Futsal")).to_be_visible()
-            original_code = page.get_by_text(re.compile("Código do time:")).inner_text()
+            original_code = (
+                page.get_by_text(re.compile("ID do time:"))
+                .and_(page.locator(':not([aria-hidden="true"] *)'))
+                .inner_text()
+            )
             page.get_by_role("button", name="Editar time", exact=True).click()
             page.get_by_label("Nome do time", exact=True).fill("Tabajara FC")
             expect(page.get_by_role("checkbox", name="Society / Fut7", exact=True)).to_be_checked()
@@ -181,13 +185,18 @@ def test_browser_team_flow(engine: Engine) -> None:
             page.get_by_role("checkbox", name="Campo", exact=True).click()
             page.get_by_role("button", name="Salvar alterações", exact=True).click()
             expect(active_text("Society / Fut7 • Futsal")).to_be_visible()
-            expect(page.get_by_text(original_code, exact=True).filter(visible=True)).to_be_visible()
+            expect(active_text(original_code)).to_be_visible()
             page.get_by_role("button", name="Voltar para meus times", exact=True).click()
             fill_team("Tabajara FC")
             expect(active_text("Encontramos um time parecido.")).to_be_visible()
             page.get_by_role("button", name="Criar mesmo assim", exact=True).click()
             expect(active_text("Time criado. Você é o Presidente!")).to_be_visible()
-            assert page.get_by_text(re.compile("Código do time:")).inner_text() != original_code
+            assert (
+                page.get_by_text(re.compile("ID do time:"))
+                .and_(page.locator(':not([aria-hidden="true"] *)'))
+                .inner_text()
+                != original_code
+            )
             page.get_by_role("button", name="Editar time", exact=True).click()
             page.get_by_label("Nome do time", exact=True).fill("Segundo time")
             page.get_by_role("button", name="Salvar alterações", exact=True).click()

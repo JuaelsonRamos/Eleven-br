@@ -235,7 +235,9 @@ def test_browser_notifications_flow(engine: Engine) -> None:
                     "button", name="Nova solicitação de entrada, não lida.", exact=False
                 ).click()
                 expect(visible("Time A da conta")).to_be_visible()
-                expect(visible("Solicitações de entrada")).to_be_visible()
+                expect(
+                    page.get_by_role("heading", name="Solicitações de entrada", exact=True)
+                ).to_be_visible()
                 expect(page.get_by_role("tab")).to_have_count(4)
                 assert bundles and all(status == 200 for status in bundles)
                 assert not errors, errors

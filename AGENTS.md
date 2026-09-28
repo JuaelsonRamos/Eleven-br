@@ -198,6 +198,25 @@ Foto existente é preservada; se somente a conta tem foto, transfira a referênc
 sem duplicar arquivo. Duas fotos diferentes bloqueiam vinculação até decisão
 explícita sobre a imagem; não sobrescrever nem apagar silenciosamente.
 
+## Busca e ajustes do elenco — Prompt 14
+
+`Team.code` é também o ID público: oito caracteres estáveis, sem expiração ou limite
+de usos. Busca autenticada por nome normaliza espaços e caixa; por ID usa igualdade.
+Resultados limitados expõem somente identidade pública e estado do próprio solicitante.
+Código/link (`?team_code=`) e busca reutilizam TeamJoinRequest, aprovação e Notification.
+Compartilhar código não cria convite individual; não inventar destinatário, expiração,
+cancelamento ou histórico de envio. O acesso continua dependendo de Membership.
+
+`statistic_adjustments` (0012) registra deltas imutáveis por TeamMembership, autor,
+data e totais anterior/novo. MANAGE_EVENTS autoriza ajustes; MANAGE_MEMBERS continua
+autorizando elenco/solicitações. Total histórico = partidas finalizadas + soma dos
+ajustes, com piso zero caso uma correção posterior retire a base de ajuste negativo.
+Nesse caso a edição sinaliza a situação, sem apagar o ajuste ou alterar partidas.
+Ajustes não entram em filtros por período/modalidade nem em médias por partida.
+Usar lock de Team, fingerprint dos valores atuais e comando único por time para
+proteger concorrência/retry. Nunca sobrescrever MatchEvent, duplicar gols ou mover
+ajustes entre times. Downgrade com auditoria é bloqueado.
+
 ## Notificações internas — Prompt 13
 
 `Notification` pertence a **User**, nunca a Player/Membership. Player sem User e

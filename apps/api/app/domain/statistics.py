@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Literal
 from uuid import UUID
@@ -37,6 +37,7 @@ class PersonStatistics:
     event_date: date | None = None
     goals_position: int | None = None
     assists_position: int | None = None
+    manual_adjustments: dict[str, int] = field(default_factory=dict)
 
 
 def ranking(people: list[PersonStatistics], *, assists: bool = False) -> list[PersonStatistics]:

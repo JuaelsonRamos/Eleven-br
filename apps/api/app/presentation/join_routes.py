@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
 
-from app.application import join_requests
+from app.application import join_requests, team_discovery
 from app.infrastructure.config import get_settings
 from app.infrastructure.rate_limit import rate_limit
 from app.presentation.dependencies import CurrentUser, SessionDep
@@ -15,9 +15,23 @@ from app.presentation.join_schemas import (
     LookupRead,
     RequestDetail,
     RequestRead,
+    SearchRead,
 )
 
 router = APIRouter(tags=["team-join-requests"])
+
+
+@router.get("/v1/teams/join/search", response_model=SearchRead)
+def search(
+    session: SessionDep,
+    user: CurrentUser,
+    request: Request,
+    q: Annotated[str, Query(min_length=2, max_length=100)],
+    offset: Annotated[int, Query(ge=0, le=1000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> SearchRead:
+    limit_discovery(session, user, request)
+    return SearchRead.model_validate(team_discovery.search(session, user.id, q, offset, limit))
 
 
 def limit_discovery(session: SessionDep, user: CurrentUser, request: Request) -> None:
