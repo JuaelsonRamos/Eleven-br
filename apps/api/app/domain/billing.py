@@ -33,7 +33,9 @@ class BillingUnavailable(DomainError):
 class BillingRejected(DomainError):
     """Provider explicitly rejected the request before creating a resource."""
 
-    pass
+    def __init__(self, message: str, detail: str | None = None) -> None:
+        super().__init__(message)
+        self.detail = detail  # Provider cause for the audit trail; never shown to users.
 
 
 class BillingDivergence(DomainError):

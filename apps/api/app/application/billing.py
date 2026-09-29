@@ -8,7 +8,7 @@ uncertain POST. Claims without provider proof are resolved by the audited
 `python -m app.billing_admin <team> reconcile` (billing_reconciliation).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 from urllib.parse import quote
@@ -25,7 +25,7 @@ from app.application.teams import require_membership
 from app.domain.billing import PRO_CODE, PRO_PRICE, BillingRejected, BillingUnavailable
 from app.domain.billing import SubscriptionStatus as Status
 from app.domain.policies import Conflict, Forbidden, NotFound, Plan
-from app.infrastructure.asaas import Asaas
+from app.infrastructure.asaas import Asaas, item_image
 from app.infrastructure.billing_models import BillingAudit, BillingSubscription, TeamBilling
 from app.infrastructure.config import Settings
 from app.infrastructure.models import Team
@@ -170,7 +170,12 @@ def summary(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
         "method": subscription.method if subscription else None,
         "operation_status": subscription.operation_status if subscription else None,
         "cancel_requested": bool(subscription and subscription.cancel_requested),
-        "can_cancel": bool(subscription and not subscription.cancelled_at),
+        # NEW never reached the provider (or was refused by it): nothing to cancel there.
+        "can_cancel": bool(
+            subscription
+            and not subscription.cancelled_at
+            and subscription.operation_status != "NEW"
+        ),
         "warning": WARNINGS.get(status),
     }
 
@@ -230,8 +235,15 @@ def begin_checkout(
     if data.method == "CREDIT_CARD" and not settings.billing_return_url:
         raise BillingUnavailable("Configure a URL HTTPS de retorno do checkout.")
     account_for(session, team, settings)
-    if access_state(session, team)[1] == Status.ADMIN_GRANTED:
+    plan, status, paid_until = access_state(session, team)
+    if status == Status.ADMIN_GRANTED:
         raise Conflict("Este time já possui Pro administrativo.")
+    if plan == Plan.PRO and status == Status.CANCELLED and paid_until:
+        # A new contract now would charge the period that is already paid.
+        until = date.fromisoformat(paid_until).strftime("%d/%m/%Y")
+        raise Conflict(
+            f"O ELEVEN BR PRO já está pago até {until}. Assine novamente após essa data."
+        )
     current = latest(session, team_id)
     if current and not current.cancelled_at and pix_expired(current, datetime.now(UTC)):
         from app.application.billing_expiration import expire_initial_pix
@@ -259,12 +271,16 @@ def begin_checkout(
         raise Conflict("Esta tentativa foi encerrada. Inicie uma nova contratação.")
     if subscription is None:
         current = latest(session, team_id)
-        if current and not current.cancelled_at:
-            # Different double-click commands still reuse the same live subscription.
-            if current.method != data.method:
+        if current and not current.cancelled_at and current.method != data.method:
+            if current.operation_status != "NEW":
                 raise Conflict(
                     "Conclua ou cancele a contratação atual antes de trocar o pagamento."
                 )
+            # Never sent, or explicitly refused by the provider: closed and kept, not deleted.
+            current.cancelled_at = datetime.now(UTC)
+            audit(session, team_id, "SUBSCRIPTION_SUPERSEDED", str(current.id), user_id)
+        if current and not current.cancelled_at:
+            # Different double-click commands still reuse the same live subscription.
             subscription = current
         else:
             subscription = BillingSubscription(
@@ -295,14 +311,15 @@ def begin_checkout(
     path, body = creation_request(data.method, subscription_id, customer_id, settings, amount)
     try:
         created = provider.request("POST", path, body)
-    except BillingRejected:
+    except BillingRejected as rejected:
+        # An explicit refusal created nothing remotely: NEW lets a corrected retry proceed.
         lock_team(session, team_id)
         subscription = subscription_of(session, subscription_id)
         if subscription.operation_status == "CREATING" and not (
             subscription.provider_id or subscription.checkout_id
         ):
             subscription.operation_status = "NEW"
-        audit(session, team_id, "PROVIDER_REJECTED", str(subscription_id))
+        audit(session, team_id, "PROVIDER_REJECTED", str(subscription_id), reason=rejected.detail)
         session.commit()
         raise
     return record_creation(
@@ -355,10 +372,10 @@ def ensure_customer(
                 "notificationDisabled": True,
             },
         )
-    except BillingRejected:
+    except BillingRejected as rejected:
         lock_team(session, team_id)
         billing_account(session, team_id).customer_attempted = False
-        audit(session, team_id, "PROVIDER_REJECTED", str(subscription_id))
+        audit(session, team_id, "PROVIDER_REJECTED", str(subscription_id), reason=rejected.detail)
         session.commit()
         raise
     customer_id = str(created["id"])
@@ -403,6 +420,7 @@ def creation_request(
                 "description": "Assinatura mensal por time",
                 "quantity": 1,
                 "value": float(amount),
+                "imageBase64": item_image(),
             }
         ],
         "subscription": {"cycle": "MONTHLY", "nextDueDate": today},
@@ -609,13 +627,17 @@ def administrative_grant(
     """Trusted internal operation, deliberately not exposed to team administrators."""
     if not operator.strip() or not reason.strip():
         raise Conflict("Concessão exige operador e justificativa.")
+    if expires_at is not None and expires_at.utcoffset() is None:
+        raise Conflict("A validade da cortesia exige fuso horário.")
     team = session.scalar(select(Team).where(Team.id == team_id).with_for_update())
     if not team:
         raise NotFound("Time não encontrado.")
-    current = latest(session, team_id)
-    if enabled and current and not current.cancelled_at:
-        raise Conflict("Cancele a recorrência antes de conceder Pro sem cobrança.")
-    account = account_for(session, team, settings)
+    # Courtesy is independent of financial contracts and the configured provider environment.
+    # Preserve all provider references; never cancel a paid recurrence to grant courtesy.
+    account = session.scalar(select(TeamBilling).where(TeamBilling.team_id == team_id))
+    if account is None:
+        account = TeamBilling(team_id=team_id, environment=settings.asaas_env)
+        session.add(account)
     account.grant_active, account.grant_expires_at = enabled, expires_at
     audit(
         session,
@@ -626,3 +648,26 @@ def administrative_grant(
         reason=reason[:300],
     )
     session.commit()
+
+
+def courtesy_status(session: Session, team_id: UUID) -> dict[str, object]:
+    """Read-only operator view; no Asaas calls or access-check audit writes."""
+    from app.application.billing_access import granted
+
+    team = session.get(Team, team_id)
+    if team is None:
+        raise NotFound("Time não encontrado.")
+    account = session.scalar(select(TeamBilling).where(TeamBilling.team_id == team_id))
+    active = bool(account and granted(account, datetime.now(UTC)))
+    plan, status, _ = access_state(session, team)
+    return {
+        "team_id": str(team.id),
+        "team_name": team.name,
+        "courtesy_enabled": bool(account and account.grant_active),
+        "courtesy_valid": active,
+        "courtesy_expires_at": account.grant_expires_at.isoformat()
+        if account and account.grant_expires_at
+        else None,
+        "entitlement_origin": "CORTESIA" if active else status.value,
+        "effective_plan": plan.value,
+    }

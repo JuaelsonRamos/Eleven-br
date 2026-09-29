@@ -12,7 +12,7 @@ import { s } from './styles';
 
 type Mode = 'dues' | 'cash' | 'settings' | 'entry' | 'detail' | 'payment';
 type Action = { path: string; payload: object; title: string; reasonRequired: boolean };
-export function FinancePanel({ teamId, onBack, onNavigate, initialDuesId, onInitialConsumed }: { teamId: string; onBack: () => void; onNavigate: () => void; initialDuesId?: string; onInitialConsumed?: () => void }) {
+export function FinancePanel({ teamId, onBack, onNavigate, onPro, initialDuesId, onInitialConsumed }: { teamId: string; onBack: () => void; onNavigate: () => void; onPro: () => void; initialDuesId?: string; onInitialConsumed?: () => void }) {
   const initial = useRef(initialDuesId), consumed = useRef(onInitialConsumed);
   const [context, setContext] = useState<api.Context | null>(null);
   const [mode, setMode] = useState<Mode>('dues');
@@ -39,6 +39,7 @@ export function FinancePanel({ teamId, onBack, onNavigate, initialDuesId, onInit
       const ctx = await api.call<api.Context>(teamId);
       if (current !== generation.current) return;
       setContext(ctx);
+      if (!ctx.enabled) return; // Free: ELEVEN BR PRO presentation only; the backend refuses operations.
       if (!ctx.can_manage && !['dues', 'detail'].includes(target)) throw new Error('Sem permissão para administrar o financeiro.');
       if (target === 'dues') {
         setAppliedMonth(selectedMonth);
@@ -127,7 +128,13 @@ export function FinancePanel({ teamId, onBack, onNavigate, initialDuesId, onInit
   return <View style={s.stack}>
     <Text accessibilityRole="header" style={s.title}>Financeiro</Text>
     <FormError message={error} /><Feedback message={success} />
-    {loading ? <LoadingState /> : !context ? <Button label="Tentar novamente" onPress={() => void load()} /> : action ? <Card><View style={s.stack}>
+    {loading ? <LoadingState /> : !context ? <Button label="Tentar novamente" onPress={() => void load()} /> : !context.enabled ? <Card><View style={s.stack}>
+      <Badge label="ELEVEN BR PRO" /><Text style={s.heading}>Financeiro é um recurso ELEVEN BR PRO.</Text>
+      <Text style={s.text}>Tenha o controle financeiro do seu time em um só lugar.</Text>
+      {['Mensalidades do elenco', 'Registro e acompanhamento de pagamentos', 'Receitas e despesas do caixa', 'Saldo e histórico financeiro do time'].map(item => <Text key={item} style={s.text}>• {item}</Text>)}
+      <Text style={s.heading}>ELEVEN BR PRO</Text><Text style={s.text}>{context.pro_price ? api.brl(context.pro_price) : ''}/mês por time</Text>
+      <Button label="CONHECER O ELEVEN BR PRO" onPress={onPro} />
+    </View></Card> : action ? <Card><View style={s.stack}>
       <Text style={s.heading}>{action.title}</Text><Field label={action.reasonRequired ? 'Motivo' : 'Motivo (opcional)'} value={reason} onChangeText={setReason} maxLength={500} editable={!busy} />
       <Button label="Confirmar ação" disabled={busy || (action.reasonRequired && !reason.trim())} onPress={() => void save(action.path, { ...action.payload, reason: reason.trim() || null })} />
       <TextAction label="Voltar sem alterar" disabled={busy} onPress={() => setAction(null)} />

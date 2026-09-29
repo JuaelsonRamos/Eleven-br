@@ -19,6 +19,7 @@ from app.domain.policies import Conflict, Permission, Plan, Role
 from app.infrastructure.finance_models import CashEntry, MonthlyDues
 from tests.conftest import make_player
 from tests.migration_snapshot import LEGACY_JSON
+from tests.test_billing import checkout_data, payload, provider, webhook  # noqa: F401
 from tests.test_foundation import make_team
 from tests.test_roster import setup_roster
 from tests.test_team_profiles import client_for
@@ -26,7 +27,7 @@ from tests.test_team_profiles import client_for
 MONTH = "2026-02-01"
 
 
-def setup(session, plan=Plan.FREE):
+def setup(session, plan=Plan.PRO):  # Financial operations are ELEVEN BR PRO.
     owner, team, client, roster = setup_roster(session, plan)
     manual = client.post(roster, json={"name": "João do elenco"}).json()
     path = f"/v1/teams/{team.id}/finance"
@@ -270,7 +271,7 @@ def test_player_scope_no_cash_and_cross_team_ids(session):
     dues = generate(admin, path)
     own = next(d for d in dues if d["membership_id"] == str(member.id))
     other = next(d for d in dues if d != own)
-    assert client.get(path).json() == {"can_manage": False, "currency": "BRL"}
+    assert client.get(path).json() == {"can_manage": False, "currency": "BRL", "enabled": True}
     assert client.get(path + "/dues").json()["items"] == [own]
     assert client.get(path + f"/dues/{other['id']}").status_code == 404
     assert client.get(path + f"/dues/{own['id']}").status_code == 200
@@ -324,7 +325,7 @@ def test_finance_permission_is_granular_and_free_president_only(session):
 def test_ids_from_another_authorized_team_are_rejected(session):
     owner, team, client, path, _ = setup(session, Plan.PRO)
     dues = generate(client, path)[0]
-    second = make_team(session, owner)
+    second = make_team(session, owner, Plan.PRO)
     session.commit()
     second_path = f"/v1/teams/{second.id}/finance"
     assert client.get(second_path).status_code == 200
@@ -502,3 +503,55 @@ def test_migration_preservation_and_downgrade_guard(engine, session):
         command.downgrade(config, "0009")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014"
+
+
+def test_free_team_cannot_operate_finance_but_keeps_history(session, provider):  # noqa: F811
+    _, team, client, path, _ = setup(session)
+    dues = generate(client, path)
+    pay(client, path, dues[0])
+    entry = client.post(path + "/cash", json=manual()).json()
+    team.plan = Plan.FREE  # Downgrade: financial records are never deleted.
+    session.commit()
+    before = client.get(path + "/cash").json()
+    kept = client.get(path + "/dues", params={"competence": MONTH}).json()
+    assert len(kept["items"]) == len(dues) and before["items"]
+    context = client.get(path).json()
+    assert (context["enabled"], context["pro_price"]) == (False, "29.99")
+    pending = dues[1]
+    writes = [
+        (
+            "PUT",
+            "/settings",
+            {"amount": "40.00", "due_day": 5, "active": True, "expected_version": 1},
+        ),
+        ("POST", "/dues/preview", {"competence": "2026-03-01"}),
+        (
+            "POST",
+            "/dues/generate",
+            {"competence": "2026-03-01", "preview_token": "x" * 64, "confirm": True},
+        ),
+        ("POST", f"/dues/{pending['id']}/payments", payment(pending)),
+        (
+            "POST",
+            f"/dues/{pending['id']}/actions",
+            {"action": "exempt", "expected_version": 1, "confirm": True},
+        ),
+        ("POST", "/cash", manual("EXPENSE")),
+        ("POST", f"/cash/{entry['id']}/reverse", {"reason": "Teste", "confirm": True}),
+    ]
+    for method, suffix, body in writes:
+        response = client.request(method, path + suffix, json=body)
+        assert response.status_code == 403, (suffix, response.text)
+        assert response.json()["detail"] == "Financeiro é um recurso ELEVEN BR PRO."
+    assert client.get(path + "/cash").json() == before
+    assert client.get(path + "/dues", params={"competence": MONTH}).json() == kept
+    # The ELEVEN BR PRO subscription is not the team finance module: it stays available.
+    billing = f"/v1/teams/{team.id}/billing"
+    assert client.get(billing).json()["can_manage"] is True
+    assert client.post(billing + "/checkout", json=checkout_data()).status_code == 200
+    assert client.get(path).json()["enabled"] is False  # A pending charge never enables PRO.
+    provider["status"] = "CONFIRMED"
+    assert webhook(client, payload()).status_code == 200
+    assert client.get(path).json()["enabled"] is True
+    assert client.post(path + "/cash", json=manual("EXPENSE")).status_code == 200
+    assert len(client.get(path + "/cash").json()["items"]) == len(before["items"]) + 1

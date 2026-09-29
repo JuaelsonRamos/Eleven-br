@@ -70,6 +70,15 @@ export function BillingPanel({ teamId }: { teamId: string }) {
     void run(() => api.refreshBilling(teamId));
   }, [remaining, busy, data, run, teamId]);
   const expired = Boolean(data?.signup_expired || remaining === 0);
+  async function submit() {
+    try { return await api.checkout(teamId, { command_id: command.current, method, name, email, cpf_cnpj: document }); }
+    catch (cause) {
+      // A fresh command lets the President fix data or switch method; the backend reuses any live attempt.
+      const fresh = await api.getBilling(teamId).catch(() => null);
+      if (fresh && alive.current) { command.current = fresh.command_id; setData(fresh); }
+      throw cause;
+    }
+  }
   if (!data) return <><FormError message={error} />{error ? <Button label="Tentar novamente" onPress={() => void run(() => api.getBilling(teamId))} /> : <LoadingState />}</>;
   return <View style={s.stack}>
     <Text accessibilityRole="header" style={s.title}>ELEVEN BR PRO</Text>
@@ -85,14 +94,15 @@ export function BillingPanel({ teamId }: { teamId: string }) {
     <FormError message={error} />
     {(data.warning || data.notice || notice) && <Text accessibilityRole="alert" style={s.body}>{data.warning || data.notice || notice}</Text>}
     {!data.can_manage ? <><Text style={s.note}>Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.</Text><SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /></> : <>
-      {data.status !== 'ADMIN_GRANTED' && data.status !== 'RECONCILIATION' && !data.can_cancel && !form && <Button label={data.can_retry_pix ? 'Gerar novo Pix' : 'ASSINAR ELEVEN PRO'} onPress={() => { command.current = data.command_id; setMethod('PIX'); setForm(true); }} disabled={busy} />}
+      {data.plan === 'pro' && data.status === 'CANCELLED' && <Text style={s.note}>A renovação foi cancelada. O PRO continua até o fim do período pago; depois, você pode assinar novamente.</Text>}
+      {data.plan !== 'pro' && data.status !== 'RECONCILIATION' && !data.can_cancel && !form && <Button label={data.can_retry_pix ? 'Gerar novo Pix' : 'ASSINAR ELEVEN PRO'} onPress={() => { command.current = data.command_id; setMethod('PIX'); setForm(true); }} disabled={busy} />}
       {form && <Card><Text style={s.heading}>Como deseja pagar?</Text>
         <View style={s.row}><FilterChip label="PIX" selected={method === 'PIX'} onPress={() => setMethod('PIX')} disabled={busy} /><FilterChip label="Cartão de crédito" selected={method === 'CREDIT_CARD'} onPress={() => setMethod('CREDIT_CARD')} disabled={busy} /></View>
         <Field label="Nome do responsável pelo pagamento" value={name} onChangeText={setName} editable={!busy} />
         <Field label="E-mail de cobrança" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" editable={!busy} />
         <Field label="CPF ou CNPJ do pagador" value={document} onChangeText={value => setDocument(value.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={14} editable={!busy} />
         <Text style={s.note}>{method === 'PIX' ? `Uma cobrança Pix de ${money(data.price)} será gerada a cada mês. Você paga manualmente; não há débito automático.` : `Assinatura mensal de ${money(data.price)}. Você informará o cartão na página segura do Asaas, responsável pelas cobranças recorrentes.`}</Text>
-        <Button label={method === 'PIX' ? 'Confirmar assinatura e gerar Pix' : 'Confirmar e continuar no Asaas'} disabled={busy || !name.trim() || !email.trim() || ![11, 14].includes(document.length)} onPress={() => void run(() => api.checkout(teamId, { command_id: command.current, method, name, email, cpf_cnpj: document }))} />
+        <Button label={method === 'PIX' ? 'Confirmar assinatura e gerar Pix' : 'Confirmar e continuar no Asaas'} disabled={busy || !name.trim() || !email.trim() || ![11, 14].includes(document.length)} onPress={() => void run(submit)} />
         <SecondaryButton label="Voltar" disabled={busy} onPress={() => setForm(false)} />
       </Card>}
       {data.pix && !expired && <Card><Text style={s.heading}>Pix · {money(data.pix.amount)}</Text>

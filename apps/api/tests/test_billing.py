@@ -1,8 +1,10 @@
+import base64
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
+import httpx
 import pytest
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.orm import Session
@@ -307,6 +309,13 @@ def test_cancel_preserves_paid_period_and_history(session, provider):
     assert client.post(path + "/cancel", json={"confirm": True}).status_code == 200
     assert len([c for c in provider["calls"] if c[0] == "DELETE"]) == 1
     assert session.scalar(select(func.count()).select_from(BillingPayment)) == 1
+    # The paid period stays PRO; a new contract now would charge it twice.
+    for method in ("PIX", "CREDIT_CARD"):
+        again = client.post(path + "/checkout", json=checkout_data(method))
+        assert again.status_code == 409 and "já está pago até" in again.json()["detail"]
+    assert client.get(path).json()["plan"] == "pro"
+    assert len(provider["subscriptions"]) == 1
+    assert not any(c[:2] == ("POST", "/checkouts") for c in provider["calls"])
 
 
 def test_card_uses_hosted_monthly_checkout_no_card_capture(session, provider):
@@ -317,6 +326,9 @@ def test_card_uses_hosted_monthly_checkout_no_card_capture(session, provider):
     request = next(c[2] for c in provider["calls"] if c[1] == "/checkouts")
     assert request["subscription"]["cycle"] == "MONTHLY"
     assert request["items"][0]["value"] == 29.99
+    # Asaas requires an item image: the official logo, never card data.
+    assert base64.b64decode(request["items"][0]["imageBase64"]).startswith(b"\x89PNG")
+    assert request["customer"] == "cus_test" and "customerData" not in request
     assert request["minutesToExpire"] == 60
     assert "creditCard" not in request
 
@@ -936,3 +948,79 @@ def test_card_ignores_initial_pix_deadline(session, provider):
     result = client.post(path + "/refresh", json={}).json()
     assert result["checkout_url"] and result["signup_expires_at"] is None
     assert not result["signup_expired"]
+
+
+def test_asaas_refusal_keeps_a_masked_cause_and_a_friendly_message(monkeypatch):
+    monkeypatch.setenv("ASAAS_ENV", "sandbox")
+    monkeypatch.setenv("ASAAS_API_KEY", "sandbox-test-key-never-real")
+    monkeypatch.setenv("ASAAS_WEBHOOK_TOKEN", "test-webhook-" + "x" * 32)
+    get_settings.cache_clear()
+    body = {
+        "errors": [
+            {"code": "invalid_object", "description": "Imagem ausente. a@example.com 12345678909"}
+        ]
+    }
+
+    def respond(self, method, url, **kwargs):
+        return httpx.Response(400, json=body, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(httpx.Client, "request", respond)
+    with pytest.raises(BillingRejected) as refused:
+        Asaas(get_settings()).request("POST", "/checkouts", {"items": []})
+    assert (
+        str(refused.value)
+        == "Não foi possível iniciar o pagamento. Confira os dados e tente novamente."
+    )
+    assert refused.value.detail == "invalid_object: Imagem ausente. *** ***"
+    get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("retry", ["CREDIT_CARD", "PIX"])
+def test_card_refusal_never_blocks_a_safe_retry(session, provider, monkeypatch, retry):
+    _, _, client, path = setup(session)
+    original, refusals = Asaas.request, [True]
+
+    def refuse_once(self, method, path, *args, **kwargs):
+        if (method, path) == ("POST", "/checkouts") and refusals:
+            refusals.pop()
+            raise BillingRejected(
+                "Não foi possível iniciar o pagamento. Confira os dados e tente novamente.",
+                "invalid_object: imagem ausente",
+            )
+        return original(self, method, path, *args, **kwargs)
+
+    monkeypatch.setattr(Asaas, "request", refuse_once)
+    refused = client.post(path + "/checkout", json=checkout_data("CREDIT_CARD"))
+    assert (refused.status_code, refused.json()["detail"]) == (
+        400,
+        "Não foi possível iniciar o pagamento. Confira os dados e tente novamente.",
+    )
+    item = session.scalar(select(BillingSubscription))
+    assert (item.operation_status, item.provider_id, item.checkout_id) == ("NEW", None, None)
+    assert (
+        session.scalar(
+            select(BillingAudit.reason).where(BillingAudit.action == "PROVIDER_REJECTED")
+        )
+        == "invalid_object: imagem ausente"
+    )
+    summary = client.get(path).json()
+    assert (summary["status"], summary["plan"], summary["can_cancel"]) == ("FREE", "free", False)
+    pending_pix(provider)
+    retried = client.post(path + "/checkout", json=checkout_data(retry))
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["plan"] == "free"  # Nothing is PRO before a confirmed payment.
+    session.expire_all()
+    live = session.scalars(
+        select(BillingSubscription).where(BillingSubscription.cancelled_at.is_(None))
+    ).all()
+    assert len(live) == 1 and live[0].method == retry
+    if retry == "CREDIT_CARD":
+        assert live[0].id == item.id  # The never-sent attempt is reused, not duplicated.
+        assert (live[0].checkout_id, live[0].operation_status) == ("checkout_test", "READY")
+        assert retried.json()["checkout_url"].endswith("id=checkout_test")
+    else:
+        assert item.cancelled_at  # Superseded and kept for audit, never deleted.
+        assert live[0].provider_id == "sub_test" and len(provider["subscriptions"]) == 1
+        assert retried.json()["pix"]["amount"] == "29.99"
+    created = [c for c in provider["calls"] if c[:2] == ("POST", "/checkouts")]
+    assert len(created) == (1 if retry == "CREDIT_CARD" else 0)

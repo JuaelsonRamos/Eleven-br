@@ -14,6 +14,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from app.application.teams import add_member
+from app.domain.policies import Plan
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
@@ -30,6 +31,7 @@ def test_browser_notifications_flow(engine: Engine) -> None:
         owner, team_a, admin_a, _ = setup_events(session)
         _, team_b, admin_b, events_b = setup_events(session)
         team_a.name, team_b.name = "Time A da conta", "Time B dos amigos"
+        team_b.plan = Plan.PRO  # Finance notices need ELEVEN BR PRO.
         add_member(session, team_id=team_b.id, player_id=owner.id)
         user = session.get(User, owner.user_id)
         user.email, user.password_hash = (

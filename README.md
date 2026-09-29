@@ -972,7 +972,9 @@ cancelar. Valores de cobranças emitidas são preservados; não há edição sil
 O jogador ativo vê somente **Minhas mensalidades**, pagamentos e histórico próprios.
 O backend deriva seu Membership do User autenticado; não aceita IDs para consultar
 outro jogador. Caixa/configuração/gestão exigem `manage_finance` pela política
-central: Presidente no Free, Presidente ou administrador Pro com esse grant.
+central: Presidente ou administrador com esse grant. Operações financeiras são
+ELEVEN BR PRO (bloqueadas no backend para times Free, 403); no Free o menu mostra a
+apresentação do PRO e os dados existentes são preservados, sem exclusão.
 Permissões de elenco/eventos não concedem acesso. As quatro abas continuam iguais.
 
 Migration **0010_team_finance** cria `dues_settings`, `monthly_dues`, `cash_entries`
@@ -1255,9 +1257,17 @@ Concessão interna auditada, por UUID (não executar para demonstração no banc
 # Em apps/api, operador com acesso administrativo ao ambiente:
 uv run python -m app.billing_admin <team-uuid> grant --operator <operador> --reason <motivo>
 # revoke remove a concessão; --expires-at aceita ISO com timezone, omitido é permanente.
+uv run python -m app.billing_admin <team-uuid> status
+uv run python -m app.billing_admin <team-uuid> revoke --operator <operador> --reason <motivo>
 ```
 
-Uma recorrência existente deve ser cancelada antes da concessão sem cobrança.
+CORTESIA reutiliza a concessão administrativa existente e libera o mesmo Pro, inclusive
+Financeiro. Não chama Asaas, não cria cobrança e não modifica assinaturas/pagamentos.
+Pode coexistir com assinatura paga: expiração/revogação da cortesia mantém o Pro
+quando houver cobertura financeira válida; sem ela, retorna ao Free. A consulta
+`status` informa validade, expiração e plano efetivo, sem modificar dados.
+Concessão e revogação exigem operador/motivo e ficam auditadas. Para cortesia temporária,
+adicione ao `grant`, por exemplo, `--expires-at "2026-12-31T23:59:59-03:00"`.
 Não há exceção por nome de time, nem endpoint público de concessão.
 
 Conciliação auditada, sem SQL manual, pelo mesmo comando interno:

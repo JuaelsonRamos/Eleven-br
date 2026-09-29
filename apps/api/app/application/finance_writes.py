@@ -50,7 +50,7 @@ def audit(
 def settings(
     session: Session, user_id: UUID, team_id: UUID, data: SettingsInput
 ) -> dict[str, object]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     item = session.scalar(select(DuesSettings).where(DuesSettings.team_id == team_id))
     f.version(item.version if item else 0, data.expected_version)
     if item is None:
@@ -78,7 +78,7 @@ def settings(
 def generation(
     session: Session, user_id: UUID, team_id: UUID, competence: date
 ) -> tuple[dict[str, object], list[UUID], DuesSettings]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     config = session.scalar(select(DuesSettings).where(DuesSettings.team_id == team_id))
     if not config or not config.active:
         raise Conflict("Configure e ative a mensalidade antes de gerar cobranças.")
@@ -155,7 +155,7 @@ def existing_command(session: Session, team_id: UUID, command_id: UUID) -> CashE
 def pay(
     session: Session, user_id: UUID, team_id: UUID, dues_id: UUID, data: PaymentInput
 ) -> dict[str, object]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     item = f.get_dues(session, team_id, dues_id)
     f.confirmed(data.confirm)
     old = existing_command(session, team_id, data.command_id)
@@ -215,7 +215,7 @@ def pay(
 def dues_action(
     session: Session, user_id: UUID, team_id: UUID, dues_id: UUID, data: DuesActionInput
 ) -> dict[str, object]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     item = f.get_dues(session, team_id, dues_id)
     f.confirmed(data.confirm)
     f.version(item.version, data.expected_version)
@@ -242,7 +242,7 @@ def dues_action(
 def manual_entry(
     session: Session, user_id: UUID, team_id: UUID, data: EntryInput
 ) -> dict[str, object]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     f.confirmed(data.confirm)
     old = existing_command(session, team_id, data.command_id)
     fields = data.model_dump(exclude={"confirm", "command_id"})
@@ -262,7 +262,7 @@ def manual_entry(
 def cancel_entry(
     session: Session, user_id: UUID, team_id: UUID, entry_id: UUID, data: CancelEntryInput
 ) -> dict[str, object]:
-    f.authorize(session, user_id, team_id, manage=True)
+    f.authorize_write(session, user_id, team_id)
     item = session.scalar(
         select(CashEntry)
         .where(CashEntry.team_id == team_id, CashEntry.id == entry_id)

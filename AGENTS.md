@@ -297,8 +297,12 @@ Conciliação sem prova segura permanece pendente para suporte. Cancelamento tam
 é durável e repetível. Não remover histórico nem dados Pro em downgrade comercial.
 
 `python -m app.billing_admin` é ferramenta interna confiável por UUID, com operador
-e justificativa, nunca endpoint de Presidente. Cancelar recorrência existente antes
-de conceder Pro sem cobrança. Não executar concessão em dados reais para demonstração.
+e justificativa, nunca endpoint de Presidente. CORTESIA reutiliza `TeamBilling.grant_active`
+e `grant_expires_at`: permanente ou temporária, com revogação e auditoria existentes.
+Não chama Asaas nem cria/cancela contratos ou pagamentos. Pode coexistir com assinatura:
+ao expirar/revogar, a cobertura paga continua sendo avaliada pelo entitlement central,
+inclusive Financeiro. `status` é consulta somente leitura, sem operador/justificativa.
+Não executar concessão em dados reais para demonstração.
 Sandbox e produção não compartilham referências; desenvolvimento proíbe ambiente
 Asaas production. Não usar credenciais reais nos testes; adapter é simulado em banco
 isolado. Migration 0014 é aditiva; preserve 0001–0013. Sem Pix Automático ou jobs externos.
@@ -353,8 +357,10 @@ consumir a mesma identidade da Notification, sem acoplar emissão à interface.
 
 ## Planos e permissões
 
-Financeiro básico usa `Permission.MANAGE_FINANCE` nas policies existentes: Presidente
-no Free e Presidente/gestor Pro com a permissão específica. `manage_team`,
+Operações do Financeiro são ELEVEN BR PRO: capability `finance` em ENTITLEMENTS,
+aplicada no backend por `finance.authorize_write`. No Free o app mostra a apresentação
+do PRO; dados existentes são preservados e voltam a ser operáveis com o PRO. No PRO,
+`Permission.MANAGE_FINANCE`: Presidente e gestor com a permissão específica. `manage_team`,
 `manage_members` e `manage_events` não concedem acesso financeiro. Membro ativo
 consulta somente suas próprias cobranças, derivadas do User autenticado, sem caixa,
 configuração ou cobranças alheias. Não armazenar acesso financeiro global no User.

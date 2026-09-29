@@ -7,10 +7,12 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.application.roster import roster_name
 from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
-from app.domain.policies import Conflict, NotFound, Permission
+from app.domain.billing import PRO_PRICE
+from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission
 from app.infrastructure.finance_models import CashEntry, DuesSettings, FinanceAudit, MonthlyDues
 from app.infrastructure.models import Player, Team, TeamMembership, User
 
@@ -37,6 +39,18 @@ def authorize(session: Session, user_id: UUID, team_id: UUID, *, manage: bool = 
     )
 
 
+def enabled(session: Session, team: Team) -> bool:
+    return ENTITLEMENTS[effective_plan(session, team)].finance
+
+
+def authorize_write(session: Session, user_id: UUID, team_id: UUID) -> Team:
+    """Financial operations are ELEVEN BR PRO; data kept while Free stays intact and readable."""
+    team = authorize(session, user_id, team_id, manage=True)
+    if not enabled(session, team):
+        raise Forbidden("Financeiro é um recurso ELEVEN BR PRO.")
+    return team
+
+
 def version(current: int, expected: int) -> None:
     if current != expected:
         raise Conflict("Os dados mudaram. Atualize antes de confirmar novamente.")
@@ -60,6 +74,9 @@ def context(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
     team = authorize(session, user_id, team_id)
     _, manage = membership_context(session, team, user_id, Permission.MANAGE_FINANCE)
     result: dict[str, object] = {"can_manage": manage, "currency": "BRL"}
+    result["enabled"] = enabled(session, team)
+    if not result["enabled"]:
+        result["pro_price"] = str(PRO_PRICE)
     if manage:
         result["command_id"] = str(uuid4())
         result["settings"] = settings_read(

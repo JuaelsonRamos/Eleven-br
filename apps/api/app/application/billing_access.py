@@ -96,6 +96,8 @@ def decide(
     if granted(account, now):
         grant_end = account.grant_expires_at
         return Plan.PRO, Status.ADMIN_GRANTED, grant_end.isoformat() if grant_end else None
+    # A NEW attempt without charges never reached the provider (or was refused): no status.
+    subscriptions = [s for s in subscriptions if s.operation_status != "NEW" or payments.get(s.id)]
     if not subscriptions:
         return Plan.FREE, Status.FREE, None
     today = now.astimezone(ZoneInfo("America/Sao_Paulo")).date()

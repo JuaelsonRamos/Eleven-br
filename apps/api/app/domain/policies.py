@@ -28,12 +28,13 @@ class Entitlements:
     administrators: int
     granular_permissions: bool
     lineups: bool = False
+    finance: bool = False  # Financial operations; existing data is never removed on Free.
 
 
 ENTITLEMENTS = MappingProxyType(
     {
         Plan.FREE: Entitlements(24, 0, False),
-        Plan.PRO: Entitlements(100, 5, True, True),
+        Plan.PRO: Entitlements(100, 5, True, lineups=True, finance=True),
     }
 )
 

@@ -2,7 +2,7 @@ import { authenticated } from '../auth/api';
 
 export type Totals = { income: string; expense: string; balance: string };
 export type Settings = { amount: string; due_day: number; active: boolean; version: number };
-export type Context = { can_manage: boolean; currency: 'BRL'; settings?: Settings; totals?: Totals; command_id?: string };
+export type Context = { can_manage: boolean; currency: 'BRL'; enabled: boolean; pro_price?: string; settings?: Settings; totals?: Totals; command_id?: string };
 export type Dues = { id: string; membership_id: string; name: string; competence: string; due_date: string; amount: string; received: string; remaining: string; status: 'PENDING' | 'PAID' | 'EXEMPT' | 'CANCELLED'; overdue: boolean; version: number };
 export type Entry = { id: string; dues_id: string | null; kind: 'INCOME' | 'EXPENSE'; category: string; description: string; amount: string; entry_date: string; payment_method: string | null; note: string | null; cancelled_at: string | null; cancellation_reason: string | null; created_at: string; source: string; created_by_name: string; cancelled_by_name: string | null };
 export type Detail = Dues & { command_id?: string; payments: Entry[]; audit: { action: string; actor_name: string; reason: string | null; created_at: string }[] };

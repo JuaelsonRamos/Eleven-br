@@ -14,6 +14,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from app.application.teams import add_member
+from app.domain.policies import Plan
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
@@ -25,7 +26,7 @@ def test_browser_redesign_flow(engine: Engine) -> None:
     from playwright.sync_api import expect, sync_playwright
 
     with Session(engine) as session:
-        owner, team, client, _ = setup_roster(session)
+        owner, team, client, _ = setup_roster(session, Plan.PRO)  # Finance is ELEVEN BR PRO.
         player = make_player(session)
         player.display_name = (
             "João Antônio de Albuquerque e Vasconcelos dos Santos Pereira da Silva"

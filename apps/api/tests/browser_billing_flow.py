@@ -317,3 +317,50 @@ def login(page, email):
     page.get_by_label("Telefone ou e-mail", exact=True).fill(email)
     page.get_by_label("Senha", exact=True).fill("browser-password-123")
     page.get_by_role("button", name="Entrar", exact=True).click()
+
+
+@pytest.mark.parametrize("role", [None, Role.ADMIN, Role.MEMBER])
+def test_browser_finance_paywall_opens_the_pro_central(session, provider, role):  # noqa: F811
+    from playwright.sync_api import expect, sync_playwright
+
+    owner, team, client, _ = setup(session)
+    person = owner if role is None else make_player(session)
+    if role is not None:
+        team.plan = Plan.PRO
+        add_member(session, team_id=team.id, player_id=person.id, role=role)
+        team.plan = Plan.FREE  # An administrator kept after a downgrade still cannot subscribe.
+    user = session.get(User, person.user_id)
+    user.email, user.password_hash = "paywall@example.com", hash_password("browser-password-123")
+    session.commit()
+    client.headers.pop("Authorization", None)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(viewport={"width": 390, "height": 900})
+        route_api(context, client)
+        page = context.new_page()
+        login(page, "paywall@example.com")
+        page.get_by_role("button", name="Financeiro", exact=True).click()
+        expect(
+            page.get_by_text("Financeiro é um recurso ELEVEN BR PRO.", exact=True)
+        ).to_be_visible()
+        expect(page.get_by_text("R$ 29,99/mês por time", exact=True)).to_be_visible()
+        expect(page.get_by_text("Saldo atual", exact=True)).to_have_count(0)
+        for width in (320, 1280):
+            page.set_viewport_size({"width": width, "height": 900})
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.get_by_role("button", name="CONHECER O ELEVEN BR PRO", exact=True).click()
+        expect(page.get_by_role("heading", name="ELEVEN BR PRO", exact=True)).to_be_visible()
+        subscribe = page.get_by_role("button", name="ASSINAR ELEVEN PRO", exact=True)
+        if role is None:
+            expect(subscribe).to_be_visible()
+        else:
+            expect(subscribe).to_have_count(0)
+            expect(
+                page.get_by_text(
+                    "Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.",
+                    exact=True,
+                )
+            ).to_be_visible()
+        assert provider["calls"] == []
+        context.close()
+        browser.close()

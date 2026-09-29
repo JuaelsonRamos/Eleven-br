@@ -325,7 +325,7 @@ export const helpSections = [
     topics: [
       {
         id: 'finance-overview', title: 'Como funciona o Financeiro',
-        summary: 'Mensalidades dos jogadores e caixa do time, com registros manuais.',
+        summary: 'Recurso ELEVEN BR PRO: mensalidades dos jogadores e caixa do time, com registros manuais.',
         steps: [
           'Abra **Início → Financeiro**.',
           '**Mensalidades**: cobranças mensais geradas para os jogadores ativos.',
@@ -333,7 +333,8 @@ export const helpSections = [
           'Cada jogador vê somente as próprias cobranças em **Minhas mensalidades**.',
         ],
         notes: [
-          'Quem gerencia: o Presidente e, no ELEVEN PRO, administradores com a área Financeiro.',
+          'No Free, o Financeiro mostra a apresentação do ELEVEN BR PRO; dados já registrados são preservados e voltam a ser usados com o PRO.',
+          'Quem gerencia: o Presidente e administradores com a área Financeiro.',
           'Os pagamentos são registrados manualmente (Pix, dinheiro, cartão ou outro). O app não recebe dinheiro dos jogadores.',
         ],
         related: ['dues-settings', 'register-payment', 'cash-entries', 'cash-follow'],

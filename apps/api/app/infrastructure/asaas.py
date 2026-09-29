@@ -1,5 +1,9 @@
-"""Small Asaas adapter. Never logs requests, provider error bodies or credentials."""
+"""Small Asaas adapter. Never logs requests or credentials; rejections keep a masked cause."""
 
+import base64
+import re
+from functools import cache
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -33,7 +37,10 @@ class Asaas:
                     params=params,
                 )
             if response.status_code == 400:
-                raise BillingRejected("Confira os dados de cobrança. O Asaas recusou a operação.")
+                raise BillingRejected(
+                    "Não foi possível iniciar o pagamento. Confira os dados e tente novamente.",
+                    rejection(response),
+                )
             if method == "DELETE" and response.status_code == 404:
                 return {"deleted": True}
             response.raise_for_status()
@@ -55,3 +62,22 @@ class Asaas:
             if not page.get("hasMore", False):
                 return rows
         raise BillingUnavailable("Conciliação requer revisão do suporte.")
+
+
+def rejection(response: httpx.Response) -> str | None:
+    """Provider error codes for the audit trail, with e-mails and document numbers masked."""
+    try:
+        errors = response.json().get("errors") or []
+        text = "; ".join(f"{e.get('code')}: {e.get('description')}" for e in errors)
+    except (ValueError, AttributeError, TypeError):
+        return None
+    return re.sub(r"[^\s@]+@[^\s@]+|\d{6,}", "***", text)[:280] or None
+
+
+ITEM_IMAGE = Path(__file__).with_name("checkout-item.png")
+
+
+@cache
+def item_image() -> str:
+    """Official ELEVEN BR logo, proportionally reduced: Asaas requires an image per item."""
+    return base64.b64encode(ITEM_IMAGE.read_bytes()).decode("ascii")
