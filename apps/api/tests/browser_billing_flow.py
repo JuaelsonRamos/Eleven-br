@@ -1,5 +1,7 @@
 """Real Expo browser, API and PostgreSQL isolated; provider simulated, no dev data writes."""
 
+import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -10,7 +12,7 @@ from app.infrastructure.asaas import Asaas
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
-from tests.test_billing import payload, provider, setup, webhook  # noqa: F401
+from tests.test_billing import age_pix, payload, pending_pix, provider, setup, webhook  # noqa: F401
 
 
 def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
@@ -76,6 +78,7 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
         expect(page.get_by_text("Plano atual", exact=True)).to_be_visible()
         button("Conhecer o PRO").click()
         expect(page.get_by_text("Plano gratuito", exact=True)).to_be_visible()
+        expect(page.get_by_text("R$ 29,99", exact=False).first).to_be_visible()
         page.get_by_role("tab", name="Início", exact=True).click()
         button("Escalação").click()
         button("Conhecer o Pro").click()
@@ -93,9 +96,15 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
             page.screenshot(path=str(artifacts / f"checkout-{width}.png"), full_page=True)
         provider["payments"] = [{"id": "pay_test", "status": "PENDING", "dueDate": "2026-12-01"}]
         button("Confirmar assinatura e gerar Pix").click()
-        expect(page.get_by_text("Aguardando pagamento", exact=True).first).to_be_visible()
-        expect(page.get_by_text("Vencimento: 01/12/2026", exact=True)).to_be_visible()
-        expect(page.get_by_text("Código válido até 01/12/2026", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="ELEVEN BR PRO", exact=True)).to_be_visible()
+        expect(page.get_by_text("R$ 29,99/mês", exact=False).first).to_be_visible()
+        expect(page.get_by_text("Pagamento inicial pendente", exact=True)).to_be_visible()
+        expect(
+            page.get_by_text("Tempo para concluir esta contratação:", exact=False)
+        ).to_be_visible()
+        # Before the first payment: no renewal dates and no Asaas QR validity as a deadline.
+        for text in ("Próxima cobrança", "Vencimento", "Código válido até", "Validade técnica"):
+            expect(page.get_by_text(text, exact=False)).to_have_count(0)
         expect(button("Copiar código Pix")).to_be_visible()
         button("Copiar código Pix").click()
         expect(page.get_by_text("Código Pix copiado.", exact=True)).to_be_visible()
@@ -116,6 +125,11 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
         assert webhook(client, payload()).status_code == 200
         button("Atualizar assinatura").click()
         expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_be_visible()
+        expect(page.get_by_text("Ativo", exact=True).filter(visible=True)).to_have_count(1)
+        expect(page.get_by_text("Próxima cobrança:", exact=False)).to_be_visible()
+        expect(
+            page.get_by_text("Tempo para concluir esta contratação:", exact=False)
+        ).to_have_count(0)
         page.get_by_role("tab", name="Início", exact=True).click()
         button("Perfil do time").click()
         button("Gerenciar assinatura").click()
@@ -209,7 +223,7 @@ def test_browser_billing_hosted_card_stays_pending(session, provider):  # noqa: 
         )
         checkout.close()
         button("Atualizar assinatura").click()
-        expect(page.get_by_text("Aguardando pagamento", exact=True)).to_be_visible()
+        expect(page.get_by_text("Pagamento inicial pendente", exact=True)).to_be_visible()
         expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
         assert len([call for call in provider["calls"] if call[:2] == ("POST", "/checkouts")]) == 1
         context.close()
@@ -236,6 +250,65 @@ def route_api(context, client):
         )
 
     context.route("**/v1/**", api)
+
+
+def test_browser_pix_countdown_expiry_and_new_attempt(session, provider):  # noqa: F811
+    from playwright.sync_api import expect, sync_playwright
+
+    owner, _, client, _ = setup(session)
+    user = session.get(User, owner.user_id)
+    user.email, user.password_hash = "expiry@example.com", hash_password("browser-password-123")
+    session.commit()
+    client.headers.pop("Authorization", None)
+    pending_pix(provider)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(viewport={"width": 390, "height": 900})
+        route_api(context, client)
+        page = context.new_page()
+        # A device clock 20 minutes behind must not extend the backend deadline.
+        page.clock.install(time=datetime.now(UTC) - timedelta(minutes=20))
+        login(page, "expiry@example.com")
+        page.get_by_role("tab", name="Mais", exact=True).click()
+
+        def button(label):
+            return page.get_by_role("button", name=label, exact=True)
+
+        button("ELEVEN PRO").click()
+        button("ASSINAR ELEVEN PRO").click()
+        page.get_by_label("CPF ou CNPJ do pagador", exact=True).fill("12345678909")
+        button("Confirmar assinatura e gerar Pix").click()
+        expect(button("Copiar código Pix")).to_be_visible()
+        expect(page.get_by_text("Pagamento inicial pendente", exact=True)).to_be_visible()
+        timer = page.get_by_text("Tempo para concluir esta contratação:", exact=False)
+        expect(timer).to_have_text(re.compile(r"(10:00|09:5\d)$"))
+        before = timer.inner_text()
+        page.clock.fast_forward(3000)
+        expect(timer).not_to_have_text(before)
+        age_pix(session, 5)
+        button("Atualizar assinatura").click()
+        expect(timer).to_have_text(re.compile(r"(05:00|04:5\d)$"))
+        age_pix(session)
+        page.clock.fast_forward(310000)
+        expect(button("Copiar código Pix")).to_have_count(0)
+        expect(page.get_by_text("Tempo para contratação expirado.", exact=True)).to_be_visible()
+        expect(button("Gerar novo Pix")).to_be_visible()
+        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
+        artifacts = Path(__file__).resolve().parents[3] / ".local/prompt16-browser"
+        artifacts.mkdir(exist_ok=True)
+        for width in (320, 390, 768, 1280):
+            page.set_viewport_size({"width": width, "height": 900})
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            page.screenshot(path=str(artifacts / f"pix-expired-{width}.png"), full_page=True)
+        button("Gerar novo Pix").click()
+        button("Confirmar assinatura e gerar Pix").click()
+        expect(button("Cancelar assinatura")).to_be_visible()
+        expect(timer).to_have_text(re.compile(r"(10:00|09:5\d)$"))
+        assert len(provider["subscriptions"]) == 2
+        deleted = [call[1] for call in provider["calls"] if call[0] == "DELETE"]
+        assert deleted == ["/payments/pay_test", "/subscriptions/sub_test"]
+        context.close()
+        browser.close()
 
 
 def login(page, email):

@@ -261,8 +261,10 @@ o plano efetivo para todas as capabilities, limites e permissões. Não consulta
 Team.plan diretamente para autorizar: seu valor legado só vale enquanto não há
 TeamBilling. Pro legado é preservado, sem cobrança presumida ou concessão por nome.
 
-Pro mensal custa R$ 30 por time. TeamBilling guarda referência de cliente/ambiente
-e concessão administrativa; BillingSubscription preserva tentativas/contratos;
+Pro mensal custa R$ 29,99 por time, definido em `PRO_PRICE`. Contratações
+existentes preservam o valor salvo; retries não reajustam contratos. TeamBilling
+guarda referência de cliente/ambiente e concessão administrativa; BillingSubscription
+preserva tentativas/contratos;
 BillingPayment guarda períodos financeiros; BillingWebhook deduplica evento do
 provedor; BillingAudit registra decisões. Não misturar com MonthlyDues/CashEntry.
 Estados públicos são derivados dos pagamentos válidos e do relógio, não de um
@@ -270,6 +272,15 @@ booleano local. Vencimento é local de São Paulo, período mensal calendário e
 exclusivo. Tolerância de três dias só mantém acesso anteriormente pago; primeira
 cobrança pendente nunca concede Pro. Cancelamento mantém apenas período pago.
 Refund/chargeback retiram a cobertura daquele pagamento, preservando os registros.
+
+Somente a contratação inicial por Pix tem janela de 10 minutos (`PIX_SIGNUP_MINUTES`
+desde `created_at` da tentativa), decidida pelo backend e pelo relógio, sem scheduler.
+Não altera valor, ciclo MONTHLY, vencimentos nem renovações de assinatura já paga.
+Não sobrescrever `expirationDate` do Asaas. `billing_expiration` encerra fora de
+transação, com claim EXPIRING: remove a cobrança pendente antes da assinatura (Asaas
+recusa remover cobrança paga) e só então libera nova tentativa; nunca duas recorrências.
+Confirmação após o prazo, pagamento ou divergência no encerramento viram REVIEW:
+registrados e auditados, sem Pro, sem estorno/cancelamento automático.
 
 Asaas adapter não registra bodies/segredos. Cartão usa Checkout RECURRENT/MONTHLY
 hospedado HTTPS, associado ao cliente do time; PAN/CVV não passam pelo ELEVEN BR.

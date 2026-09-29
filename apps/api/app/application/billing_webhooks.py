@@ -23,7 +23,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.application.billing import Provider, audit, lock_team
-from app.application.billing_access import access_state
+from app.application.billing_access import access_state, pix_deadline
 from app.domain.billing import BillingDivergence, next_month
 from app.infrastructure.billing_models import (
     BillingPayment,
@@ -103,6 +103,13 @@ def process(session: Session, payload: dict[str, Any], settings: Settings) -> No
         with session.begin_nested():
             if facts is not None:
                 apply_payment(session, facts, event_type, settings)
+                state = session.scalar(
+                    select(BillingSubscription.operation_status).where(
+                        BillingSubscription.provider_id == facts.subscription_ref
+                    )
+                )
+                if state == "REVIEW":
+                    record.status = "RECONCILIATION"
             elif event_type.startswith("CHECKOUT_"):
                 checkout_event(session, resource, event_type)
             elif event_type in SUBSCRIPTION_EVENTS:
@@ -199,7 +206,9 @@ def adopt(session: Session, facts: PaymentFacts) -> BillingSubscription | None:
             and Decimal(str(canonical.get("value", 0))) == item.amount
             and canonical.get("billingType") == item.method
         ):
-            item.provider_id, item.operation_status = facts.subscription_ref, "READY"
+            item.provider_id = facts.subscription_ref
+            if item.operation_status not in ("EXPIRED", "EXPIRING", "REVIEW"):
+                item.operation_status = "READY"
             session.flush()
             return item
     # Repeating the same event cannot create a match: park it for reconciliation.
@@ -262,8 +271,25 @@ def apply_payment(session: Session, facts: PaymentFacts, kind: str, settings: Se
         and row.confirmed_at is None
     ):
         row.confirmed_at = datetime.now(UTC)
-        subscription.started_at = subscription.started_at or row.confirmed_at
         audit(session, team.id, "PAYMENT_CONFIRMED", row.provider_id, origin="webhook")
+        deadline = pix_deadline(subscription)
+        if deadline and (
+            facts.observed_at >= deadline
+            or subscription.operation_status in ("EXPIRED", "EXPIRING", "REVIEW")
+        ):
+            # Keep the financial receipt and webhook. A date-only provider field cannot
+            # prove payment happened within the window; do not infer it from delivery time.
+            subscription.operation_status = "REVIEW"
+            audit(
+                session,
+                team.id,
+                "PIX_LATE_PAYMENT_REVIEW",
+                row.provider_id,
+                origin="webhook",
+                reason="Primeiro pagamento sem comprovação dentro da janela válida.",
+            )
+        else:
+            subscription.started_at = subscription.started_at or row.confirmed_at
     session.flush()
     after = access_state(session, team)
     if before[:2] != after[:2]:

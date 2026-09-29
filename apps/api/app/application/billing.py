@@ -9,6 +9,7 @@ uncertain POST. Claims without provider proof are resolved by the audited
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Literal
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -18,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.application.billing_access import access_state
+from app.application.billing_access import access_state, pix_deadline, pix_expired
 from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
 from app.domain.billing import PRO_CODE, PRO_PRICE, BillingRejected, BillingUnavailable
@@ -30,6 +31,13 @@ from app.infrastructure.config import Settings
 from app.infrastructure.models import Team
 
 CHECKOUT_MINUTES = 60
+WARNINGS = {
+    Status.OVERDUE: "Pagamento pendente. Regularize sua assinatura para manter os recursos PRO.",
+    Status.RECONCILIATION: (
+        "Contratação em conciliação. Pagamentos recebidos ficam registrados; "
+        "o PRO não é liberado automaticamente. Não gere outro pagamento."
+    ),
+}
 
 
 class CheckoutInput(BaseModel):
@@ -137,12 +145,22 @@ def summary(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
     team = authorize(session, user_id, team_id)
     plan, status, expiry = access_state(session, team)
     subscription = latest(session, team_id)
+    deadline, now = pix_deadline(subscription), datetime.now(UTC)
     return {
         "command_id": str(uuid4()),
         "plan": plan.value,
         "plan_code": PRO_CODE if plan == Plan.PRO else "FREE",
         "status": status.value,
         "price": str(PRO_PRICE),
+        # Millisecond ISO strings for the app countdown: parsed alike by every JS engine.
+        "server_time": now.isoformat(timespec="milliseconds"),
+        "signup_expires_at": deadline.isoformat(timespec="milliseconds") if deadline else None,
+        "signup_expired": pix_expired(subscription, now),
+        "can_retry_pix": bool(
+            subscription
+            and subscription.operation_status == "EXPIRED"
+            and subscription.cancelled_at
+        ),
         "expires_at": expiry,
         "next_due_date": expiry if subscription and not subscription.cancelled_at else None,
         "started_at": subscription.started_at.isoformat()
@@ -153,9 +171,7 @@ def summary(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
         "operation_status": subscription.operation_status if subscription else None,
         "cancel_requested": bool(subscription and subscription.cancel_requested),
         "can_cancel": bool(subscription and not subscription.cancelled_at),
-        "warning": "Pagamento pendente. Regularize sua assinatura para manter os recursos PRO."
-        if status.value == "OVERDUE"
-        else None,
+        "warning": WARNINGS.get(status),
     }
 
 
@@ -216,6 +232,21 @@ def begin_checkout(
     account_for(session, team, settings)
     if access_state(session, team)[1] == Status.ADMIN_GRANTED:
         raise Conflict("Este time já possui Pro administrativo.")
+    current = latest(session, team_id)
+    if current and not current.cancelled_at and pix_expired(current, datetime.now(UTC)):
+        from app.application.billing_expiration import expire_initial_pix
+
+        current_id = current.id
+        session.commit()
+        expire_initial_pix(session, team_id, current_id, settings)
+        team = authorize(session, user_id, team_id, write=True)
+        current = latest(session, team_id)
+    if current and current.operation_status == "REVIEW":
+        raise Conflict("Contratação em conciliação. Não será criada outra assinatura.")
+    if current and current.operation_status == "EXPIRING":
+        raise Conflict("Encerrando a contratação anterior. Atualize em alguns minutos.")
+    if current and pix_expired(current, datetime.now(UTC)) and not current.cancelled_at:
+        raise Conflict("Aguarde o encerramento da contratação anterior antes de gerar novo Pix.")
     subscription = session.scalar(
         select(BillingSubscription).where(
             BillingSubscription.team_id == team_id,
@@ -224,6 +255,8 @@ def begin_checkout(
     )
     if subscription and subscription.method != data.method:
         raise Conflict("Esta operação já foi usada para outra forma de pagamento.")
+    if subscription and subscription.cancelled_at:
+        raise Conflict("Esta tentativa foi encerrada. Inicie uma nova contratação.")
     if subscription is None:
         current = latest(session, team_id)
         if current and not current.cancelled_at:
@@ -257,8 +290,9 @@ def begin_checkout(
         session.commit()
         return payment_details(session, user_id, team_id, settings)
     subscription.operation_status = "CREATING"
+    amount = subscription.amount
     session.commit()
-    path, body = creation_request(data.method, subscription_id, customer_id, settings)
+    path, body = creation_request(data.method, subscription_id, customer_id, settings, amount)
     try:
         created = provider.request("POST", path, body)
     except BillingRejected:
@@ -338,7 +372,7 @@ def ensure_customer(
 
 
 def creation_request(
-    method: str, subscription_id: UUID, customer_id: str, settings: Settings
+    method: str, subscription_id: UUID, customer_id: str, settings: Settings, amount: Decimal
 ) -> tuple[str, dict[str, Any]]:
     today = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
     reference = f"eleven-sub:{subscription_id}"
@@ -346,7 +380,7 @@ def creation_request(
         return "/subscriptions", {
             "customer": customer_id,
             "billingType": "PIX",
-            "value": float(PRO_PRICE),
+            "value": float(amount),
             "cycle": "MONTHLY",
             "nextDueDate": today,
             "externalReference": reference,
@@ -368,7 +402,7 @@ def creation_request(
                 "name": "ELEVEN BR PRO",
                 "description": "Assinatura mensal por time",
                 "quantity": 1,
-                "value": float(PRO_PRICE),
+                "value": float(amount),
             }
         ],
         "subscription": {"cycle": "MONTHLY", "nextDueDate": today},
@@ -420,12 +454,30 @@ def payment_details(
     team = authorize(session, user_id, team_id, write=True)
     account = account_for(session, team, settings)
     subscription = latest(session, team_id)
+    if (
+        subscription
+        and not subscription.cancelled_at
+        and pix_expired(subscription, datetime.now(UTC))
+    ):
+        from app.application.billing_expiration import expire_initial_pix
+
+        subscription_id = subscription.id
+        session.commit()
+        expire_initial_pix(session, team_id, subscription_id, settings)
+        result = summary(session, user_id, team_id)
+        if not result["can_retry_pix"]:
+            result["notice"] = (
+                "Prazo encerrado. A contratação aguarda conciliação; não pague o código antigo."
+            )
+        session.commit()
+        return result
     result = summary(session, user_id, team_id)
     if not subscription or subscription.cancelled_at:
         session.commit()
         return result
     subscription_id, method, amount = subscription.id, subscription.method, subscription.amount
     provider_id, checkout_id = subscription.provider_id, subscription.checkout_id
+    started = subscription.started_at is not None
     creating = subscription.operation_status == "CREATING"
     stopping = subscription.cancel_requested
     customer_id = account.customer_id
@@ -457,7 +509,8 @@ def payment_details(
         )
         if pending:
             payment = pending[0]
-            result["next_due_date"] = payment.get("dueDate")
+            if started:  # The initial charge is not a renewal of an active PRO.
+                result["next_due_date"] = payment.get("dueDate")
             if method == "PIX":
                 qr = provider.request(
                     "GET", f"/payments/{quote(str(payment['id']), safe='')}/pixQrCode"
@@ -472,6 +525,13 @@ def payment_details(
         result["notice"] = (
             "Contratação em conciliação. Não repita a criação; aguarde o webhook ou o suporte."
         )
+    # Provider calls may cross the deadline. Never return a QR using the earlier snapshot.
+    authorize(session, user_id, team_id, write=True)
+    current = subscription_of(session, subscription_id)
+    elapsed = not current.cancelled_at and pix_expired(current, datetime.now(UTC))
+    session.commit()
+    if elapsed:
+        return payment_details(session, user_id, team_id, settings)
     return result
 
 
@@ -500,6 +560,16 @@ def cancel(session: Session, user_id: UUID, team_id: UUID, settings: Settings) -
     subscription = latest(session, team_id)
     if not subscription:
         raise NotFound("Assinatura não encontrada.")
+    if subscription.operation_status in ("REVIEW", "EXPIRING"):
+        raise Conflict("Contratação em conciliação. Solicite revisão antes de cancelar.")
+    if not subscription.cancelled_at and pix_expired(subscription, datetime.now(UTC)):
+        # The deadline already ended this attempt: use the payment-safe cleanup instead.
+        from app.application.billing_expiration import expire_initial_pix
+
+        subscription_id = subscription.id
+        session.commit()
+        expire_initial_pix(session, team_id, subscription_id, settings)
+        return summary(session, user_id, team_id)
     if not subscription.cancelled_at:
         subscription.cancel_requested = True
         subscription_id = subscription.id

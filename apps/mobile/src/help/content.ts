@@ -400,7 +400,7 @@ export const helpSections = [
         id: 'pro-overview', title: 'O que é o ELEVEN PRO',
         summary: 'O plano completo do seu time.',
         steps: [
-          'É o plano pago do time: R$ 30 por mês, por time.',
+          'É o plano mensal pago do time. Consulte o preço atual na Central ELEVEN PRO.',
           'Libera até 100 jogadores ativos, até 5 administradores com permissões por área e escalações visuais.',
           'O Free continua gratuito, com até 24 jogadores ativos e administração somente pelo Presidente.',
         ],
@@ -422,7 +422,8 @@ export const helpSections = [
         id: 'pro-payment', title: 'Como funciona Pix e cartão',
         summary: 'Duas formas de pagar a assinatura mensal.',
         steps: [
-          'Pix: a cada mês, uma cobrança de R$ 30 é gerada com QR Code e código copia e cola. O pagamento é manual, sem débito automático.',
+          'Pix: a cada mês, uma cobrança no valor da assinatura é gerada com QR Code e código copia e cola. O pagamento é manual, sem débito automático.',
+          'Na contratação por Pix, pague o primeiro Pix em até 10 minutos. Se o tempo acabar, não pague o código anterior: toque em **Gerar novo Pix**. Pagamento feito depois do prazo não libera o Pro automaticamente e fica em conciliação.',
           'Cartão: você informa o cartão na página segura do Asaas, que faz as cobranças recorrentes. O ELEVEN BR não recebe os dados do cartão.',
           'Se um pagamento atrasar, o Pro já pago continua por até 3 dias.',
         ],

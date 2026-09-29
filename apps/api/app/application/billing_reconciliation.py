@@ -28,6 +28,7 @@ from app.application.billing import (
     subscription_of,
 )
 from app.application.billing_access import access_state
+from app.application.billing_expiration import expire_initial_pix
 from app.application.billing_webhooks import PAID, apply_payment, payment_facts
 from app.domain.billing import BillingDivergence, BillingUnavailable, next_month
 from app.domain.policies import Conflict, NotFound
@@ -139,12 +140,16 @@ class Reconciliation:
         self.session.commit()
         for item_id, provider_id, checkout_id, status, cancelled_at in rows:
             try:
+                if status == "REVIEW":
+                    self.report.append(f"Assinatura {item_id}: pagamento em revisão; não cancelar.")
+                    continue
                 if not (cancelled_at or provider_id or checkout_id) and status == "CREATING":
                     provider_id = self.intent(item_id)
                 elif cancelled_at and provider_id:
                     self.stop(provider_id)
                 if provider_id:
                     self.payments(item_id, provider_id)
+                expire_initial_pix(self.session, self.team_id, item_id, self.settings, self.now)
             except BillingUnavailable:
                 self.session.rollback()
                 self.report.append(f"Asaas indisponível para a assinatura {item_id}: repita.")
@@ -309,6 +314,16 @@ class Reconciliation:
         except BillingDivergence as divergence:
             self.report.append(f"Evento {event_id} continua divergente: {divergence}")
         else:
-            record.status, record.processed_at = "PROCESSED", datetime.now(UTC)
+            state = (
+                self.session.scalar(
+                    select(BillingSubscription.operation_status).where(
+                        BillingSubscription.provider_id == facts.subscription_ref
+                    )
+                )
+                if facts
+                else None
+            )
+            record.status = "RECONCILIATION" if state == "REVIEW" else "PROCESSED"
+            record.processed_at = datetime.now(UTC)
             self.record("WEBHOOK_REPROCESSED", event_id, f"Evento {event_id} reprocessado.")
         self.session.commit()

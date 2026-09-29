@@ -1155,14 +1155,35 @@ Os testes usam exclusivamente schemas temporários em banco `_test`.
 ## Assinatura ELEVEN PRO — Asaas
 
 **Perfil do time → Conhecer o PRO/Gerenciar assinatura**, **Mais → ELEVEN PRO**
-e o CTA da Escalação abrem a mesma Central: Free R$ 0 ou Pro R$ 30/mês
+e o CTA da Escalação abrem a mesma Central: Free R$ 0 ou Pro R$ 29,99/mês
 por time. Somente o Presidente contrata e cancela. Pix gera uma cobrança mensal
 manual com QR Code/copia e cola; cartão abre o checkout recorrente HTTPS do Asaas.
 O app não captura cartão/CVV. O retorno ao site não comprova pagamento.
 Admin e jogador consultam plano e benefícios; só o Presidente vê contratação,
 pagamento e cancelamento. Ao reabrir uma contratação existente, a Central retoma
 QR Code/link por uma atualização autorizada, sem criar cobrança nem usar polling.
-Pix mostra valor, vencimento e validade do código quando retornados pelo backend.
+Na contratação por Pix a Central mostra **Pagamento inicial pendente**, o contador
+**Tempo para concluir esta contratação**, QR Code e **Copiar código Pix**, sem
+"Próxima cobrança" antes da confirmação. Renovações de um Pro ativo mostram valor,
+vencimento e validade do código quando retornados pelo backend.
+
+**Prazo do Pix inicial (10 minutos).** Vale somente para a primeira contratação por
+Pix: `created_at` da tentativa + `PIX_SIGNUP_MINUTES`, persistido no banco e aplicado
+pelo backend em toda decisão de acesso, mesmo com o app fechado. Não altera o valor
+(R$ 29,99), o ciclo MONTHLY, os vencimentos futuros nem as renovações de uma
+assinatura já paga. O contador usa `signup_expires_at` e `server_time` da API; o
+`expirationDate` do QR no Asaas não é alterado nem usado como prazo. Vencido o prazo,
+o QR deixa de ser exibido, o time continua Free e a próxima ação autorizada do
+Presidente (atualizar ou contratar) ou a conciliação encerra a tentativa: remove a
+cobrança pendente antes da assinatura (o Asaas recusa remover cobrança paga) e só
+então libera **Gerar novo Pix**, sem duas recorrências ativas. Confirmação recebida
+após o prazo, ou pagamento/divergência observados no encerramento, é registrada e
+auditada, deixa a tentativa em conciliação (`RECONCILIATION`) e não concede Pro,
+não estorna nem cancela o valor. Falha ao consultar/remover no Asaas mantém a
+tentativa expirada, sem Pro e sem nova recorrência, até uma nova atualização.
+Ainda não há comando para resolver uma contratação em conciliação (liberar o
+pagamento tardio ou estorná-lo no painel do Asaas); enquanto isso, o time não inicia
+outra contratação.
 
 Configuração **somente backend**, no `.env` não versionado:
 
@@ -1210,7 +1231,8 @@ Transições observadas na Central Pro também são auditadas; não há job de s
 
 Migration aditiva **0014_billing_asaas** cria cinco tabelas: team_billing,
 billing_subscriptions, billing_payments, billing_webhooks e billing_audit.
-Estados FREE/PENDING/ACTIVE/OVERDUE/CANCELLED/SUSPENDED/ADMIN_GRANTED são derivados
+Estados FREE/PENDING/ACTIVE/OVERDUE/CANCELLED/SUSPENDED/ADMIN_GRANTED, além de
+EXPIRED (prazo do Pix inicial) e RECONCILIATION (pagamento em revisão), são derivados
 das referências, concessão e períodos, evitando status de acesso desatualizado.
 Team.plan legado permanece intacto e só serve de fallback sem registro comercial.
 
@@ -1251,7 +1273,9 @@ O comando consulta o Asaas e:
   (checkout de cartão), quando nenhuma requisição pode estar em andamento;
 - interrompe no Asaas a recorrência de assinatura já cancelada no ELEVEN BR;
 - atualiza status de cobranças em ordem de observação;
-- reprocessa eventos `DIVERGENT` com as regras do webhook.
+- reprocessa eventos `DIVERGENT` com as regras do webhook;
+- encerra tentativas Pix iniciais vencidas com as mesmas regras do prazo de 10 minutos;
+  tentativas em conciliação são apenas relatadas, nunca canceladas.
 
 Não cria cobranças nem concede Pro: a cobertura continua exigindo
 PAYMENT_CONFIRMED/RECEIVED. O relatório indica o que exige ação no painel do Asaas.

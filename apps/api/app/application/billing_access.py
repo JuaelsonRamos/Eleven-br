@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.billing import GRACE_DAYS
+from app.domain.billing import GRACE_DAYS, PIX_SIGNUP_MINUTES
 from app.domain.billing import SubscriptionStatus as Status
 from app.domain.policies import Plan
 from app.infrastructure.billing_models import BillingPayment, BillingSubscription, TeamBilling
@@ -27,6 +27,17 @@ REVERSALS = (
     "CHARGEBACK_DISPUTE",
     "AWAITING_CHARGEBACK_REVERSAL",
 )
+
+
+def pix_deadline(subscription: BillingSubscription | None) -> datetime | None:
+    if subscription and subscription.method == "PIX" and not subscription.started_at:
+        return subscription.created_at + timedelta(minutes=PIX_SIGNUP_MINUTES)
+    return None
+
+
+def pix_expired(subscription: BillingSubscription | None, now: datetime) -> bool:
+    deadline = pix_deadline(subscription)
+    return deadline is not None and now >= deadline
 
 
 def access_states(
@@ -91,6 +102,15 @@ def decide(
     # A cancelled paid period can overlap a later pending renewal. Keep paid coverage.
     fallback = Status.PENDING
     for index, subscription in enumerate(subscriptions):
+        if subscription.operation_status == "REVIEW" or pix_expired(subscription, now):
+            if not index:
+                if subscription.operation_status == "REVIEW":
+                    fallback = Status.RECONCILIATION
+                elif subscription.cancelled_at and subscription.operation_status != "EXPIRED":
+                    fallback = Status.CANCELLED  # Closed by the president/provider, not the clock.
+                else:
+                    fallback = Status.EXPIRED
+            continue  # Late/ambiguous first payments never grant coverage.
         charges = payments.get(subscription.id, [])
         paid = [p for p in charges if p.confirmed_at and p.status in ("CONFIRMED", "RECEIVED")]
         covered = [p for p in paid if p.due_date <= today < p.period_end]
