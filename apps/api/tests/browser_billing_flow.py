@@ -12,7 +12,15 @@ from app.infrastructure.asaas import Asaas
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
-from tests.test_billing import age_pix, payload, pending_pix, provider, setup, webhook  # noqa: F401
+from tests.test_billing import (  # noqa: F401
+    age_pix,
+    enabled_cards,
+    payload,
+    pending_pix,
+    provider,
+    setup,
+    webhook,
+)
 
 
 def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
@@ -87,6 +95,8 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
         button("ELEVEN PRO").click()
         expect(page.get_by_text("Plano gratuito", exact=True)).to_be_visible()
         button("ASSINAR ELEVEN PRO").click()
+        expect(button("Cartão de crédito")).to_have_count(0)
+        expect(page.get_by_text("Pagamento disponível: PIX", exact=True)).to_be_visible()
         page.get_by_label("CPF ou CNPJ do pagador", exact=True).fill("12345678909")
         artifacts = Path(__file__).resolve().parents[3] / ".local/prompt16-browser"
         artifacts.mkdir(exist_ok=True)
@@ -187,6 +197,7 @@ def test_browser_billing_read_only(session, provider, role):  # noqa: F811
         browser.close()
 
 
+@pytest.mark.usefixtures("enabled_cards")
 def test_browser_billing_hosted_card_stays_pending(session, provider):  # noqa: F811
     from playwright.sync_api import expect, sync_playwright
 

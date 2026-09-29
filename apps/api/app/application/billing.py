@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.application.billing_access import access_state, pix_deadline, pix_expired
 from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
+from app.domain import billing as billing_policy
 from app.domain.billing import PRO_CODE, PRO_PRICE, BillingRejected, BillingUnavailable
 from app.domain.billing import SubscriptionStatus as Status
 from app.domain.policies import Conflict, Forbidden, NotFound, Plan
@@ -152,6 +153,7 @@ def summary(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
         "plan_code": PRO_CODE if plan == Plan.PRO else "FREE",
         "status": status.value,
         "price": str(PRO_PRICE),
+        "available_payment_methods": list(billing_policy.ENABLED_PAYMENT_METHODS),
         # Millisecond ISO strings for the app countdown: parsed alike by every JS engine.
         "server_time": now.isoformat(timespec="milliseconds"),
         "signup_expires_at": deadline.isoformat(timespec="milliseconds") if deadline else None,
@@ -227,6 +229,11 @@ def begin_checkout(
     settings: Settings,
 ) -> dict[str, object]:
     team = authorize(session, user_id, team_id, write=True)
+    if data.method not in billing_policy.ENABLED_PAYMENT_METHODS:
+        raise Conflict(
+            "Pagamento por cartão estará disponível em breve. "
+            "Utilize PIX para assinar o ELEVEN BR PRO."
+        )
     if (
         not settings.asaas_api_key.get_secret_value()
         or not settings.asaas_webhook_token.get_secret_value()

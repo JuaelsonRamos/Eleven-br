@@ -1156,6 +1156,14 @@ Os testes usam exclusivamente schemas temporários em banco `_test`.
 
 ## Assinatura ELEVEN PRO — Asaas
 
+**Lançamento PIX-only:** novas contratações aceitam somente Pix. A infraestrutura
+de cartão permanece preservada, temporariamente desabilitada. A configuração única
+é `ENABLED_PAYMENT_METHODS = ("PIX",)` em `apps/api/app/domain/billing.py`, consumida
+pela API e pela Central PRO. Para reativar cartão, concluir a validação real do
+checkout (inclusive os dados de cliente exigidos pelo Asaas) e adicionar
+`"CREDIT_CARD"` à tupla. O bloqueio não cria recursos nem altera registros históricos.
+As descrições de cartão abaixo documentam a implementação preservada.
+
 **Perfil do time → Conhecer o PRO/Gerenciar assinatura**, **Mais → ELEVEN PRO**
 e o CTA da Escalação abrem a mesma Central: Free R$ 0 ou Pro R$ 29,99/mês
 por time. Somente o Presidente contrata e cancela. Pix gera uma cobrança mensal

@@ -31,6 +31,13 @@ from tests.test_team_profiles import client_for
 
 
 @pytest.fixture
+def enabled_cards(monkeypatch):
+    from app.domain import billing as policy
+
+    monkeypatch.setattr(policy, "ENABLED_PAYMENT_METHODS", ("PIX", "CREDIT_CARD"))
+
+
+@pytest.fixture
 def provider(monkeypatch):
     monkeypatch.setenv("ASAAS_ENV", "sandbox")
     monkeypatch.setenv("ASAAS_API_KEY", "sandbox-test-key-never-real")
@@ -187,6 +194,38 @@ def test_access_periods(session, offset, status, confirmed, cancelled, grant, ex
     assert access_state(session, team, now)[0].value == expected
 
 
+@pytest.mark.parametrize("existing", [False, True])
+def test_pix_only_rejects_card_before_any_financial_effect(session, provider, existing):
+    _, team, client, path = setup(session)
+    if existing:
+        session.add(TeamBilling(team_id=team.id, environment="sandbox"))
+        session.add(
+            BillingSubscription(
+                team_id=team.id,
+                command_id=uuid4(),
+                method="CREDIT_CARD",
+                amount=29.99,
+                plan_code="PRO_MONTHLY",
+                operation_status="NEW",
+            )
+        )
+        session.commit()
+    result = client.post(path + "/checkout", json=checkout_data("CREDIT_CARD"))
+    assert result.status_code == 409
+    assert "Utilize PIX" in result.json()["detail"]
+    assert provider["calls"] == []
+    assert session.scalar(select(func.count()).select_from(TeamBilling)) == int(existing)
+    assert session.scalar(select(func.count()).select_from(BillingSubscription)) == int(existing)
+    assert session.scalar(select(func.count()).select_from(BillingPayment)) == 0
+    assert session.scalar(select(func.count()).select_from(BillingAudit)) == 0
+    if existing:
+        item = session.scalar(select(BillingSubscription))
+        assert item.operation_status == "NEW" and item.cancelled_at is None
+    summary = client.get(path).json()
+    assert summary["available_payment_methods"] == ["PIX"]
+    assert summary["price"] == "29.99"
+
+
 def test_checkout_dedup_and_payment_success(session, provider):
     _, team, client, path = setup(session)
     data = checkout_data()
@@ -298,6 +337,7 @@ def test_timeout_does_not_repeat_subscription_post(session, provider, monkeypatc
     assert len(attempts) == 1
 
 
+@pytest.mark.usefixtures("enabled_cards")
 def test_cancel_preserves_paid_period_and_history(session, provider):
     _, _, client, path = setup(session)
     client.post(path + "/checkout", json=checkout_data())
@@ -318,6 +358,7 @@ def test_cancel_preserves_paid_period_and_history(session, provider):
     assert not any(c[:2] == ("POST", "/checkouts") for c in provider["calls"])
 
 
+@pytest.mark.usefixtures("enabled_cards")
 def test_card_uses_hosted_monthly_checkout_no_card_capture(session, provider):
     _, _, client, path = setup(session)
     response = client.post(path + "/checkout", json=checkout_data("CREDIT_CARD"))
@@ -941,6 +982,7 @@ def test_concurrent_expiry_and_new_checkout_do_not_duplicate(engine, session, pr
     assert deleted(provider) == 1
 
 
+@pytest.mark.usefixtures("enabled_cards")
 def test_card_ignores_initial_pix_deadline(session, provider):
     _, _, client, path = setup(session)
     client.post(path + "/checkout", json=checkout_data("CREDIT_CARD"))
@@ -976,6 +1018,7 @@ def test_asaas_refusal_keeps_a_masked_cause_and_a_friendly_message(monkeypatch):
 
 
 @pytest.mark.parametrize("retry", ["CREDIT_CARD", "PIX"])
+@pytest.mark.usefixtures("enabled_cards")
 def test_card_refusal_never_blocks_a_safe_retry(session, provider, monkeypatch, retry):
     _, _, client, path = setup(session)
     original, refusals = Asaas.request, [True]

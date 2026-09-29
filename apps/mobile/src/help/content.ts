@@ -413,19 +413,19 @@ export const helpSections = [
         summary: 'Somente o Presidente contrata para o time.',
         steps: [
           'O Presidente abre **Mais → ELEVEN PRO** e toca em **ASSINAR ELEVEN PRO**.',
-          'Escolha **PIX** ou **Cartão de crédito** e informe nome, e-mail e CPF ou CNPJ de quem paga.',
+          'O lançamento aceita **PIX**. Informe nome, e-mail e CPF ou CNPJ de quem paga.',
           'Confirme. O Pro é liberado depois que o pagamento é confirmado; toque em **Atualizar assinatura** para conferir.',
         ],
         notes: ['Administradores não contratam nem cancelam o ELEVEN PRO.'],
         related: ['pro-payment', 'pro-cancel'],
       },
       {
-        id: 'pro-payment', title: 'Como funciona Pix e cartão',
-        summary: 'Duas formas de pagar a assinatura mensal.',
+        id: 'pro-payment', title: 'Como funciona o pagamento por Pix',
+        summary: 'Pagamento da assinatura mensal via Pix.',
         steps: [
           'Pix: a cada mês, uma cobrança no valor da assinatura é gerada com QR Code e código copia e cola. O pagamento é manual, sem débito automático.',
           'Na contratação por Pix, pague o primeiro Pix em até 10 minutos. Se o tempo acabar, não pague o código anterior: toque em **Gerar novo Pix**. Pagamento feito depois do prazo não libera o Pro automaticamente e fica em conciliação.',
-          'Cartão: você informa o cartão na página segura do Asaas, que faz as cobranças recorrentes. O ELEVEN BR não recebe os dados do cartão.',
+          'Cartão de crédito estará disponível futuramente. No lançamento, utilize Pix.',
           'Se um pagamento atrasar, o Pro já pago continua por até 3 dias.',
         ],
         related: ['pro-subscribe'],

@@ -70,8 +70,10 @@ export function BillingPanel({ teamId }: { teamId: string }) {
     void run(() => api.refreshBilling(teamId));
   }, [remaining, busy, data, run, teamId]);
   const expired = Boolean(data?.signup_expired || remaining === 0);
+  const cardAvailable = data?.available_payment_methods?.includes('CREDIT_CARD') ?? false;
+  const paymentMethod = cardAvailable ? method : 'PIX';
   async function submit() {
-    try { return await api.checkout(teamId, { command_id: command.current, method, name, email, cpf_cnpj: document }); }
+    try { return await api.checkout(teamId, { command_id: command.current, method: cardAvailable ? method : 'PIX', name, email, cpf_cnpj: document }); }
     catch (cause) {
       // A fresh command lets the President fix data or switch method; the backend reuses any live attempt.
       const fresh = await api.getBilling(teamId).catch(() => null);
@@ -96,13 +98,13 @@ export function BillingPanel({ teamId }: { teamId: string }) {
     {!data.can_manage ? <><Text style={s.note}>Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.</Text><SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /></> : <>
       {data.plan === 'pro' && data.status === 'CANCELLED' && <Text style={s.note}>A renovação foi cancelada. O PRO continua até o fim do período pago; depois, você pode assinar novamente.</Text>}
       {data.plan !== 'pro' && data.status !== 'RECONCILIATION' && !data.can_cancel && !form && <Button label={data.can_retry_pix ? 'Gerar novo Pix' : 'ASSINAR ELEVEN PRO'} onPress={() => { command.current = data.command_id; setMethod('PIX'); setForm(true); }} disabled={busy} />}
-      {form && <Card><Text style={s.heading}>Como deseja pagar?</Text>
-        <View style={s.row}><FilterChip label="PIX" selected={method === 'PIX'} onPress={() => setMethod('PIX')} disabled={busy} /><FilterChip label="Cartão de crédito" selected={method === 'CREDIT_CARD'} onPress={() => setMethod('CREDIT_CARD')} disabled={busy} /></View>
+      {form && <Card><Text style={s.heading}>{cardAvailable ? 'Como deseja pagar?' : 'Pagamento disponível: PIX'}</Text>
+        <View style={s.row}><FilterChip label="PIX" selected={!cardAvailable || method === 'PIX'} onPress={() => setMethod('PIX')} disabled={busy} />{cardAvailable && <FilterChip label="Cartão de crédito" selected={method === 'CREDIT_CARD'} onPress={() => setMethod('CREDIT_CARD')} disabled={busy} />}</View>
         <Field label="Nome do responsável pelo pagamento" value={name} onChangeText={setName} editable={!busy} />
         <Field label="E-mail de cobrança" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" editable={!busy} />
         <Field label="CPF ou CNPJ do pagador" value={document} onChangeText={value => setDocument(value.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={14} editable={!busy} />
-        <Text style={s.note}>{method === 'PIX' ? `Uma cobrança Pix de ${money(data.price)} será gerada a cada mês. Você paga manualmente; não há débito automático.` : `Assinatura mensal de ${money(data.price)}. Você informará o cartão na página segura do Asaas, responsável pelas cobranças recorrentes.`}</Text>
-        <Button label={method === 'PIX' ? 'Confirmar assinatura e gerar Pix' : 'Confirmar e continuar no Asaas'} disabled={busy || !name.trim() || !email.trim() || ![11, 14].includes(document.length)} onPress={() => void run(submit)} />
+        <Text style={s.note}>{paymentMethod === 'PIX' ? `Uma cobrança Pix de ${money(data.price)} será gerada a cada mês. Você paga manualmente; não há débito automático.` : `Assinatura mensal de ${money(data.price)}. Você informará o cartão na página segura do Asaas, responsável pelas cobranças recorrentes.`}</Text>
+        <Button label={paymentMethod === 'PIX' ? 'Confirmar assinatura e gerar Pix' : 'Confirmar e continuar no Asaas'} disabled={busy || !name.trim() || !email.trim() || ![11, 14].includes(document.length)} onPress={() => void run(submit)} />
         <SecondaryButton label="Voltar" disabled={busy} onPress={() => setForm(false)} />
       </Card>}
       {data.pix && !expired && <Card><Text style={s.heading}>Pix · {money(data.pix.amount)}</Text>
@@ -114,7 +116,7 @@ export function BillingPanel({ teamId }: { teamId: string }) {
         {data.pix.payload && <><Text selectable style={s.code}>{data.pix.payload}</Text>
         <Button label="Copiar código Pix" onPress={() => { void Clipboard.setStringAsync(data.pix!.payload!).then(() => { if (alive.current) setNotice('Código Pix copiado.'); }).catch(() => { if (alive.current) setError('Selecione o código e copie manualmente.'); }); }} /></>}
       </Card>}
-      {data.checkout_url && <Button label="Abrir pagamento seguro no Asaas" disabled={busy} onPress={() => { void Linking.openURL(data.checkout_url!).catch(() => setError('Não foi possível abrir o Asaas.')); }} />}
+      {cardAvailable && data.checkout_url && <Button label="Abrir pagamento seguro no Asaas" disabled={busy} onPress={() => { void Linking.openURL(data.checkout_url!).catch(() => setError('Não foi possível abrir o Asaas.')); }} />}
       {(data.checkout_url || (data.pix && !expired)) && <Text style={s.note}>Após pagar, volte ao ELEVEN BR e atualize a assinatura. O Pro será liberado somente após a confirmação do pagamento pelo backend.</Text>}
       <SecondaryButton label="Atualizar assinatura" disabled={busy} onPress={() => void run(() => api.refreshBilling(teamId))} />
       {data.can_cancel && !expired && data.status !== 'RECONCILIATION' && !cancel && <SecondaryButton label="Cancelar assinatura" disabled={busy} onPress={() => setCancel(true)} />}

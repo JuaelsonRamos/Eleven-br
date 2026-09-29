@@ -283,6 +283,12 @@ Confirmação após o prazo, pagamento ou divergência no encerramento viram REV
 registrados e auditados, sem Pro, sem estorno/cancelamento automático.
 
 Asaas adapter não registra bodies/segredos. Cartão usa Checkout RECURRENT/MONTHLY
+implementado, mas temporariamente desabilitado no lançamento PIX-only. A fonte única
+é `ENABLED_PAYMENT_METHODS = ("PIX",)` em `app/domain/billing.py`; a API informa os
+métodos à Central PRO e recusa cartão antes de criar recursos locais/remotos.
+Para reativar, validar o checkout real e adicionar `"CREDIT_CARD"` à tupla; preservar
+integração, imagem e testes internos do cartão. Nenhum histórico é removido.
+O checkout de cartão preservado é
 hospedado HTTPS, associado ao cliente do time; PAN/CVV não passam pelo ELEVEN BR.
 Pix usa assinatura mensal com pagamento manual por cobrança, não Pix Automático.
 Callback é somente navegação. PAYMENT_CONFIRMED/RECEIVED e consulta canônica no

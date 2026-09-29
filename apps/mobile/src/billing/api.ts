@@ -2,6 +2,7 @@ import { authenticated } from '../auth/api';
 
 export type Billing = {
   command_id: string;
+  available_payment_methods: ('PIX' | 'CREDIT_CARD')[];
   plan: 'free' | 'pro'; plan_code: string; status: string; price: string;
   expires_at: string | null; started_at: string | null; can_manage: boolean;
   can_cancel: boolean; cancel_requested: boolean; method: string | null;
