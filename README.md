@@ -1154,10 +1154,15 @@ Os testes usam exclusivamente schemas temporários em banco `_test`.
 
 ## Assinatura ELEVEN PRO — Asaas
 
-**Mais → ELEVEN PRO** (também pelo CTA da Escalação): Free R$ 0 ou Pro R$ 30/mês
+**Perfil do time → Conhecer o PRO/Gerenciar assinatura**, **Mais → ELEVEN PRO**
+e o CTA da Escalação abrem a mesma Central: Free R$ 0 ou Pro R$ 30/mês
 por time. Somente o Presidente contrata e cancela. Pix gera uma cobrança mensal
 manual com QR Code/copia e cola; cartão abre o checkout recorrente HTTPS do Asaas.
 O app não captura cartão/CVV. O retorno ao site não comprova pagamento.
+Admin e jogador consultam plano e benefícios; só o Presidente vê contratação,
+pagamento e cancelamento. Ao reabrir uma contratação existente, a Central retoma
+QR Code/link por uma atualização autorizada, sem criar cobrança nem usar polling.
+Pix mostra valor, vencimento e validade do código quando retornados pelo backend.
 
 Configuração **somente backend**, no `.env` não versionado:
 

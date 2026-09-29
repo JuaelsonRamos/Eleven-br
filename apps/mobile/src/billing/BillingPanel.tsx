@@ -9,6 +9,12 @@ import { theme } from '../theme';
 import * as api from './api';
 
 const statuses: Record<string, string> = { FREE: 'Plano gratuito', PENDING: 'Aguardando pagamento', ACTIVE: 'Assinatura ativa', OVERDUE: 'Pagamento pendente', CANCELLED: 'Assinatura cancelada', SUSPENDED: 'Recursos Pro suspensos', ADMIN_GRANTED: 'Pro administrativo' };
+const money = (value: string) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function when(value: string) {
+  // Preserve the provider's local calendar date instead of converting midnight to yesterday.
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}${match[4] ? ` às ${match[4]}` : ''}` : value;
+}
 export function BillingPanel({ teamId }: { teamId: string }) {
   const { profile } = useAuth();
   const { selected, reload } = useTeams();
@@ -18,7 +24,25 @@ export function BillingPanel({ teamId }: { teamId: string }) {
   const [name, setName] = useState(profile?.display_name ?? ''), [email, setEmail] = useState(profile?.email ?? ''), [document, setDocument] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const alive = useRef(true), lock = useRef(false), command = useRef('');
-  useEffect(() => { alive.current = true; void api.getBilling(teamId).then(value => { if (alive.current) setData(value); }).catch(cause => { if (alive.current) setError(cause.message); }); return () => { alive.current = false; }; }, [teamId]);
+  useEffect(() => {
+    alive.current = true;
+    async function load() {
+      try {
+        const value = await api.getBilling(teamId);
+        if (!alive.current) return;
+        setData(value);
+        // Resume an existing payment once on entry; never create another checkout or poll.
+        if (value.can_manage && value.can_cancel) {
+          lock.current = true; setBusy(true);
+          const payment = await api.refreshBilling(teamId);
+          if (alive.current) setData(payment);
+        }
+      } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar a assinatura.'); }
+      finally { lock.current = false; if (alive.current) setBusy(false); }
+    }
+    void load();
+    return () => { alive.current = false; };
+  }, [teamId]);
   async function run(action: () => Promise<api.Billing>) {
     if (lock.current) return; lock.current = true; setBusy(true); setError(null); setNotice(null);
     try { const value = await action(); if (alive.current) { setData(value); setForm(false); setCancel(false); if (selected?.id === teamId && selected.plan !== value.plan) void reload(); } }
@@ -29,32 +53,35 @@ export function BillingPanel({ teamId }: { teamId: string }) {
   return <View style={s.stack}>
     <Text style={s.title}>ELEVEN PRO</Text>
     <Card><Badge label={data.plan === 'pro' ? 'ELEVEN PRO ATIVO' : 'FREE'} />
-      <Text style={s.title}>R$ 30<Text style={s.body}> / mês por time</Text></Text>
+      <Text style={s.title}>{money(data.price)}<Text style={s.body}> / mês por time</Text></Text>
       <Text style={s.body}>{statuses[data.status] ?? data.status}</Text>
-      {data.expires_at && <Text style={s.note}>Período pago até {data.expires_at.slice(0, 10).split('-').reverse().join('/')}</Text>}
-      {data.next_due_date && <Text style={s.note}>Próxima cobrança: {data.next_due_date.split('-').reverse().join('/')}</Text>}
+      {data.expires_at && <Text style={s.note}>{data.status === 'ADMIN_GRANTED' ? 'Concessão válida até' : 'Período pago até'} {when(data.expires_at)}</Text>}
+      {data.next_due_date && <Text style={s.note}>Próxima cobrança: {when(data.next_due_date)}</Text>}
       <Text style={s.body}>Escalações visuais · Até 100 jogadores ativos · Até 5 administradores com permissões por área</Text>
       <Text style={s.note}>Free · R$ 0. Até 24 jogadores e administração pelo Presidente.</Text>
     </Card>
     <FormError message={error} />
     {(data.warning || data.notice || notice) && <Text accessibilityRole="alert" style={s.body}>{data.warning || data.notice || notice}</Text>}
-    {!data.can_manage ? <Text style={s.note}>Somente o Presidente pode contratar ou cancelar o Pro deste time.</Text> : <>
+    {!data.can_manage ? <><Text style={s.note}>Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.</Text><SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /></> : <>
       {data.status !== 'ADMIN_GRANTED' && !data.can_cancel && !form && <Button label="ASSINAR ELEVEN PRO" onPress={() => { command.current = data.command_id; setForm(true); }} disabled={busy} />}
       {form && <Card><Text style={s.heading}>Como deseja pagar?</Text>
         <View style={s.row}><FilterChip label="PIX" selected={method === 'PIX'} onPress={() => setMethod('PIX')} disabled={busy} /><FilterChip label="Cartão de crédito" selected={method === 'CREDIT_CARD'} onPress={() => setMethod('CREDIT_CARD')} disabled={busy} /></View>
         <Field label="Nome do responsável pelo pagamento" value={name} onChangeText={setName} editable={!busy} />
         <Field label="E-mail de cobrança" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" editable={!busy} />
         <Field label="CPF ou CNPJ do pagador" value={document} onChangeText={value => setDocument(value.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={14} editable={!busy} />
-        <Text style={s.note}>{method === 'PIX' ? 'Uma cobrança Pix de R$ 30 será gerada a cada mês. Você paga manualmente; não há débito automático.' : 'Assinatura mensal de R$ 30. Você informará o cartão na página segura do Asaas, responsável pelas cobranças recorrentes.'}</Text>
+        <Text style={s.note}>{method === 'PIX' ? `Uma cobrança Pix de ${money(data.price)} será gerada a cada mês. Você paga manualmente; não há débito automático.` : `Assinatura mensal de ${money(data.price)}. Você informará o cartão na página segura do Asaas, responsável pelas cobranças recorrentes.`}</Text>
         <Button label={method === 'PIX' ? 'Confirmar assinatura e gerar Pix' : 'Confirmar e continuar no Asaas'} disabled={busy || !name.trim() || !email.trim() || ![11, 14].includes(document.length)} onPress={() => void run(() => api.checkout(teamId, { command_id: command.current, method, name, email, cpf_cnpj: document }))} />
         <SecondaryButton label="Voltar" disabled={busy} onPress={() => setForm(false)} />
       </Card>}
-      {data.pix && <Card><Text style={s.heading}>Pix · R$ {data.pix.amount.replace('.', ',')}</Text><Text style={s.body}>Aguardando pagamento</Text>
-        <Image source={{ uri: `data:image/png;base64,${data.pix.image}` }} style={s.qr} accessibilityLabel="QR Code Pix da assinatura" />
-        <Text selectable style={s.code}>{data.pix.payload}</Text>
-        <Button label="Copiar código Pix" onPress={() => { void Clipboard.setStringAsync(data.pix!.payload).then(() => setNotice('Código Pix copiado.')).catch(() => setError('Selecione o código e copie manualmente.')); }} />
+      {data.pix && <Card><Text style={s.heading}>Pix · {money(data.pix.amount)}</Text><Text style={s.body}>Aguardando pagamento</Text>
+        {data.next_due_date && <Text style={s.note}>Vencimento: {when(data.next_due_date)}</Text>}
+        {data.pix.expires_at && <Text style={s.note}>Código válido até {when(data.pix.expires_at)}</Text>}
+        {data.pix.image && <Image source={{ uri: `data:image/png;base64,${data.pix.image}` }} style={s.qr} accessibilityLabel="QR Code Pix da assinatura" />}
+        {data.pix.payload && <><Text selectable style={s.code}>{data.pix.payload}</Text>
+        <Button label="Copiar código Pix" onPress={() => { void Clipboard.setStringAsync(data.pix!.payload!).then(() => { if (alive.current) setNotice('Código Pix copiado.'); }).catch(() => { if (alive.current) setError('Selecione o código e copie manualmente.'); }); }} /></>}
       </Card>}
       {data.checkout_url && <Button label="Abrir pagamento seguro no Asaas" disabled={busy} onPress={() => { void Linking.openURL(data.checkout_url!).catch(() => setError('Não foi possível abrir o Asaas.')); }} />}
+      {(data.checkout_url || data.pix) && <Text style={s.note}>Após pagar, volte ao ELEVEN BR e atualize a assinatura. O Pro será liberado somente após a confirmação do pagamento pelo backend.</Text>}
       <SecondaryButton label="Atualizar assinatura" disabled={busy} onPress={() => void run(() => api.refreshBilling(teamId))} />
       {data.can_cancel && !cancel && <SecondaryButton label="Cancelar assinatura" disabled={busy} onPress={() => setCancel(true)} />}
       {cancel && <Card><Text style={s.heading}>Cancelar a assinatura?</Text><Text style={s.body}>Novas cobranças serão interrompidas. Seu time mantém o Pro até o fim do período já pago. Seus dados e histórico serão preservados.</Text>

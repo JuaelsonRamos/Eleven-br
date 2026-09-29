@@ -7,7 +7,7 @@ export type Billing = {
   can_cancel: boolean; cancel_requested: boolean; method: string | null;
   operation_status: string | null; warning: string | null; notice?: string;
   next_due_date?: string | null; checkout_url?: string;
-  pix?: { image: string; payload: string; expires_at: string; amount: string };
+  pix?: { image: string | null; payload: string | null; expires_at: string | null; amount: string };
 };
 const path = (teamId: string) => `/v1/teams/${teamId}/billing`;
 export const getBilling = (teamId: string) => authenticated<Billing>(path(teamId));

@@ -54,6 +54,12 @@ export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParam
               onCancel={() => setMode(mode === 'edit' ? 'detail' : 'list')} /> :
             !list && selected ? <>
               <Card><TeamSummary team={selected} detail /></Card>
+              <Card>
+                <Text style={styles.note}>Plano atual</Text>
+                <Badge label={selected.plan === 'pro' ? 'ELEVEN BR PRO' : 'FREE'} />
+                <Text style={styles.note}>{selected.plan === 'pro' ? 'Consulte os benefícios e o estado da assinatura do seu time.' : 'Desbloqueie todos os recursos do seu time com o ELEVEN BR PRO.'}</Text>
+                <Button label={selected.plan === 'pro' ? selected.my_role === 'president' ? 'Gerenciar assinatura' : 'Ver plano PRO' : 'Conhecer o PRO'} onPress={() => navigation.navigate('ELEVEN PRO')} />
+              </Card>
               <InviteCode key={selected.id} code={selected.code} name={selected.name} />
               <Badge label="TIME SELECIONADO" />
               <Button label="Início do time" onPress={() => navigation.navigate('Início')} />

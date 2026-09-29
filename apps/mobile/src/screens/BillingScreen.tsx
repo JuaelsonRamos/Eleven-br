@@ -16,7 +16,7 @@ export function BillingScreen({ navigation }: BottomTabScreenProps<TabParams>) {
   const { selected, loading, error, reload } = useTeams();
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-    <ScrollView ref={scroll} contentContainerStyle={styles.scroll}><View style={styles.container}>
+    <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
       <AppHeader />
       {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="pro-overview" label="Como funciona o ELEVEN PRO?" /><BillingPanel teamId={selected.id} /></View> : <>
         <EmptyState title="Selecione seu time" description="Abra um time para consultar o plano e a assinatura ELEVEN PRO." />
