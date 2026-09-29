@@ -6,7 +6,8 @@ O projeto entrega a fundação, cadastro, verificação de contato, login, sess�
 perfil inicial, gestão básica de times, elenco e eventos com confirmação de presença.
 As áreas pessoais e do time ficam na área autenticada. Inclui formação de equipes e partidas
 com placar por pelada, estatísticas internas e entrada por código com aprovação e
-vinculação ao elenco, mensalidades e caixa interno. Não inclui integração de pagamentos.
+vinculação ao elenco, mensalidades e caixa interno. A assinatura ELEVEN PRO do time usa
+o Asaas (Sandbox); mensalidades e caixa dos jogadores continuam internos, sem gateway.
 
 ## Arquitetura
 
@@ -41,7 +42,8 @@ vínculo garante exatamente um Presidente pertencente ao próprio time. A checag
 é adiada até o commit para permitir a criação atômica do time e do primeiro vínculo.
 Presidente é derivado dessa referência, sem um segundo campo de função que possa divergir.
 O elenco permite inativar membros, preservando o vínculo; Presidente não pode ser
-inativado nesse fluxo. Transferência de Presidência permanece fora do escopo.
+inativado nesse fluxo. A transferência de Presidência troca essa mesma referência
+(ver **Tela inicial, Aprenda a usar e papéis do time**).
 
 O plano está no time. `domain/policies.py` centraliza 24/100 jogadores ativos e
 0/5 administradores adicionais para Free/Pro. Permissões de administradores são
@@ -53,8 +55,8 @@ aplicam os limites de plano da camada de aplicação.
 
 Os routers são finos; regras ficam na aplicação/domínio. Consultas usam sessões
 SQLAlchemy explícitas, sem camada genérica de repositórios. Não há carga automática
-de dados fictícios. Preferências de notificação e assinaturas
-com cobrança foram adiadas por não serem necessárias à fundação.
+de dados fictícios. Preferências de notificação foram adiadas; a assinatura com
+cobrança está descrita em **Assinatura ELEVEN PRO — Asaas**.
 
 ## Instalação e configuração no Windows
 
@@ -607,8 +609,9 @@ as linhas anteriores e preservou o Tabajara FC. Validação em aparelhos físico
 **Meus Times → Abrir time → Início do time**. O Início mostra escudo, nome,
 cidade/UF, plano e atalhos para Jogos, Elenco e Perfil do time, além de **Trocar time**.
 Com time selecionado, a barra inferior contém **Início | Jogos | Elenco | Mais**.
-**Mais** reúne Meus Times/Trocar time, Notificações e Perfil pessoal. Sem time,
-as abas pessoais dão acesso à criação; convites/entrada em novos times seguem fora do escopo.
+**Mais** reúne Meus Times/Trocar time, Notificações, ELEVEN PRO (com time selecionado),
+Perfil pessoal e **Aprenda a usar**. Sem time, as abas pessoais dão acesso à criação e à
+entrada por código.
 
 Jogos, detalhes/formulário de evento e todas as telas de Elenco mantêm cabeçalho
 compacto do time. Nenhum formulário pede nova seleção: o `team_id` vem exclusivamente
@@ -1138,8 +1141,8 @@ Aceitar/recusar continuam nas solicitações existentes, com notificação e aud
 (7) e Futsal (5), com evento/jogo opcional. Membros consultam; a API bloqueia Free.
 Selecionar jogador fora da posição sugerida é permitido, duplicá-lo na escalação não.
 Trocar formação mantém posições compatíveis e avisa sobre jogadores sem novo lugar.
-O recurso não altera o sorteio da pelada. “Conhecer o Pro” é informativo; contratação
-e cobrança de assinatura ainda não existem.
+O recurso não altera o sorteio da pelada. “Conhecer o Pro” abre a Central ELEVEN PRO,
+cuja contratação está descrita em **Assinatura ELEVEN PRO — Asaas**.
 
 A abertura do app mostra contadores reais, sem dados privados, via
 `GET /v1/public/platform-stats`: times ativos e identidades Player, sem duplicar quem
@@ -1149,12 +1152,171 @@ Validação em `apps/api`: `uv run pytest -q tests/test_launch_essentials.py`;
 com Expo Web em 8081: `uv run --with playwright pytest -q tests/browser_launch_flow.py`.
 Os testes usam exclusivamente schemas temporários em banco `_test`.
 
+## Assinatura ELEVEN PRO — Asaas
+
+**Mais → ELEVEN PRO** (também pelo CTA da Escalação): Free R$ 0 ou Pro R$ 30/mês
+por time. Somente o Presidente contrata e cancela. Pix gera uma cobrança mensal
+manual com QR Code/copia e cola; cartão abre o checkout recorrente HTTPS do Asaas.
+O app não captura cartão/CVV. O retorno ao site não comprova pagamento.
+
+Configuração **somente backend**, no `.env` não versionado:
+
+```dotenv
+ASAAS_ENV=sandbox
+ASAAS_API_KEY=
+ASAAS_WEBHOOK_TOKEN=
+ASAAS_BASE_URL=https://api-sandbox.asaas.com/v3
+BILLING_RETURN_URL=https://elevenbr.com.br
+```
+
+Token de webhook aleatório com pelo menos 32 caracteres, diferente da API Key.
+Produção futura usa `ASAAS_ENV=production`, `APP_ENV=production` e
+`https://api.asaas.com/v3`; não reutilize referências de Sandbox. Credenciais nunca
+usam prefixo EXPO_PUBLIC. A chave Sandbox deve ser configurada pelo responsável.
+
+Endpoints autenticados sob `/v1/teams/{team_id}/billing`:
+
+- GET vazio: plano efetivo, status, validade e permissão; acessível aos membros ativos.
+- POST `/checkout`: command_id, PIX/CREDIT_CARD, nome, e-mail, CPF/CNPJ do pagador
+  e confirm=true. Dados do pagador vão ao Asaas, sem persistir CPF na conta ELEVEN.
+- POST `/refresh`: conciliação manual, QR Code/link quando aplicável; sem polling automático.
+- POST `/cancel`: confirm=true; interrompe recorrência e preserva período pago.
+
+No painel Sandbox configure webhook HTTPS apontando ao backend de validação em
+`/v1/billing/asaas/webhook`, com `authToken` igual a ASAAS_WEBHOOK_TOKEN e entrega
+sequencial. O backend local precisa de uma URL HTTPS alcançável pelo Asaas; este
+Prompt não publica na VPS nem cria um túnel automaticamente. Habilite:
+
+- PAYMENT_CREATED, PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE,
+  PAYMENT_REFUNDED, PAYMENT_DELETED, PAYMENT_UPDATED, PAYMENT_RESTORED,
+  PAYMENT_REFUND_IN_PROGRESS, PAYMENT_CHARGEBACK_REQUESTED,
+  PAYMENT_CHARGEBACK_DISPUTE, PAYMENT_AWAITING_CHARGEBACK_REVERSAL;
+- SUBSCRIPTION_CREATED, SUBSCRIPTION_UPDATED, SUBSCRIPTION_INACTIVATED,
+  SUBSCRIPTION_DELETED;
+- CHECKOUT_CREATED, CHECKOUT_PAID, CHECKOUT_CANCELED, CHECKOUT_EXPIRED.
+
+Ativação depende de PAYMENT_CONFIRMED/RECEIVED e validação do pagamento atual no
+Asaas. PAYMENT_CREATED e o callback não concedem Pro. Períodos seguem vencimento
+mensal calendário; tolerância de três dias mantém apenas Pro anteriormente pago.
+Cancelamento mantém o período pago, sem tolerância adicional. Estorno/chargeback
+invalidam aquela cobertura; dados esportivos/financeiros nunca são apagados.
+O relógio do backend bloqueia recursos vencidos mesmo sem webhook ou scheduler.
+Transições observadas na Central Pro também são auditadas; não há job de suspensão.
+
+Migration aditiva **0014_billing_asaas** cria cinco tabelas: team_billing,
+billing_subscriptions, billing_payments, billing_webhooks e billing_audit.
+Estados FREE/PENDING/ACTIVE/OVERDUE/CANCELLED/SUSPENDED/ADMIN_GRANTED são derivados
+das referências, concessão e períodos, evitando status de acesso desatualizado.
+Team.plan legado permanece intacto e só serve de fallback sem registro comercial.
+
+Nenhuma chamada ao Asaas ocorre com transação ou lock do time abertos: o lock protege
+apenas transições curtas no banco. A criação grava a intenção (cliente/assinatura) e
+somente a requisição que a reivindicou faz o POST; duplo clique ou retry concorrente
+reutiliza a mesma intenção. Após um timeout, repetir a ação concilia por referência,
+sem emitir outra assinatura; sem prova do resultado, permanece em conciliação.
+Erros explícitos de validação permitem corrigir o formulário. Webhooks consultam o
+pagamento atual antes da transação curta, deduplicam por ID e aplicam observações
+em ordem de consulta, para que sucesso antigo não desfaça estorno/chargeback.
+Indisponibilidade devolve erro para retry do Asaas, sem efeitos locais. Dados que
+contradizem as referências locais (valor, cliente ou assinatura) ficam registrados
+como `DIVERGENT`, sem efeitos, auditados e confirmados após o commit, para não travar
+a fila sequencial; a conciliação abaixo os reprocessa.
+
+Concessão interna auditada, por UUID (não executar para demonstração no banco real):
+
+```powershell
+# Em apps/api, operador com acesso administrativo ao ambiente:
+uv run python -m app.billing_admin <team-uuid> grant --operator <operador> --reason <motivo>
+# revoke remove a concessão; --expires-at aceita ISO com timezone, omitido é permanente.
+```
+
+Uma recorrência existente deve ser cancelada antes da concessão sem cobrança.
+Não há exceção por nome de time, nem endpoint público de concessão.
+
+Conciliação auditada, sem SQL manual, pelo mesmo comando interno:
+
+```powershell
+uv run python -m app.billing_admin <team-uuid> reconcile --operator <operador> --reason <motivo>
+```
+
+O comando consulta o Asaas e:
+
+- vincula cliente/assinatura comprovados pela referência externa;
+- libera tentativas sem recurso no Asaas só após 15 minutos (cliente/Pix) ou 2 horas
+  (checkout de cartão), quando nenhuma requisição pode estar em andamento;
+- interrompe no Asaas a recorrência de assinatura já cancelada no ELEVEN BR;
+- atualiza status de cobranças em ordem de observação;
+- reprocessa eventos `DIVERGENT` com as regras do webhook.
+
+Não cria cobranças nem concede Pro: a cobertura continua exigindo
+PAYMENT_CONFIRMED/RECEIVED. O relatório indica o que exige ação no painel do Asaas.
+
+Testes isolados: `uv run pytest -q tests/test_billing.py`; Expo em 8081:
+`uv run --with playwright pytest -q tests/browser_billing_flow.py`. Provedor simulado
+nesses testes; validação real exige credenciais Sandbox e webhook HTTPS acessível.
+Sem Pix Automático, boleto, gateway para mensalidades dos jogadores ou cobrança real
+de produção. Bundles não equivalem a execução em aparelhos nativos.
+
+Referências oficiais: [assinaturas](https://docs.asaas.com/docs/assinaturas),
+[checkout recorrente](https://docs.asaas.com/docs/checkout-com-assinatura-recorrente),
+[eventos financeiros](https://docs.asaas.com/docs/webhook-para-cobrancas).
+
+## Tela inicial, Aprenda a usar e papéis do time
+
+**Tela pública.** Segue a referência visual aprovada: fundo claro, título verde, os
+indicadores reais de `GET /v1/public/platform-stats` (times ativos e jogadores, sem número
+fixo), **Criar minha conta** e **Já tenho conta** nos fluxos existentes e a faixa TIMES ·
+PELADAS · JOGOS · FINANCEIRO. A arte (jogadores de costas no uniforme ELEVEN BR, estádio
+e bola) é um recorte da própria referência em `apps/mobile/assets/landing/players.webp`,
+sem nenhum texto ou botão embutido: textos, indicadores, botões e faixa são componentes.
+O topo usa o logo oficial `apps/mobile/assets/brand/eleven-br-logo.png` (E11, ELEVEN BR e
+slogan; margens brancas recortadas e fundo transparente, cores originais preservadas).
+
+**Aprenda a usar.** Central de ajuda por assuntos (Começando, Elenco, Peladas e eventos,
+Escalação, Jogos, Financeiro e ELEVEN PRO), com busca. Acesso pelo ícone de ajuda no
+cabeçalho de todas as áreas autenticadas e por **Mais → Aprenda a usar**. Atalhos
+contextuais (por exemplo, “Como funciona o Financeiro?”) abrem o tópico direto. O conteúdo
+fica em `apps/mobile/src/help/content.ts` e descreve só o que existe. Cada tópico aceita
+`media` (imagem, GIF, vídeo ou link). O TypeScript recusa atalho ou tópico relacionado
+com ID inexistente.
+
+**Administradores e Presidência.** A estrutura já existia, mas sem caso de uso, endpoint
+ou tela: `TeamMembership.role`, permissões granulares em `membership_permissions`,
+limites de `ENTITLEMENTS` e a FK diferida `Team.president_membership_id`. Os novos fluxos
+reutilizam essa estrutura, sem migration:
+
+| Método | Endpoint | Regra |
+| --- | --- | --- |
+| PUT | `/v1/teams/{team_id}/players/{membership_id}/role` | `role` admin/member, `permissions` e `expected_version` |
+| POST | `/v1/teams/{team_id}/presidency` | `membership_id` e `confirm: true`; devolve o time do solicitante |
+
+- Somente o Presidente atual executa. Grants administrativos não bastam; outro time
+  recebe 404.
+- Administrador precisa estar ativo, ter conta ativa e ter ao menos uma área: Perfil do
+  time, Elenco e solicitações, Jogos, peladas e escalações ou Financeiro.
+- É recurso Pro, com até 5 administradores. No Free o pedido é recusado, mas uma
+  administração preservada de um Pro anterior pode ser removida.
+- A Presidência só pode ir para um membro ativo do próprio time, com conta ativa. A troca
+  ocorre numa única transação, sob o lock do time, e mantém exatamente um Presidente.
+- Nenhum vínculo é apagado ou recriado. O Presidente anterior continua como jogador, e
+  permissões antigas dos dois lados são retiradas, com registro na auditoria.
+- A auditoria em `team_audit` registra `ADMIN_GRANTED`, `ADMIN_PERMISSIONS_CHANGED`,
+  `ADMIN_REVOKED` e `PRESIDENCY_TRANSFERRED`.
+- O elenco mostra a função (Presidente, Administrador ou Jogador) a todo o time. As áreas
+  de cada administrador ficam visíveis só para quem gerencia o elenco.
+
+Testes em `apps/api`: `uv run pytest -q tests/test_team_roles.py`. Com o Expo Web em 8081:
+`uv run --with playwright pytest -q tests/browser_help_roles_flow.py`, com schema `_test`
+e API temporária. Esse fluxo valida a tela pública em 320/375/430/1280 px, a ajuda e a
+troca de papéis.
+
 ## Próxima etapa
 
+Configurar o Sandbox do Asaas (API Key, token e webhook HTTPS) e validar o fluxo real.
 Validar a entrega SMTP no ambiente de publicação e o armazenamento durável de imagens.
 Entregar assets oficiais e validar em Android/iOS reais.
 Unificação de Players com histórico, resolução de fotos conflitantes, integrações
-financeiras e assinaturas continuam fora deste escopo.
+financeiras para os jogadores continuam fora deste escopo.
 
 O `npm audit` identificou 9 alertas moderados na cadeia de ferramentas do Expo
 (`xcode` → `uuid`), sem alertas altos/críticos. A correção automática sugerida

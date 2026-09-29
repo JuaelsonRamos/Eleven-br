@@ -23,8 +23,12 @@ import { StatisticsScreen } from './screens/StatisticsScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { NotificationProvider } from './notifications/NotificationContext';
 
+import { BillingScreen } from './screens/BillingScreen';
+import { HelpScreen } from './screens/HelpScreen';
+
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
+  'ELEVEN PRO': 'star-outline', Ajuda: 'help-circle-outline',
   Início: 'home-outline', Jogos: 'football-outline', Times: 'shield-outline',
   Notificações: 'notifications-outline', Perfil: 'person-outline',
   Elenco: 'people-outline', Mais: 'menu-outline', Estatísticas: 'stats-chart-outline', Financeiro: 'wallet-outline', Escalação: 'football-outline',
@@ -56,6 +60,8 @@ function MainNavigation() {
     <Tab.Screen name="Estatísticas" component={StatisticsScreen} />
     <Tab.Screen name="Financeiro" component={FinanceScreen} />
     <Tab.Screen name="Escalação" component={LineupsScreen} />
+    <Tab.Screen name="ELEVEN PRO" component={BillingScreen} />
+    <Tab.Screen name="Ajuda" component={HelpScreen} />
   </Tab.Navigator>;
 }
 

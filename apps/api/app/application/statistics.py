@@ -8,10 +8,11 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.selectable import CTE
 
+from app.application.billing_access import effective_plan
 from app.application.events import authorize
 from app.application.roster import roster_name
 from app.application.statistic_adjustments import apply_to, sums
-from app.domain.policies import NotFound, Permission, Plan, Role, allows
+from app.domain.policies import NotFound, Permission, Role, allows
 from app.domain.statistics import Period, PersonStatistics, Totals, period_start, ranking
 from app.infrastructure.event_models import Event, EventGuest
 from app.infrastructure.formation_models import FormationParticipant, FormationSquad
@@ -174,7 +175,7 @@ def overview(
     ):
         if player.user_id == user_id and member.status == "active":
             can_manage = allows(
-                Plan(team.plan),
+                effective_plan(session, team),
                 is_president=member.id == team.president_membership_id,
                 role=Role(member.role),
                 grants={Permission.MANAGE_EVENTS} if granted else set(),

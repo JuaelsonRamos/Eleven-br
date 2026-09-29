@@ -464,4 +464,4 @@ def test_0013_preserves_all_original_columns_and_guards_new_data(session, engine
         config.attributes["connection"] = connection
         command.downgrade(config, "0012")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0013"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014"

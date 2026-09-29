@@ -81,3 +81,9 @@ class AdministrationRead(BaseModel):
     plan: Plan
     active_player_limit: int
     administrator_limit: int
+
+
+class PresidencyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    membership_id: UUID
+    confirm: bool = Field(strict=True)

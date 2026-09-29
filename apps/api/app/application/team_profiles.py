@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.application.teams import create_team, require_membership
 from app.domain.policies import Conflict, Permission, Plan, Role, allows
 from app.domain.team_identity import generate_code, normalized
@@ -80,7 +81,9 @@ def membership_context(
     team: Team,
     user_id: UUID,
     permission: Permission = Permission.MANAGE_TEAM,
+    plan: Plan | None = None,
 ) -> tuple[str, bool]:
+    """Pass `plan` when the caller already computed it to avoid repeating billing reads."""
     membership = session.scalars(
         select(TeamMembership)
         .join(Player, Player.id == TeamMembership.player_id)
@@ -101,7 +104,7 @@ def membership_context(
     return (
         "president" if president else membership.role,
         allows(
-            Plan(team.plan),
+            plan or effective_plan(session, team),
             is_president=president,
             role=Role(membership.role),
             grants=grants,

@@ -28,7 +28,7 @@ e o Prompt 15 (recuperação de senha, posições, remoção lógica e escalaç�
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações reúne avisos pessoais. Verificação local é
 simulada com opção explícita; autenticação por e-mail usa SMTP configurável.
-Integrações de cobrança e contratação de assinatura não foram implementadas.
+Assinatura comercial Pro usa Asaas, separada das mensalidades e do caixa dos jogadores.
 
 Times reutilizam a estrutura existente; a migration `0003_team_modalities` converte
 a modalidade anterior em um array PostgreSQL não vazio, preservando o valor.
@@ -251,7 +251,65 @@ posição cadastrada sugere, não restringe. FKs compostas, unicidade de slot/jo
 lock de Team, versão e command_id protegem isolamento, concorrência e retries.
 Posições/status/remoção/escalações geram TeamAudit na mesma transação. Aprovação e
 recusa continuam auditadas por TeamJoinRequest e notificam pelo mecanismo existente.
-Não implementar assinatura, contratação ou cobrança pelo CTA informativo do Pro.
+O CTA do Pro abre a área de assinatura implementada no Prompt 16.
+
+## Assinatura comercial — Prompt 16
+
+Assinatura pertence a Team. Somente o Presidente ativo contrata/cancela; grants
+`manage_team`/`manage_finance` não autorizam essa operação. `billing_access` calcula
+o plano efetivo para todas as capabilities, limites e permissões. Não consultar
+Team.plan diretamente para autorizar: seu valor legado só vale enquanto não há
+TeamBilling. Pro legado é preservado, sem cobrança presumida ou concessão por nome.
+
+Pro mensal custa R$ 30 por time. TeamBilling guarda referência de cliente/ambiente
+e concessão administrativa; BillingSubscription preserva tentativas/contratos;
+BillingPayment guarda períodos financeiros; BillingWebhook deduplica evento do
+provedor; BillingAudit registra decisões. Não misturar com MonthlyDues/CashEntry.
+Estados públicos são derivados dos pagamentos válidos e do relógio, não de um
+booleano local. Vencimento é local de São Paulo, período mensal calendário e fim
+exclusivo. Tolerância de três dias só mantém acesso anteriormente pago; primeira
+cobrança pendente nunca concede Pro. Cancelamento mantém apenas período pago.
+Refund/chargeback retiram a cobertura daquele pagamento, preservando os registros.
+
+Asaas adapter não registra bodies/segredos. Cartão usa Checkout RECURRENT/MONTHLY
+hospedado HTTPS, associado ao cliente do time; PAN/CVV não passam pelo ELEVEN BR.
+Pix usa assinatura mensal com pagamento manual por cobrança, não Pix Automático.
+Callback é somente navegação. PAYMENT_CONFIRMED/RECEIVED e consulta canônica no
+Asaas confirmam a cobertura; PAYMENT_CREATED/CHECKOUT_PAID isolados não ativam Pro.
+Webhooks com token constante validado deduplicam por event_id na mesma transação
+dos efeitos. Falha devolve erro para retry; não confirmar recebimento antes do commit.
+
+Intent persistido antes de POST externo e lock de Team impedem duplo clique/retry
+concorrente. Timeout é ambíguo: conciliar por externalReference/checkout/pagamento,
+nunca repetir cegamente o POST. Rejeição explícita 400 permite corrigir dados.
+Conciliação sem prova segura permanece pendente para suporte. Cancelamento também
+é durável e repetível. Não remover histórico nem dados Pro em downgrade comercial.
+
+`python -m app.billing_admin` é ferramenta interna confiável por UUID, com operador
+e justificativa, nunca endpoint de Presidente. Cancelar recorrência existente antes
+de conceder Pro sem cobrança. Não executar concessão em dados reais para demonstração.
+Sandbox e produção não compartilham referências; desenvolvimento proíbe ambiente
+Asaas production. Não usar credenciais reais nos testes; adapter é simulado em banco
+isolado. Migration 0014 é aditiva; preserve 0001–0013. Sem Pix Automático ou jobs externos.
+
+## Papéis do time, Aprenda a usar e tela inicial
+
+Administradores e Presidência reutilizam `TeamMembership.role`, `membership_permissions`,
+`ENTITLEMENTS`/`ensure_admin_slot` e a FK de Presidência; não criar estrutura paralela.
+`application/team_roles.py` concentra os casos de uso: somente o Presidente atual concede,
+altera ou remove administração e transfere a Presidência (grants nunca bastam).
+Administração exige vínculo ativo, conta ativa, ao menos uma permissão existente e a
+capability Pro `granular_permissions`; no Free só a remoção é aceita. A Presidência vai
+para membro ativo com conta ativa, em transação única sob lock de Team; os dois lados
+ficam `member` sem grants e vínculo, histórico e estatísticas são preservados. Toda
+mudança usa `roster_version` e gera TeamAudit (`ADMIN_*`, `PRESIDENCY_TRANSFERRED`).
+O elenco expõe o papel a todo o time e as permissões somente a quem gerencia membros.
+
+"Aprenda a usar" (`apps/mobile/src/help`) descreve apenas funcionalidades existentes:
+ao alterar um fluxo, atualize o tópico. IDs de tópicos são verificados pelo TypeScript e
+atalhos contextuais abrem o tópico pela rota `Ajuda`. A tela pública usa os contadores
+reais de `platform-stats`; a arte `assets/landing/players.webp` vem da referência aprovada
+e não contém interface; textos, indicadores, botões e faixa continuam componentes.
 
 ## Notificações internas — Prompt 13
 
@@ -425,9 +483,9 @@ fundos verdes/escuros. Paleta oficial:
 Use os tokens de `packages/shared/src/index.ts` e `apps/mobile/src/theme.ts`;
 não espalhe hexadecimais quando já houver token correspondente. Evite aparência
 empresarial, excesso de cores, gradientes, cards, texto, decoração sem função e
-telas burocráticas. O conceito aprovado de logo é o monograma E11; os assets
-oficiais serão fornecidos. Não redesenhar ou substituir a marca por conta própria;
-até lá, use placeholders discretos.
+telas burocráticas. O logo oficial (monograma E11, ELEVEN BR e slogan) está em
+`apps/mobile/assets/brand/eleven-br-logo.png`: use-o sem redesenhar, distorcer ou mudar
+cores. Ícone e splash oficiais ainda serão fornecidos; até lá, não os recrie.
 
 Reutilize componentes quando houver reutilização real, sem duplicação desnecessária
 nem abstrações prematuras. Telas com dados devem considerar loading, vazio, erro,

@@ -17,6 +17,9 @@ export const listTeams = () => authenticated<Team[]>('/v1/teams');
 export const getTeam = (id: string) => authenticated<Team>(`/v1/teams/${encodeURIComponent(id)}`);
 export const getOptions = () => authenticated<Options>('/v1/teams/options');
 export const findSimilar = (data: TeamInput) => authenticated<PublicTeam[]>('/v1/teams/similar', data, 'POST');
+export const transferPresidency = (teamId: string, membershipId: string) => authenticated<Team>(
+  `/v1/teams/${encodeURIComponent(teamId)}/presidency`, { membership_id: membershipId, confirm: true }, 'POST',
+);
 export const saveTeam = (data: TeamInput, id?: string) => authenticated<Team>(
   id ? `/v1/teams/${encodeURIComponent(id)}` : '/v1/teams', data, id ? 'PUT' : 'POST',
 );

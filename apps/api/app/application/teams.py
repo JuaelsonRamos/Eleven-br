@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.domain.policies import (
     ENTITLEMENTS,
     Conflict,
@@ -117,10 +118,12 @@ def active_count(session: Session, team_id: UUID) -> int:
 
 def ensure_active_slot(session: Session, team: Team) -> None:
     """Caller must hold the team row lock before checking capacity and writing."""
-    limit = ENTITLEMENTS[Plan(team.plan)].active_players
+    plan = effective_plan(session, team)
+    limit = ENTITLEMENTS[plan].active_players
     if active_count(session, team.id) >= limit:
         raise Conflict(
-            f"Seu time atingiu o limite de {limit} jogadores ativos do plano {team.plan.title()}. "
+            f"Seu time atingiu o limite de {limit} jogadores ativos do plano "
+            f"{plan.value.title()}. "
             "Inative um jogador para liberar uma vaga."
         )
 
@@ -140,7 +143,7 @@ def ensure_admin_slot(session: Session, team: Team) -> None:
         )
         or 0
     )
-    if admins >= ENTITLEMENTS[Plan(team.plan)].administrators:
+    if admins >= ENTITLEMENTS[effective_plan(session, team)].administrators:
         raise Conflict("Limite de administradores do plano atingido")
 
 
@@ -182,7 +185,7 @@ def require_membership(
             )
         )
         if not allows(
-            Plan(team.plan),
+            effective_plan(session, team),
             is_president=team.president_membership_id == membership.id,
             role=Role(membership.role),
             grants=grants,

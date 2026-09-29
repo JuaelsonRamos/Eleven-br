@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
 import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
 import { TeamHeading } from '../teams/TeamHeading';
+import { HelpShortcut } from '../help/HelpShortcut';
 import { StatisticsPanel } from '../statistics/StatisticsPanel';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
@@ -18,7 +19,7 @@ export function StatisticsScreen({ navigation }: BottomTabScreenProps<TabParams>
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <ScrollView ref={scroll} contentContainerStyle={styles.scroll}><View style={styles.container}>
       <AppHeader />
-      {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><StatisticsPanel teamId={selected.id} onGames={() => navigation.navigate('Jogos')} onNavigate={onNavigate} /></View> : <>
+      {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="match-stats" label="Como as estatísticas são calculadas?" /><StatisticsPanel teamId={selected.id} onGames={() => navigation.navigate('Jogos')} onNavigate={onNavigate} /></View> : <>
         <EmptyState title="Selecione seu time" description="Abra um time para consultar suas estatísticas." />
         <Button label="Meus times" onPress={() => navigation.navigate('Times')} />
       </>}

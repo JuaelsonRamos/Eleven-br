@@ -1,6 +1,7 @@
-import { useState, type PropsWithChildren } from 'react';
+import { useContext, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { NavigationContext, NavigationRouteContext } from '@react-navigation/native';
 import { brand } from '@eleven/shared';
 import { theme } from '../theme';
 import { imageUrl } from '../images/api';
@@ -10,12 +11,15 @@ export { SectionHeader, StatCard, StatusBadge, FilterChip, IconButton, ListItem,
 
 export function AppHeader({ onProfile, onNotifications }: { onProfile?: () => void; onNotifications?: () => void } = {}) {
   const { profile } = useAuth();
+  // Authenticated screens live inside the navigator; public auth screens have no help route.
+  const navigation = useContext(NavigationContext);
+  const route = useContext(NavigationRouteContext);
   return <View style={styles.header}>
     <View>
       <Text accessibilityRole="header" style={styles.brand}>{brand.name}</Text>
       <Text style={styles.slogan}>{brand.slogan}</Text>
     </View>
-    <View style={styles.headerActions}>{onNotifications && <IconButton label="Notificações" icon="notifications-outline" onPress={onNotifications} />}{onProfile ? <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={onProfile} style={({ pressed }) => [styles.headerMark, pressed && styles.dimmed]}><Avatar name={profile?.display_name || 'Jogador'} photoUrl={profile?.photo_url} /></Pressable> : profile?.photo_url ? <Avatar name={profile.display_name || 'Jogador'} photoUrl={profile.photo_url} /> : <View accessible accessibilityLabel="Futebol brasileiro" style={styles.headerMark}>
+    <View style={styles.headerActions}>{navigation && route?.name !== 'Ajuda' && <IconButton label="Aprenda a usar o ELEVEN BR" icon="help-circle-outline" onPress={() => navigation.navigate('Ajuda')} />}{onNotifications &&<IconButton label="Notificações" icon="notifications-outline" onPress={onNotifications} />}{onProfile ? <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={onProfile} style={({ pressed }) => [styles.headerMark, pressed && styles.dimmed]}><Avatar name={profile?.display_name || 'Jogador'} photoUrl={profile?.photo_url} /></Pressable> : profile?.photo_url ? <Avatar name={profile.display_name || 'Jogador'} photoUrl={profile.photo_url} /> : <View accessible accessibilityLabel="Futebol brasileiro" style={styles.headerMark}>
       <Ionicons name="football-outline" size={26} color={theme.colors.green} />
     </View>}</View>
   </View>;

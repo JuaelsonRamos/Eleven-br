@@ -3,12 +3,14 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.application import roster
+from app.application import roster, team_roles
+from app.domain.policies import Role
 from app.domain.positions import POSITIONS
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.roster_schemas import (
     PositionInput,
     RemoveInput,
+    RoleInput,
     RosterCreate,
     RosterPage,
     RosterRead,
@@ -38,6 +40,23 @@ def set_positions(
             list(data.positions),
             data.primary_position,
             data.expected_version,
+        )
+    )
+
+
+@router.put("/{membership_id}/role", response_model=RosterRead)
+def set_role(
+    team_id: UUID, membership_id: UUID, data: RoleInput, session: SessionDep, user: CurrentUser
+) -> RosterRead:
+    return RosterRead.model_validate(
+        team_roles.set_role(
+            session,
+            user.id,
+            team_id,
+            membership_id,
+            role=Role(data.role),
+            permissions=frozenset(data.permissions),
+            version=data.expected_version,
         )
     )
 

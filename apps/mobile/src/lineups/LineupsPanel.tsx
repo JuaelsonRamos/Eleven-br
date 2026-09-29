@@ -8,10 +8,10 @@ import { theme } from '../theme';
 import * as api from './api';
 
 const modalities: Record<string, string> = { campo: 'Campo', society: 'Society', futsal: 'Futsal' };
-export function LineupsPanel({ teamId }: { teamId: string }) {
+export function LineupsPanel({ teamId, onPro }: { teamId: string; onPro: () => void }) {
   const [page, setPage] = useState<api.Page | null>(null), [roster, setRoster] = useState<RosterPerson[]>([]), [events, setEvents] = useState<SportEvent[]>([]);
   const [draft, setDraft] = useState<api.Lineup | null>(null), [slot, setSlot] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [plans, setPlans] = useState(false);
+  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null);
   const lock = useRef(false), alive = useRef(true);
   async function load() {
@@ -56,8 +56,7 @@ export function LineupsPanel({ teamId }: { teamId: string }) {
     {loading ? <LoadingState /> : !page ? <Button label="Tentar novamente" onPress={() => void load()} /> : !page.enabled ? <Card>
       <Badge label="ELEVEN BR PRO" /><Text style={s.heading}>Escalação é um recurso ELEVEN BR PRO.</Text>
       <Text style={s.note}>Monte seu time no campo e salve suas formações.</Text>
-      <Button label="Conhecer o Pro" onPress={() => setPlans(true)} />
-      {plans && <Text style={s.note}>A contratação do Pro estará disponível em breve. Nenhuma cobrança foi realizada.</Text>}
+      <Button label="Conhecer o Pro" onPress={onPro} />
     </Card> : !draft ? <>
       {page.can_manage && <Button label="Nova escalação" onPress={create} disabled={busy} />}
       {!page.items.length && <EmptyState title="Seu campo está livre" description="As escalações salvas do time aparecerão aqui." icon="football-outline" />}

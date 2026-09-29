@@ -200,7 +200,8 @@ def test_guest_same_name_across_events_and_constant_query_count(session, engine)
         data = get(client, root)
     finally:
         sql_event.remove(engine, "before_cursor_execute", count)
-    assert len(statements) <= 10
+    # Constant budget; +1 since Prompt 16: permissions read the effective plan (billing_access).
+    assert len(statements) <= 11
     guests = [p for p in data["scorers"] if p["name"] == "João"]
     assert {p["id"] for p in guests} == set(ids)
     assert [p["totals"]["goals"] for p in guests] == [1, 1]

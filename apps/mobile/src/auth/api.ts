@@ -29,7 +29,7 @@ export function setExpiryHandler(handler: () => void) { onExpired = handler; }
 async function request<T>(path: string, body?: unknown, token?: string | null, method = 'POST'): Promise<T> {
   const multipart = body instanceof FormData;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), multipart ? 60000 : 15000);
+  const timeout = setTimeout(() => controller.abort(), path.includes('/billing/') ? 120000 : multipart ? 60000 : 15000);
   try {
     const response = await fetch(`${API_URL}${path}`, {
       method, signal: controller.signal, credentials: web ? 'include' : 'omit',

@@ -6,11 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.application.events import authorize, find_event
 from app.application.team_audit import record
 from app.application.team_profiles import membership_context
 from app.domain.lineups import TEMPLATES
-from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission, Plan
+from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission
 from app.domain.team_identity import Modality
 from app.infrastructure.launch_models import Lineup, LineupPosition
 from app.infrastructure.models import Team, TeamMembership
@@ -33,8 +34,8 @@ class LineupInput(BaseModel):
     command_id: UUID
 
 
-def require_pro(team: Team) -> None:
-    if not ENTITLEMENTS[Plan(team.plan)].lineups:
+def require_pro(session: Session, team: Team) -> None:
+    if not ENTITLEMENTS[effective_plan(session, team)].lineups:
         raise Forbidden("Escalação é um recurso ELEVEN BR PRO.")
 
 
@@ -61,8 +62,9 @@ def list_items(
     session: Session, user_id: UUID, team_id: UUID, offset: int = 0
 ) -> dict[str, object]:
     team = authorize(session, user_id, team_id)
-    enabled = ENTITLEMENTS[Plan(team.plan)].lineups
-    manage = membership_context(session, team, user_id, Permission.MANAGE_EVENTS)[1]
+    plan = effective_plan(session, team)
+    enabled = ENTITLEMENTS[plan].lineups
+    manage = membership_context(session, team, user_id, Permission.MANAGE_EVENTS, plan)[1]
     items = (
         list(
             session.scalars(
@@ -96,7 +98,7 @@ def list_items(
 
 def detail(session: Session, user_id: UUID, team_id: UUID, lineup_id: UUID) -> dict[str, object]:
     team = authorize(session, user_id, team_id, write=True)
-    require_pro(team)
+    require_pro(session, team)
     item = session.scalar(select(Lineup).where(Lineup.id == lineup_id, Lineup.team_id == team_id))
     if item is None:
         raise NotFound("Escalação não encontrada.")
@@ -108,7 +110,7 @@ def save(
 ) -> dict[str, object]:
     try:
         team = authorize(session, user_id, team_id, write=True, manage=True)
-        require_pro(team)
+        require_pro(session, team)
         template = TEMPLATES.get(data.modality, {}).get(data.formation)
         if data.modality not in team.modalities or template is None:
             raise Conflict("Escolha uma formação da modalidade do time.")

@@ -1,5 +1,6 @@
 """Team-scoped roster operations. No global player lookup or automatic account linkage."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from uuid import UUID
@@ -7,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.application.team_audit import record
 from app.application.team_profiles import membership_context
 from app.application.teams import (
@@ -15,7 +17,7 @@ from app.application.teams import (
     ensure_admin_slot,
     require_membership,
 )
-from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission, Plan, Role
+from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission, Role
 from app.domain.team_identity import normalized
 from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership
 
@@ -35,6 +37,8 @@ class RosterPerson:
     positions: list[str]
     primary_position: str | None
     roster_version: int
+    role: str
+    permissions: list[str]
 
 
 @dataclass
@@ -45,6 +49,9 @@ class RosterSnapshot:
     active_limit: int
     can_manage: bool
     plan: str
+    can_manage_admins: bool
+    admin_limit: int
+    admin_count: int
 
 
 @dataclass
@@ -79,10 +86,38 @@ def roster_name(membership: TeamMembership, player: Player) -> str:
     return player.display_name if player.user_id else membership.roster_name or player.display_name
 
 
+def member_grants(session: Session, membership_id: UUID) -> list[str]:
+    return sorted(
+        session.scalars(
+            select(MembershipPermission.permission).where(
+                MembershipPermission.membership_id == membership_id
+            )
+        )
+    )
+
+
+def grants_by_member(session: Session, ids: list[UUID]) -> dict[UUID, list[str]]:
+    grants: dict[UUID, list[str]] = {}
+    for membership_id, permission in session.execute(
+        select(MembershipPermission.membership_id, MembershipPermission.permission)
+        .where(MembershipPermission.membership_id.in_(ids))
+        .order_by(MembershipPermission.permission)
+    ):
+        grants.setdefault(membership_id, []).append(permission)
+    return grants
+
+
 def person(
-    team: Team, membership: TeamMembership, player: Player, *, contacts: bool
+    team: Team,
+    membership: TeamMembership,
+    player: Player,
+    *,
+    contacts: bool,
+    grants: Iterable[str] = (),
 ) -> RosterPerson:
+    """Role is public inside the team; grants follow the same visibility as contacts."""
     linked = player.user_id is not None
+    president = membership.id == team.president_membership_id
     return RosterPerson(
         membership.id,
         player.id,
@@ -93,10 +128,12 @@ def person(
         player.photo_url,
         membership.status,
         linked,
-        membership.id == team.president_membership_id,
+        president,
         membership.positions,
         membership.primary_position,
         membership.roster_version,
+        "president" if president else membership.role,
+        sorted(grants) if contacts else [],
     )
 
 
@@ -116,13 +153,18 @@ def member_in_team(
 
 def list_roster(session: Session, *, user_id: UUID, team_id: UUID, status: str) -> RosterSnapshot:
     team = authorized_team(session, user_id, team_id, write=False)
-    _, can_manage = membership_context(session, team, user_id, Permission.MANAGE_MEMBERS)
+    plan = effective_plan(session, team)
+    role, can_manage = membership_context(session, team, user_id, Permission.MANAGE_MEMBERS, plan)
     rows = session.execute(
         select(TeamMembership, Player)
         .join(Player, Player.id == TeamMembership.player_id)
         .where(TeamMembership.team_id == team_id)
     ).all()
-    items = [person(team, member, player, contacts=can_manage) for member, player in rows]
+    grants = grants_by_member(session, [member.id for member, _ in rows]) if can_manage else {}
+    items = [
+        person(team, member, player, contacts=can_manage, grants=grants.get(member.id, ()))
+        for member, player in rows
+    ]
     active = sum(item.status == "active" for item in items)
     return RosterSnapshot(
         sorted(
@@ -135,9 +177,12 @@ def list_roster(session: Session, *, user_id: UUID, team_id: UUID, status: str) 
         ),
         active,
         sum(item.status == "inactive" for item in items),
-        ENTITLEMENTS[Plan(team.plan)].active_players,
+        ENTITLEMENTS[plan].active_players,
         can_manage,
-        team.plan,
+        plan.value,
+        role == "president",
+        ENTITLEMENTS[plan].administrators,
+        sum(item.role == Role.ADMIN.value and item.status == "active" for item in items),
     )
 
 
@@ -147,7 +192,8 @@ def get_person(
     team = authorized_team(session, user_id, team_id, write=False)
     _, can_manage = membership_context(session, team, user_id, Permission.MANAGE_MEMBERS)
     member, player = member_in_team(session, team_id, membership_id)
-    return person(team, member, player, contacts=can_manage)
+    grants = member_grants(session, member.id) if can_manage else []
+    return person(team, member, player, contacts=can_manage, grants=grants)
 
 
 def find_similar(
@@ -233,7 +279,7 @@ def add_player(
     member.roster_name, member.nickname = name, nickname
     member.contact_phone, member.contact_email = phone, email
     session.flush()
-    result = person(team, member, player, contacts=True)
+    result = person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     session.commit()
     return result
 
@@ -266,7 +312,7 @@ def edit_player(
     if "nickname" in updates:
         member.nickname = updates["nickname"]
     session.flush()
-    result = person(team, member, player, contacts=True)
+    result = person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     session.commit()
     return result
 
@@ -303,7 +349,7 @@ def change_status(
             {"status": member.status},
         )
     session.flush()
-    result = person(team, member, player, contacts=True)
+    result = person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     session.commit()
     return result
 
@@ -322,7 +368,7 @@ def positions(
     if member.status == "removed":
         raise Conflict("Este jogador não pertence mais ao elenco.")
     if member.positions == values and member.primary_position == primary:
-        return person(team, member, player, contacts=True)
+        return person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     if member.roster_version != version:
         raise Conflict("O cadastro mudou. Atualize antes de salvar.")
     before: dict[str, object] = {
@@ -341,7 +387,7 @@ def positions(
         {"positions": values, "primary_position": primary},
     )
     session.flush()
-    result = person(team, member, player, contacts=True)
+    result = person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     session.commit()
     return result
 
@@ -356,7 +402,7 @@ def remove(
     if not confirm:
         raise Conflict("Confirme a remoção da equipe.")
     if member.status == "removed":
-        return person(team, member, player, contacts=True)
+        return person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     if member.roster_version != version:
         raise Conflict("O cadastro mudou. Atualize antes de remover.")
     grants = list(
@@ -386,6 +432,6 @@ def remove(
         delete(MembershipPermission).where(MembershipPermission.membership_id == member.id)
     )
     session.flush()
-    result = person(team, member, player, contacts=True)
+    result = person(team, member, player, contacts=True, grants=member_grants(session, member.id))
     session.commit()
     return result

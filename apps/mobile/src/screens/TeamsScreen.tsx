@@ -12,6 +12,7 @@ import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
 import { JoinPanel } from '../join/JoinPanel';
 import { InviteCode } from '../join/InviteCode';
+import { HelpShortcut } from '../help/HelpShortcut';
 
 export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParams, 'Times'>) {
   const { teams, selected, loading, error, warning, reload, select } = useTeams();
@@ -40,6 +41,8 @@ export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParam
         <View style={styles.container}>
           <AppHeader />
           <Text accessibilityRole="header" style={styles.title}>{mode === 'join' ? 'Entrar em um time' : mode === 'create' ? 'Criar time' : editing ? 'Editar time' : list ? 'Meus times' : 'Perfil do time'}</Text>
+          {mode === 'join' && <HelpShortcut topic="join-team" label="Como entrar em um time?" />}
+          {mode === 'create' && <HelpShortcut topic="create-team" label="Como criar um time?" />}
           {!loading && mode === 'edit' && !editing && <Text accessibilityRole="alert" style={styles.note}>O acesso ao time mudou. Confira o time selecionado antes de continuar.</Text>}
           {warning && <Text accessibilityRole="alert" style={styles.note}>{warning}</Text>}
           {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}

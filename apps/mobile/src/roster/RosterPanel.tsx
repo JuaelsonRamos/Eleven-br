@@ -4,7 +4,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Avatar, Badge, Button, Card, EmptyState, LoadingState, FilterChip, ListItem } from '../components/ui';
 import { FormError, TextAction } from '../components/AuthLayout';
 import { ApiError } from '../auth/api';
-import type { Team } from '../teams/api';
+import { roles, type Team } from '../teams/api';
+import { useTeams } from '../teams/TeamContext';
+import { TeamRolePanel } from './TeamRolePanel';
 import { changeStatus, getPerson, listRoster, removePerson, type RosterFilter, type RosterPage, type RosterPerson } from './api';
 import { PositionsForm } from './PositionsForm';
 import { PlayerForm } from './PlayerForm';
@@ -16,6 +18,7 @@ import { StatisticAdjustmentForm } from './StatisticAdjustmentForm';
 
 export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }: { team: Team; onBack: () => void; initialRequests?: boolean; onInitialConsumed?: () => void }) {
   const initial = useRef(initialRequests), consumed = useRef(onInitialConsumed);
+  const { saved } = useTeams();
   const [filter, setFilter] = useState<RosterFilter>('active');
   const [page, setPage] = useState<RosterPage | null>(null);
   const [player, setPlayer] = useState<RosterPerson | null>(null);
@@ -112,6 +115,9 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
               </View></Card> : <Button label={busy ? 'Salvando…' : player.status === 'active' ? 'Inativar jogador' : 'Reativar jogador'}
                 disabled={busy || (player.status === 'inactive' && full)} onPress={() => { setSuccess(null); if (player.status === 'active') setConfirm(true); else void toggle(); }} />}
             </>}
+            {page.can_manage_admins && !player.is_president && player.status !== 'removed' && <TeamRolePanel key={`${player.membership_id}:${player.roster_version}`} team={team} page={page} player={player} onDenied={denied}
+              onChanged={(updated, message) => { setPlayer(updated); setSuccess(message); void reload(); }}
+              onTransferred={(updated, message) => { void saved(updated); setPlayer(null); setMode('list'); setSuccess(message); void reload(); }} />}
             <TextAction label="Voltar ao elenco" disabled={busy} onPress={() => { setMode('list'); setPlayer(null); setConfirm(false); setError(null); setSuccess(null); }} />
           </> : <>
             <View style={styles.row}>{(['active', 'inactive', 'all'] as RosterFilter[]).map((value, index) => <FilterChip key={value} label={['Ativos', 'Inativos', 'Todos'][index]!} selected={filter === value}
@@ -119,7 +125,7 @@ export function RosterPanel({ team, onBack, initialRequests, onInitialConsumed }
             {!page.items.length && <EmptyState title="Nenhum jogador neste filtro" description="Os jogadores deste time aparecerão aqui." icon="people-outline" />}
             {page.items.map(item => <ListItem key={item.membership_id} title={item.name} subtitle={`${item.primary_position ? `${item.primary_position} (principal)${item.positions.filter(value => value !== item.primary_position).map(value => ` · ${value}`).join('')}\n` : ''}${item.account_linked ? 'Conta vinculada' : 'Ainda não possui conta'}\n${numbers(item.membership_id)}`}
               leading={<Avatar name={item.name} photoUrl={item.photo_url} />} accessibilityLabel={`Ver jogador ${item.name}`} onPress={() => void open(item.membership_id)}
-              trailing={<><Badge label={item.status === 'active' ? 'Ativo' : 'Inativo'} tone={item.status === 'active' ? 'success' : 'neutral'} />{item.is_president && <Badge label="Presidente" tone="info" />}</>} />)}
+              trailing={<><Badge label={item.status === 'active' ? 'Ativo' : 'Inativo'} tone={item.status === 'active' ? 'success' : 'neutral'} />{item.role !== 'member' && <Badge label={roles[item.role]} tone={item.role === 'president' ? 'info' : 'exempt'} />}</>} />)}
           </>}</>}
       </>}
     </>}
@@ -133,7 +139,7 @@ function PersonSummary({ player }: { player: RosterPerson }) {
       <Avatar name={player.name} photoUrl={player.photo_url} />
       <Text style={styles.label}>{player.name}</Text>
     </View>
-    <View style={styles.row}><Badge label={player.status === 'active' ? 'Ativo' : 'Inativo'} />{player.is_president && <Badge label="Presidente" />}</View>
+    <View style={styles.row}><Badge label={player.status === 'active' ? 'Ativo' : 'Inativo'} /><Badge label={roles[player.role]} tone={player.role === 'president' ? 'info' : player.role === 'admin' ? 'exempt' : 'neutral'} /></View>
     <Text style={styles.note}>{player.account_linked ? 'Conta vinculada' : 'Ainda não possui conta'}</Text>
     {player.primary_position ? <View style={styles.row}><Badge label={`${player.primary_position} · Principal`} /><Text style={styles.note}>{player.positions.filter(value => value !== player.primary_position).join(' · ')}</Text></View> : <Text style={styles.note}>Posições não informadas</Text>}
   </View>;

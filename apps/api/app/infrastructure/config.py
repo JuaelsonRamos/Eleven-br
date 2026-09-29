@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = True
     smtp_timeout_seconds: float = Field(default=15, gt=0, le=60)
     media_root: Path = ROOT / ".local" / "media"
+    asaas_env: Literal["sandbox", "production"] = "sandbox"
+    asaas_api_key: SecretStr = SecretStr("")
+    asaas_webhook_token: SecretStr = SecretStr("")
+    asaas_base_url: str = ""
+    billing_return_url: str = ""
 
     @field_validator("media_root")
     @classmethod
@@ -37,6 +42,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def secure_configuration(self) -> Self:
+        expected = (
+            "https://api-sandbox.asaas.com/v3"
+            if self.asaas_env == "sandbox"
+            else "https://api.asaas.com/v3"
+        )
+        if self.asaas_base_url and self.asaas_base_url.rstrip("/") != expected:
+            raise ValueError("ASAAS_BASE_URL must match the official ASAAS_ENV endpoint")
+        self.asaas_base_url = expected
+        webhook_secret = self.asaas_webhook_token.get_secret_value()
+        if webhook_secret and len(webhook_secret) < 32:
+            raise ValueError("ASAAS_WEBHOOK_TOKEN must contain at least 32 characters")
+        if self.asaas_env == "production" and self.app_env != "production":
+            raise ValueError("Asaas production is forbidden outside APP_ENV=production")
+        if self.billing_return_url and not self.billing_return_url.startswith("https://"):
+            raise ValueError("BILLING_RETURN_URL must use HTTPS")
         secret = self.jwt_secret.get_secret_value()
         if len(secret) < 32 or secret.startswith("replace-with"):
             raise ValueError("Configure JWT_SECRET with a random secret (32+ characters)")

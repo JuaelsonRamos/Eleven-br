@@ -126,7 +126,8 @@ def test_browser_launch_flow(engine):
                 page.set_viewport_size({"width": 390, "height": 900})
 
             page.goto("http://localhost:8081", wait_until="domcontentloaded", timeout=120000)
-            expect(visible("1 times · 2 jogadores no ELEVEN BR")).to_be_visible(timeout=120000)
+            expect(visible("1 time")).to_be_visible(timeout=120000)
+            expect(visible("2 jogadores")).to_be_visible()
             button("Já tenho conta").click()
             button("Esqueci minha senha").click()
             page.get_by_label("E-mail da conta", exact=True).fill("launch@example.com")

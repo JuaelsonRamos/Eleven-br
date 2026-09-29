@@ -6,9 +6,10 @@ from uuid import UUID
 from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plans
 from app.application.notification_delivery import emit, recipients
 from app.domain.notifications import NotificationAction, NotificationType
-from app.domain.policies import NotFound, Permission, Plan, Role, allows
+from app.domain.policies import NotFound, Permission, Role, allows
 from app.infrastructure.event_models import EventAttendance
 from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership
 from app.infrastructure.notification_models import Notification
@@ -44,6 +45,13 @@ def present(session: Session, user_id: UUID, items: list[Notification]) -> list[
         )
     ):
         grants.setdefault(grant.membership_id, set()).add(grant.permission)
+    # One batched plan decision for every team that needs it, never one per notification.
+    requested = {
+        item.team_id
+        for item in items
+        if item.team_id and item.action == NotificationAction.OPEN_JOIN_REQUESTS
+    }
+    plans = effective_plans(session, [contexts[key][0] for key in requested if key in contexts])
     result = []
     for item in items:
         context = contexts.get(item.team_id) if item.team_id else None
@@ -52,7 +60,7 @@ def present(session: Session, user_id: UUID, items: list[Notification]) -> list[
         if context and item.action == NotificationAction.OPEN_JOIN_REQUESTS:
             team, member = context
             available = allows(
-                Plan(team.plan),
+                plans[team.id],
                 is_president=member.id == team.president_membership_id,
                 role=Role(member.role),
                 grants=grants.get(member.id, set()),

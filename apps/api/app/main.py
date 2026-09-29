@@ -6,10 +6,12 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.domain.auth import DeliveryUnavailable, InvalidVerification, RateLimited, Unauthorized
+from app.domain.billing import BillingUnavailable
 from app.domain.images import ImageStorageUnavailable, InvalidImage
 from app.domain.policies import Conflict, DomainError, Forbidden, NotFound
 from app.infrastructure.config import get_settings
 from app.presentation.auth_routes import router as auth_router
+from app.presentation.billing_routes import router as billing_router
 from app.presentation.event_routes import router as event_router
 from app.presentation.finance_routes import router as finance_router
 from app.presentation.formation_routes import router as formation_router
@@ -76,6 +78,7 @@ def create_app() -> FastAPI:
             InvalidVerification: 400,
             RateLimited: 429,
             DeliveryUnavailable: 503,
+            BillingUnavailable: 503,
             InvalidImage: 422,
             ImageStorageUnavailable: 503,
         }.get(type(error), 400)
@@ -83,6 +86,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=status, content={"detail": str(error)}, headers=headers)
 
     app.include_router(join_router)
+    app.include_router(billing_router)
     app.include_router(lineup_router)
     app.include_router(notification_router)
     app.include_router(finance_router)

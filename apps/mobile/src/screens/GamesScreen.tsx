@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
 import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
 import { TeamHeading } from '../teams/TeamHeading';
+import { HelpShortcut } from '../help/HelpShortcut';
 import { EventPanel } from '../events/EventPanel';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
@@ -19,7 +20,7 @@ export function GamesScreen({ route, navigation }: BottomTabScreenProps<TabParam
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><View style={styles.container}>
         <AppHeader />
-        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><EventPanel team={selected} initialEventId={route.params?.teamId === selected.id ? route.params.eventId : undefined} onInitialConsumed={consumeEvent} onNavigate={() => scroll.current?.scrollTo({ y: 0, animated: false })} /></View> : <>
+        {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="pelada-overview" label="Como organizar uma pelada?" /><EventPanel team={selected} initialEventId={route.params?.teamId === selected.id ? route.params.eventId : undefined} onInitialConsumed={consumeEvent} onNavigate={() => scroll.current?.scrollTo({ y: 0, animated: false })} /></View> : <>
           <EmptyState title="Selecione seu time" description="Abra um time para acompanhar os jogos e confirmar presença." icon="football-outline" />
           <Button label="Meus times" onPress={() => navigation.navigate('Times')} />
         </>}

@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from app.domain.contacts import normalize_contact
+from app.domain.policies import Permission
 from app.domain.positions import Position
 
 
@@ -66,6 +67,8 @@ class RosterRead(BaseModel):
     roster_version: int
     account_linked: bool
     is_president: bool
+    role: Literal["president", "admin", "member"]
+    permissions: list[str]
 
 
 class RosterPage(BaseModel):
@@ -76,6 +79,9 @@ class RosterPage(BaseModel):
     active_limit: int
     can_manage: bool
     plan: str
+    can_manage_admins: bool
+    admin_limit: int
+    admin_count: int
 
 
 class SimilarRead(BaseModel):
@@ -108,3 +114,20 @@ class RemoveInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     confirm: bool = Field(strict=True)
     expected_version: int = Field(ge=1, strict=True)
+
+
+class RoleInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["admin", "member"]
+    permissions: list[Permission] = Field(default_factory=list, max_length=len(Permission))
+    expected_version: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="after")
+    def consistent(self) -> Self:
+        if len(set(self.permissions)) != len(self.permissions):
+            raise ValueError("Não repita permissões.")
+        if self.role == "admin" and not self.permissions:
+            raise ValueError("Selecione ao menos uma área para o administrador.")
+        if self.role == "member" and self.permissions:
+            raise ValueError("Jogador sem administração não recebe permissões.")
+        return self

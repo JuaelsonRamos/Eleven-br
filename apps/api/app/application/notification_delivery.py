@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.application.billing_access import effective_plan
 from app.domain.notifications import NotificationAction, NotificationType
-from app.domain.policies import Permission, Plan, Role, allows
+from app.domain.policies import Permission, Role, allows
 from app.infrastructure.models import MembershipPermission, Player, Team, TeamMembership, User
 from app.infrastructure.notification_models import Notification
 
@@ -30,27 +31,26 @@ def recipients(
             User.status == "active",
         )
     ).all()
+    if permission is None:
+        return {uid for _, uid in rows if uid != exclude}
     grants: dict[UUID, set[str]] = {}
-    if permission:
-        for member, grant in session.execute(
-            select(MembershipPermission.membership_id, MembershipPermission.permission).where(
-                MembershipPermission.membership_id.in_([m.id for m, _ in rows])
-            )
-        ):
-            grants.setdefault(member, set()).add(grant)
+    for member, grant in session.execute(
+        select(MembershipPermission.membership_id, MembershipPermission.permission).where(
+            MembershipPermission.membership_id.in_([m.id for m, _ in rows])
+        )
+    ):
+        grants.setdefault(member, set()).add(grant)
+    plan = effective_plan(session, team)  # Once per team, never per member.
     return {
         uid
         for member, uid in rows
         if uid != exclude
-        and (
-            permission is None
-            or allows(
-                Plan(team.plan),
-                is_president=team.president_membership_id == member.id,
-                role=Role(member.role),
-                grants=grants.get(member.id, set()),
-                permission=permission,
-            )
+        and allows(
+            plan,
+            is_president=team.president_membership_id == member.id,
+            role=Role(member.role),
+            grants=grants.get(member.id, set()),
+            permission=permission,
         )
     }
 

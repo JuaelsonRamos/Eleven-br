@@ -5,7 +5,7 @@ import * as api from '../auth/api';
 import { AuthLayout, Field, FormError, TextAction, authStyles } from '../components/AuthLayout';
 import { Avatar, Badge, Button, LoadingState } from '../components/ui';
 import { PasswordRecovery } from './PasswordRecovery';
-import { PlatformStats } from '../components/PlatformStats';
+import { WelcomeScreen } from '../landing/WelcomeScreen';
 
 export function AuthScreens() {
   const auth = useAuth();
@@ -93,11 +93,7 @@ export function AuthScreens() {
   }
 
   if (screen === 'recovery') return <PasswordRecovery onBack={() => go('login')} />;
-  if (screen === 'welcome') return <AuthLayout title="Entre em campo." description="Seu futebol, mais organizado. Faça parte do ELEVEN BR.">
-    <PlatformStats />
-    <Button label="Criar minha conta" onPress={() => go('register')} />
-    <TextAction label="Já tenho conta" onPress={() => go('login')} />
-  </AuthLayout>;
+  if (screen === 'welcome') return <WelcomeScreen onRegister={() => go('register')} onLogin={() => go('login')} />;
 
   return <AuthLayout title={screen === 'register' ? 'Seu primeiro passo.' : 'Bom ter você de volta.'}
     description={screen === 'register' ? 'Crie sua conta e confirme seu contato para começar.' : 'Entre com seu telefone ou e-mail.'}>

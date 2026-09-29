@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.application import team_roles
 from app.application.accounts import complete_profile
+from app.application.billing_access import effective_plan, effective_plans
 from app.application.team_profiles import (
     edit_team,
     membership_context,
@@ -19,6 +21,7 @@ from app.presentation.auth_schemas import ProfileInput
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.schemas import (
     AdministrationRead,
+    PresidencyInput,
     ProfileRead,
     TeamCreate,
     TeamInput,
@@ -76,14 +79,20 @@ def save_profile(data: ProfileInput, session: SessionDep, user: CurrentUser) -> 
 
 @router.get("/v1/teams", response_model=list[TeamRead], tags=["teams"])
 def teams(session: SessionDep, user: CurrentUser) -> list[TeamRead]:
-    return [team_response(team, session, user.id) for team in visible_teams(session, user.id)]
+    items = visible_teams(session, user.id)
+    plans = effective_plans(session, items)
+    return [team_response(team, session, user.id, plans[team.id]) for team in items]
 
 
-def team_response(team: Team, session: SessionDep, user_id: UUID) -> TeamRead:
-    role, can_edit = membership_context(session, team, user_id)
+def team_response(
+    team: Team, session: SessionDep, user_id: UUID, plan: Plan | None = None
+) -> TeamRead:
+    plan = plan or effective_plan(session, team)
+    role, can_edit = membership_context(session, team, user_id, plan=plan)
     return TeamRead.model_validate(team).model_copy(
         update={
             "my_role": role,
+            "plan": plan,
             "can_edit": can_edit,
             "active_player_count": active_count(session, team.id),
         }
@@ -124,6 +133,16 @@ def team_detail(team_id: UUID, session: SessionDep, user: CurrentUser) -> TeamRe
     )
 
 
+@router.post("/v1/teams/{team_id}/presidency", response_model=TeamRead, tags=["teams"])
+def transfer_presidency(
+    team_id: UUID, data: PresidencyInput, session: SessionDep, user: CurrentUser
+) -> TeamRead:
+    team = team_roles.transfer_presidency(
+        session, user.id, team_id, data.membership_id, confirm=data.confirm
+    )
+    return team_response(team, session, user.id)
+
+
 @router.get("/v1/teams/{team_id}/administration", tags=["teams"])
 def administration(
     team_id: UUID,
@@ -136,11 +155,12 @@ def administration(
         team_id=team_id,
         permission=Permission.MANAGE_TEAM,
     )
-    limits = ENTITLEMENTS[Plan(team.plan)]
+    plan = effective_plan(session, team)
+    limits = ENTITLEMENTS[plan]
     return AdministrationRead(
         team_id=team.id,
         president_membership_id=team.president_membership_id,
-        plan=Plan(team.plan),
+        plan=plan,
         active_player_limit=limits.active_players,
         administrator_limit=limits.administrators,
     )

@@ -52,6 +52,11 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "team_audit",
             "lineups",
             "lineup_positions",
+            "team_billing",
+            "billing_subscriptions",
+            "billing_payments",
+            "billing_webhooks",
+            "billing_audit",
         }
         command.check(config)
 
