@@ -76,6 +76,7 @@ class EventRead(EventInput):
     id: UUID
     team_id: UUID
     series_id: UUID | None
+    fixture_id: UUID | None = None  # Official fixture from the opponents center.
     recurring_until: Date | None
     recurrence_status: Literal["active", "cancelled"] | None
     status: Literal["open", "cancelled"]

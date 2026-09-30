@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -10,13 +10,16 @@ import { useNotifications } from '../notifications/NotificationContext';
 
 export function BottomNavigation({ state, navigation, visible, icons }: BottomTabBarProps & { visible: MainTab[]; icons: Record<MainTab, IconName> }) {
   const insets = useSafeAreaInsets();
+  // Five tabs on narrow phones (320–420 px): tighter indicator and label, same identity.
+  const { width } = useWindowDimensions();
+  const compact = visible.length > 4 && width < 420;
   const { count, refresh } = useNotifications();
   useEffect(() => { void refresh(); }, [state.index, refresh]);
   const [focused, setFocused] = useState<string | null>(null);
   const current = state.routes[state.index];
   const parent = current && !visible.includes(current.name as MainTab)
     ? (['Financeiro', 'Estatísticas', 'Escalação'].includes(current.name) ? 'Início' : 'Mais') : undefined;
-  return <View style={[s.surface, { paddingBottom: Math.max(insets.bottom, theme.space.sm) }]}><View style={s.bar}>
+  return <View style={[s.surface, { paddingBottom: Math.max(insets.bottom, theme.space.sm) }]}><View style={[s.bar, compact && s.compactBar]}>
     {state.routes.filter(route => visible.includes(route.name as MainTab)).map(route => {
       const active = current?.key === route.key || parent === route.name;
       const label = route.name === 'Times' ? 'Meus Times' : route.name;
@@ -24,8 +27,8 @@ export function BottomNavigation({ state, navigation, visible, icons }: BottomTa
         const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
         if (current?.key !== route.key && !event.defaultPrevented) navigation.navigate(route.name, route.params);
       }} onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })} style={[s.item, focused === route.key && s.focus]}>
-        <View style={[s.indicator, active && s.active]}><Ionicons name={icons[route.name as MainTab]} size={theme.icon.medium} color={active ? theme.colors.green : theme.colors.muted} />{!!count && ['Mais', 'Notificações'].includes(route.name) && <View style={s.counter} accessible accessibilityLabel={`${count} notificações não lidas`}><Text style={s.counterText}>{count > 99 ? '99+' : count}</Text></View>}</View>
-        <Text style={[s.label, active && s.activeLabel]}>{label}</Text>
+        <View style={[s.indicator, compact && s.compactIndicator, active && s.active]}><Ionicons name={icons[route.name as MainTab]} size={theme.icon.medium} color={active ? theme.colors.green : theme.colors.muted} />{!!count && ['Mais', 'Notificações'].includes(route.name) && <View style={s.counter} accessible accessibilityLabel={`${count} notificações não lidas`}><Text style={s.counterText}>{count > 99 ? '99+' : count}</Text></View>}</View>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[s.label, compact && s.compactLabel, active && s.activeLabel]}>{label}</Text>
       </Pressable>;
     })}
   </View></View>;
@@ -37,5 +40,6 @@ const s = StyleSheet.create({
   bar: { flexDirection: 'row', width: '100%', maxWidth: theme.maxWidth, alignSelf: 'center', paddingHorizontal: theme.space.sm },
   item: { flex: 1, minHeight: 60, alignItems: 'center', justifyContent: 'center', gap: theme.space.xs, borderWidth: 2, borderColor: 'transparent', borderRadius: theme.radii.md },
   indicator: { paddingHorizontal: theme.space.lg, paddingVertical: theme.space.xs, borderRadius: theme.radii.pill }, active: { backgroundColor: theme.colors.lightGreen },
+  compactBar: { paddingHorizontal: theme.space.xs }, compactIndicator: { paddingHorizontal: theme.space.md }, compactLabel: { fontSize: 10, letterSpacing: -0.2 },
   label: { fontFamily: theme.fontFamily, fontSize: theme.type.caption, fontWeight: '600', color: theme.colors.muted }, activeLabel: { color: theme.colors.green, fontWeight: '800' }, focus: { borderColor: theme.colors.blue },
 });

@@ -14,26 +14,26 @@ export function StateSelector({ value, options, onChange, disabled = false }: {
   const [query, setQuery] = useState('');
   const filtered = options.filter(item => searchable(item.label).includes(searchable(query)));
   const selected = options.find(item => item.value === value);
-  return <View style={styles.field}>
-    <Text style={styles.label}>UF</Text>
+  return <View style={selectorStyles.field}>
+    <Text style={selectorStyles.label}>UF</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="UF"
       aria-expanded={open}
       accessibilityState={{ expanded: open, disabled }} disabled={disabled}
-      onPress={() => { setQuery(''); setOpen(true); }} style={[styles.select, disabled && styles.disabled]}>
-      <Text style={styles.value}>{selected?.label ?? 'Selecione o estado'} ▾</Text>
+      onPress={() => { setQuery(''); setOpen(true); }} style={[selectorStyles.select, disabled && selectorStyles.disabled]}>
+      <Text style={selectorStyles.value}>{selected?.label ?? 'Selecione o estado'} ▾</Text>
     </Pressable>
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-      <SafeAreaView style={styles.overlay}>
-        <KeyboardAvoidingView style={styles.center} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View accessibilityViewIsModal style={styles.dialog}>
-            <Text accessibilityRole="header" style={styles.title}>Selecione a UF</Text>
+      <SafeAreaView style={selectorStyles.overlay}>
+        <KeyboardAvoidingView style={selectorStyles.center} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View accessibilityViewIsModal style={selectorStyles.dialog}>
+            <Text accessibilityRole="header" style={selectorStyles.title}>Selecione a UF</Text>
             <Field label="Pesquisar UF" placeholder="Nome ou sigla do estado" value={query} onChangeText={setQuery} autoFocus />
             <FlatList data={filtered} keyExtractor={item => item.value} keyboardShouldPersistTaps="handled"
-              style={styles.list} ListEmptyComponent={<Text accessibilityLiveRegion="polite" style={styles.empty}>Nenhum estado encontrado.</Text>}
+              style={selectorStyles.list} ListEmptyComponent={<Text accessibilityLiveRegion="polite" style={selectorStyles.empty}>Nenhum estado encontrado.</Text>}
               renderItem={({ item }) => <Pressable accessibilityRole="button" accessibilityLabel={item.label}
-                accessibilityState={{ selected: value === item.value }} style={[styles.option, value === item.value && styles.selected]}
+                accessibilityState={{ selected: value === item.value }} style={[selectorStyles.option, value === item.value && selectorStyles.selected]}
                 onPress={() => { onChange(item.value); setOpen(false); }}>
-                <Text style={styles.value}>{item.label}{value === item.value ? ' ✓' : ''}</Text>
+                <Text style={selectorStyles.value}>{item.label}{value === item.value ? ' ✓' : ''}</Text>
               </Pressable>} />
             <TextAction label="Fechar lista de UFs" onPress={() => setOpen(false)} />
           </View>
@@ -43,7 +43,8 @@ export function StateSelector({ value, options, onChange, disabled = false }: {
   </View>;
 }
 
-const styles = StyleSheet.create({
+// Shared with MunicipalitySelector: the same searchable picker for UF and city.
+export const selectorStyles = StyleSheet.create({
   field: { gap: 8 }, label: { fontFamily: theme.fontFamily, fontSize: 15, fontWeight: '600', color: theme.colors.graphite },
   select: { minHeight: 48, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 14, justifyContent: 'center' },
   disabled: { opacity: 0.65 }, value: { fontFamily: theme.fontFamily, fontSize: 16, color: theme.colors.graphite },

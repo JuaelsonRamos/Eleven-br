@@ -518,8 +518,8 @@ def test_account_identity_serializes_across_teams(engine, session, operation):
                         connection,
                         user_id=user_id,
                         name="Segundo time",
-                        city="Vitória",
                         state="ES",
+                        municipality_code=3205309,  # Vitória (IBGE).
                         modalities=["campo"],
                     )
                 else:

@@ -51,6 +51,15 @@ def require_open(event: Event) -> None:
         raise Conflict("Este evento foi cancelado e não aceita alterações")
 
 
+def require_unlinked(event: Event) -> None:
+    # Both teams agreed on the fixture; no bilateral change flow exists yet.
+    if event.fixture_id is not None:
+        raise Conflict(
+            "Confronto oficial: data, horário e local foram combinados entre os dois times "
+            "e não podem ser alterados ou cancelados por um só time."
+        )
+
+
 def validate_modality(team: Team, draft: EventDraft) -> None:
     if draft.modality not in team.modalities:
         raise Conflict("Selecione uma modalidade do time")
@@ -166,6 +175,7 @@ def edit_event(
     team = authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
     require_open(event)
+    require_unlinked(event)
     validate_modality(team, draft)
     if event.series_id is not None and draft.kind != "PELADA":
         raise Conflict("Uma ocorrência de pelada deve continuar sendo pelada")
@@ -185,6 +195,7 @@ def edit_event(
 def cancel_event(session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID) -> Event:
     team = authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
+    require_unlinked(event)
     if event.status != "cancelled":
         event_notice(session, team, event, user_id, NotificationType.EVENT_CANCELLED)
     event.status = "cancelled"
@@ -338,6 +349,7 @@ def snapshots(
                         "location",
                         "notes",
                         "opponent",
+                        "fixture_id",
                         "status",
                         "created_at",
                         "updated_at",

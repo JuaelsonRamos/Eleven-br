@@ -24,7 +24,8 @@ o Prompt 07 (partidas e resultados da pelada), o Prompt 08 (gols, assistências 
 o Prompt 09 (estatísticas internas), o Prompt 10 (entrada por código e vinculação aprovada)
 o Prompt 11 (mensalidades e caixa interno), o Prompt 12 (design system mobile first)
 o Prompt 13 (notificações internas persistentes), o Prompt 14 (busca e ajustes históricos)
-e o Prompt 15 (recuperação de senha, posições, remoção lógica e escalação Pro).
+o Prompt 15 (recuperação de senha, posições, remoção lógica e escalação Pro)
+e a Fase 5 (Central de Adversários: busca, desafios, confrontos e confiabilidade).
 As áreas do aplicativo exigem
 autenticação; Jogos apresenta eventos do time selecionado e Notificações reúne avisos pessoais. Verificação local é
 simulada com opção explícita; autenticação por e-mail usa SMTP configurável.
@@ -39,7 +40,8 @@ colisões são tratadas com savepoint e constraint. O vocabulário de modalidade
 UFs está em `app/domain/team_identity.py`, consumido pelo app via API. `modalities`
 é uma lista JSON nos contratos e um array `varchar(40)[]` no banco, nunca CSV.
 O seletor de UF pesquisa os 26 estados e o DF por nome/sigla e envia somente a
-sigla oficial. O backend também valida e normaliza a UF.
+sigla oficial. O backend também valida e normaliza a UF. A cidade vem da lista oficial
+de municípios da UF (código IBGE, Fase 5A), nunca de texto livre.
 O aviso de semelhança divulga somente identidade pública limitada e não impede
 nomes iguais. Escudo opcional usa o upload de imagens e o campo `Team.crest_url` existente.
 
@@ -313,6 +315,92 @@ Sandbox e produção não compartilham referências; desenvolvimento proíbe amb
 Asaas production. Não usar credenciais reais nos testes; adapter é simulado em banco
 isolado. Migration 0014 é aditiva; preserve 0001–0013. Sem Pix Automático ou jobs externos.
 
+## Central de Adversários — Fase 5
+
+`0015_opponents_challenges` é aditiva: `teams.accepts_challenges` (padrão true),
+`team_challenges`, `team_fixtures`, `fixture_scores`, `fixture_reviews` e
+`events.fixture_id`. O jogo avulso com `opponent` textual continua igual e não é
+convertido. Casos de uso em `application/opponents.py` (Central, busca, perfil),
+`challenges.py`, `fixtures.py` e `opponent_common.py`; rotas em
+`/v1/teams/{team_id}/opponents`. Nunca reutilizar `/v1/teams/join/search` para adversários.
+
+Busca (`GET /search`, livre em todos os planos, sem gravar nada): a modalidade do
+confronto é obrigatória e escolhida entre as do time, sem presumir principal; `category`
+começa igual à do time. Compatíveis primeiro; times sem categoria vêm depois, marcados
+"Categoria não informada", nunca tratados como compatíveis; `all` ignora a categoria.
+Proximidade por município (código IBGE; texto normalizado só para legados não confirmados)
+e UF: mesma cidade → mesma UF → outras UFs, alfabética em cada faixa; filtro opcional de
+UF e município oficial. Sem distância,
+raio, GPS ou endereço. Só times ativos com `accepts_challenges`, nunca o próprio, e só a
+identidade pública (`public_team`) com indicadores de confiabilidade.
+
+Crédito: `ENTITLEMENTS.opponent_challenges` (Free 1 desafio enviado por mês, PRO `None`
+= ilimitado). O próprio desafio é o consumo (`competence` do mês de São Paulo +
+`charged`); validações vêm antes e falha desfaz a transação, então nada é gasto. Mesmo
+`command_id` devolve o mesmo desafio. Recusado, cancelado ou expirado continua contando.
+Buscar, ver perfis, receber, aceitar ou recusar nunca consomem. Garantias: lock das duas
+linhas de Team (ordem de id) + índices únicos parciais `uq_team_challenges_monthly_credit`
+(time/mês quando `charged`) e `uq_team_challenges_pending_proposal` (par, modalidade,
+data e hora quando PENDING).
+
+Consultar a Central exige vínculo ativo. Buscar, desafiar, responder, informar/confirmar
+placar, avaliar e alterar "Aceitar desafios" exigem `MANAGE_EVENTS` do time representado;
+rate limit por conta, nunca por ID de time. Desafio: modalidade comum, data/hora futuras
+(locais), local, mando HOME/AWAY do ponto de vista de quem desafia e observação. Bloqueia
+proposta pendente equivalente, em qualquer direção; propostas diferentes podem coexistir.
+O pendente expira no horário proposto (estado derivado). Repetir a mesma decisão é
+idempotente; sem contraproposta. Desativar "Aceitar desafios" tira o time da busca e
+bloqueia novos desafios, preservando pendentes e confrontos.
+
+Aceite cria um único `team_fixtures` por desafio (unique) e um evento JOGO por time com
+`fixture_id` (unique por time). Um só time não edita nem cancela esse evento (409);
+presença e convidados continuam. Placar: um registro por lado; confirmar é concordar com
+o placar exibido. Iguais → VALIDATED, único resultado oficial e imutável; diferentes →
+DISPUTED (divergência). Pendente e divergência nunca são oficiais, o silêncio não
+confirma e nada resolve divergência automaticamente. Informar placar só a partir do
+horário do jogo.
+
+Avaliação só após VALIDATED, uma por lado e por confronto, com sim/não: compareceu,
+cumpriu o horário e cumpriu o combinado; sem comentário livre e sem alterar o resultado.
+Confiabilidade mostra contagens brutas, sem nota, estrelas, ranking, W.O. ou
+cancelamentos; sem confrontos validados: "Sem histórico suficiente". Ainda sem regra de
+produto: cancelar/remarcar confronto aceito, resolver divergência, W.O., amostra mínima e
+devolução do crédito em recusa. Não implementar sem decisão.
+
+## Localização oficial dos times — Fase 5A
+
+`0016_team_locations` (aditiva) cria `municipalities`, referência com os 5.571 municípios
+oficiais do IBGE (código, UF, nome) semeada de `apps/api/migrations/data/ibge_municipalities.csv`
+(gerado da API de localidades do IBGE em 2026-09-30), e acrescenta a `teams`
+`municipality_code` e `location_confirmed_at`. A FK composta (municipality_code, state, city)
+→ municipalities (code, state, name), com renomeação em cascata, garante no banco que
+código, UF e nome formam um município real; há confirmação se e somente se há código. Nada
+consulta o IBGE em tempo de execução; mudança territorial futura exige nova migration.
+
+Cadastro: UF e município escolhidos das listas oficiais (`GET /v1/locations/states/{uf}/municipalities`),
+sem texto livre; o time já nasce confirmado. Times legados mantêm `city`/`state` digitados,
+sem confirmação, até o Presidente confirmar em `PUT /v1/teams/{id}/location`. A sugestão
+aparece só quando o nome normalizado corresponde a um único município da UF e nunca é salva
+sozinha. Somente o Presidente atual (FK de Presidência, `membership_context(...)[0] ==
+"president"`) confirma ou altera; grants como `manage_team` não bastam. A edição geral do
+perfil não muda localização (clientes antigos podem reenviar a atual, inalterada). Cada
+mudança gera TeamAudit `LOCATION_CONFIRMED`/`LOCATION_CHANGED` com antes/depois.
+
+Na Central, "mesma cidade" compara o código IBGE; o texto normalizado é só fallback
+transitório para legados não confirmados, isolado em `opponents.located_in`. Localização não
+confirmada nunca é fonte oficial para funções geográficas futuras (ranking). Sem bairro,
+endereço, CEP, GPS ou coordenadas: o público vê apenas "Município/UF" e o código é interno.
+
+Decisões do Beta: legado sem confirmação não é bloqueado (elenco, jogos, peladas, financeiro
+e Central seguem normais); o Início só pede a confirmação ao Presidente. Rankings,
+estatísticas oficiais ou competições por município/UF poderão exigir localização confirmada
+(não implementar agora). DF segue o IBGE: só Brasília; regiões administrativas seriam camada
+futura abaixo do município. Sem centroide, distância, raio ou mapa nesta fase. Cliente
+anterior que envia cidade digitada recebe 422 "Atualize o app…" sem criar nada; o backend
+nunca volta a aceitar cidade livre. A 0016 confere o CSV (arquivo presente, 5.571 linhas)
+antes de alterar o banco e recusa downgrade com localização confirmada; por ser aditiva,
+num rollback da aplicação o banco permanece na 0016.
+
 ## Papéis do time, Aprenda a usar e tela inicial
 
 Administradores e Presidência reutilizam `TeamMembership.role`, `membership_permissions`,
@@ -405,6 +493,7 @@ O plano e a futura assinatura pertencem ao **Team**, nunca ao User ou Presidente
 | Jogadores ativos por time | Até 24 | Até 100 |
 | Administração | Somente Presidente | Presidente + até 5 responsáveis administrativos |
 | Recursos | Básicos | Avançados, com permissões granulares |
+| Desafios a adversários (envio) | 1 por mês | Ilimitados |
 
 Somente jogadores ativos contam para os limites; inativos não contam.
 Permissões administrativas são granulares e por vínculo. Elenco, jogos, peladas,
@@ -479,7 +568,7 @@ em login público sem implementar o fluxo de autenticação solicitado.
 
 ## Mobile, UX, marca e acessibilidade
 
-Com time selecionado, as abas são **Início, Jogos, Elenco e Mais**. Mais dá acesso
+Com time selecionado, as abas são **Início, Jogos, Adversários, Elenco e Mais**. Mais dá acesso
 às áreas pessoais: Meus Times/Trocar time, Notificações e Perfil. Sem time, mostre
 Meus Times, Notificações e Perfil, com acesso à criação. Abrir um time leva ao seu
 Início. O painel identifica escudo, nome, cidade/UF e plano, com atalhos Jogos e Elenco.
@@ -528,7 +617,8 @@ Valide 320/390/768/1280 px, nomes longos, foco Web e a barra inferior.
 `TeamDashboard` consulta a agenda existente para mostrar o próximo evento aberto
 com data/hora futura. O atalho passa evento e time para Jogos, que carrega o detalhe
 autorizado. Não criar nova agenda, seleção de time ou resumo persistido no cliente.
-As quatro abas do contexto continuam Início, Jogos, Elenco e Mais.
+As cinco abas do contexto são Início, Jogos, Adversários, Elenco e Mais; abaixo de
+420 px o menu compacta indicador e rótulo (10 px) sem cortar texto em 320 px.
 
 Financeiro apresenta valores e status retornados pela API, sem recalcular dinheiro.
 O filtro visual de cobranças consulta todas as páginas autorizadas do período

@@ -13,6 +13,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from app.application.teams import add_member
+from app.domain.policies import Plan
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
@@ -23,7 +24,7 @@ def test_browser_finance_flow(engine: Engine) -> None:
     from playwright.sync_api import expect, sync_playwright
 
     with Session(engine) as session:
-        owner, team, _, _ = setup_roster(session)
+        owner, team, _, _ = setup_roster(session, Plan.PRO)  # Finance is ELEVEN BR PRO.
         player = make_player(session)
         player.display_name = (
             "João Antônio de Albuquerque e Vasconcelos dos Santos Pereira da Silva"
@@ -216,7 +217,7 @@ def test_browser_finance_flow(engine: Engine) -> None:
             button(player_page, "Financeiro").click()
             button(player_page, f"Abrir cobrança de {player_name}").click()
             expect(visible(player_page, "Saldo devedor · R$ 10,00")).to_be_visible()
-            expect(player_page.get_by_role("tab")).to_have_count(4)
+            expect(player_page.get_by_role("tab")).to_have_count(5)  # Adversários
             assert bundles and all(status == 200 for status in bundles)
             assert not errors, errors
             for context in contexts:

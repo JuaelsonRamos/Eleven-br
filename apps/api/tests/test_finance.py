@@ -502,7 +502,7 @@ def test_migration_preservation_and_downgrade_guard(engine, session):
         config.attributes["connection"] = connection
         command.downgrade(config, "0009")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016"
 
 
 def test_free_team_cannot_operate_finance_but_keeps_history(session, provider):  # noqa: F811

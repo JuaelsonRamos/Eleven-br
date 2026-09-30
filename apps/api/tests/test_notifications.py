@@ -401,4 +401,4 @@ def test_incremental_migration_preserves_rows_and_guards_history(engine, session
         config.attributes["connection"] = connection
         command.downgrade(config, "0010")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016"

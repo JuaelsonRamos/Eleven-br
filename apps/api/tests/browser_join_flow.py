@@ -237,7 +237,7 @@ def test_browser_join_flow(engine: Engine) -> None:
             player_page.reload()
             expect(visible(player_page, "Tabajara FC")).to_be_visible()
             expect(visible(player_page, "Jogador")).to_be_visible()
-            expect(player_page.get_by_role("tab")).to_have_count(4)
+            expect(player_page.get_by_role("tab")).to_have_count(5)  # Adversários
             with Session(engine) as session:
                 target = session.get(Player, UUID(manual["player_id"]))
                 assert target and target.user_id

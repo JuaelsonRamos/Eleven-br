@@ -3,7 +3,7 @@ import { authenticated } from '../auth/api';
 export type Answer = 'VOU' | 'NAO_VOU' | 'PENDENTE';
 export type EventInput = { creation_key?: string; modality: string; kind: 'PELADA' | 'JOGO'; title: string; date: string;
   time: string; location: string; notes: string | null; opponent: string | null; recurring_weekly?: boolean; recurring_until?: string | null };
-export type SportEvent = EventInput & { id: string; team_id: string; series_id: string | null;
+export type SportEvent = EventInput & { id: string; team_id: string; series_id: string | null; fixture_id?: string | null;
   status: 'open' | 'cancelled'; recurrence_status: 'active' | 'cancelled' | null; can_manage: boolean; my_response: Answer; going: number; not_going: number; pending: number;
   participants: { membership_id: string; player_id: string; name: string; response: Answer }[];
   guests: { id: string; name: string }[] };

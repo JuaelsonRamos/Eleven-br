@@ -67,7 +67,7 @@ export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParam
               {selected.can_edit && <Button label="Editar time" onPress={() => { setSuccess(null); setEditingId(selected.id); setMode('edit'); }} />}
               <TextAction label="Voltar para meus times" onPress={() => { setSuccess(null); setMode('list'); }} />
             </> : <>
-              <Text style={styles.note}>Abra um time para acessar seu Início, Jogos e Elenco.</Text>
+              <Text style={styles.note}>Abra um time para acessar seu Início, Jogos, Adversários e Elenco.</Text>
               <Button label="Criar time" onPress={() => { setSuccess(null); setMode('create'); }} />
               <Button variant="secondary" label="Entrar em um time" onPress={() => { setSuccess(null); setMode('join'); }} />
               {!teams.length && <EmptyState title="Seu futebol começa aqui." description="Crie um time ou entre usando o código compartilhado pelo responsável." icon="shield-outline" />}

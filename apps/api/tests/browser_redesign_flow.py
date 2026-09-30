@@ -279,7 +279,7 @@ def test_browser_redesign_flow(engine: Engine) -> None:
             button(page, "Confirmar cancelamento").click()
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(visible(page, "Agenda livre por enquanto")).to_be_visible()
-            expect(page.get_by_role("tab")).to_have_count(4)
+            expect(page.get_by_role("tab")).to_have_count(5)  # Adversários
             assert bundles and all(status == 200 for status in bundles)
             assert not errors, errors
             page.wait_for_load_state("networkidle")

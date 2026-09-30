@@ -6,6 +6,26 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.models import Base, Entity
 
+# Also written by migration 0015; keep both in sync when adding types or actions.
+NOTIFICATION_TYPES = (
+    "type IN ('TEAM_JOIN_REQUEST', 'TEAM_JOIN_APPROVED', 'TEAM_JOIN_REJECTED', "
+    "'EVENT_CREATED', 'EVENT_UPDATED', 'EVENT_CANCELLED', 'ATTENDANCE_REMINDER', "
+    "'FINANCE_CHARGE_CREATED', 'FINANCE_PAYMENT_REGISTERED', 'FINANCE_PAYMENT_REVERSED', "
+    "'CHALLENGE_RECEIVED', 'CHALLENGE_ACCEPTED', 'CHALLENGE_REJECTED', 'CHALLENGE_CANCELLED', "
+    "'FIXTURE_SCORE_REPORTED', 'FIXTURE_SCORE_CONFIRMED', 'FIXTURE_SCORE_DISPUTED', "
+    "'FIXTURE_REVIEW_AVAILABLE')"
+)
+NOTIFICATION_ACTIONS = (
+    "action IS NULL OR action IN ('OPEN_TEAM', 'OPEN_JOIN_REQUESTS', "
+    "'OPEN_EVENT', 'OPEN_FINANCE_CHARGE', 'OPEN_CHALLENGE', 'OPEN_FIXTURE')"
+)
+NOTIFICATION_ENTITIES = (
+    "(entity_type IS NULL AND entity_id IS NULL) OR "
+    "(entity_type IS NOT NULL AND entity_type IN "
+    "('team', 'join_request', 'event', 'finance_charge', 'challenge', 'fixture') "
+    "AND entity_id IS NOT NULL)"
+)
+
 
 class Notification(Entity, Base):
     __tablename__ = "notifications"
@@ -21,24 +41,9 @@ class Notification(Entity, Base):
     dedup_key: Mapped[str] = mapped_column(String(200))
     __table_args__ = (
         UniqueConstraint("user_id", "dedup_key", name="uq_notifications_user_dedup"),
-        CheckConstraint(
-            "type IN ('TEAM_JOIN_REQUEST', 'TEAM_JOIN_APPROVED', 'TEAM_JOIN_REJECTED', "
-            "'EVENT_CREATED', 'EVENT_UPDATED', 'EVENT_CANCELLED', 'ATTENDANCE_REMINDER', "
-            "'FINANCE_CHARGE_CREATED', 'FINANCE_PAYMENT_REGISTERED', 'FINANCE_PAYMENT_REVERSED')",
-            name="type",
-        ),
-        CheckConstraint(
-            "action IS NULL OR action IN ('OPEN_TEAM', 'OPEN_JOIN_REQUESTS', "
-            "'OPEN_EVENT', 'OPEN_FINANCE_CHARGE')",
-            name="action",
-        ),
-        CheckConstraint(
-            "(entity_type IS NULL AND entity_id IS NULL) OR "
-            "(entity_type IS NOT NULL AND entity_type IN "
-            "('team', 'join_request', 'event', 'finance_charge') "
-            "AND entity_id IS NOT NULL)",
-            name="entity",
-        ),
+        CheckConstraint(NOTIFICATION_TYPES, name="type"),
+        CheckConstraint(NOTIFICATION_ACTIONS, name="action"),
+        CheckConstraint(NOTIFICATION_ENTITIES, name="entity"),
         CheckConstraint("length(trim(title)) > 0 AND length(trim(message)) > 0", name="text"),
         CheckConstraint("length(trim(dedup_key)) > 0", name="dedup"),
         Index("ix_notifications_user_created", "user_id", "created_at", "id"),

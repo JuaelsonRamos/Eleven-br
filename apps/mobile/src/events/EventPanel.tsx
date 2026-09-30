@@ -13,7 +13,7 @@ import { MatchesPanel } from '../matches/MatchesPanel';
 import { FormationPanel } from '../formations/FormationPanel';
 import { remindPending } from './api';
 
-export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed }: { team: Team; onNavigate?: () => void; initialEventId?: string; onInitialConsumed?: () => void }) {
+export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed, onOpenFixture }: { team: Team; onNavigate?: () => void; initialEventId?: string; onInitialConsumed?: () => void; onOpenFixture?: (fixtureId: string) => void }) {
   const initial = useRef(initialEventId);
   const consumed = useRef(onInitialConsumed);
   const { options } = useTeams();
@@ -88,11 +88,13 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
     {!page && <Button label="Tentar novamente" onPress={() => void load()} />}
     {mode === 'detail' && event ? <>
       <Card><View style={styles.stack}>
-        <Badge label={event.status === 'cancelled' ? 'CANCELADO' : event.kind === 'PELADA' ? 'PELADA' : 'JOGO AVULSO'} />
+        <Badge label={event.status === 'cancelled' ? 'CANCELADO' : event.kind === 'PELADA' ? 'PELADA' : event.fixture_id ? 'CONFRONTO OFICIAL' : 'JOGO AVULSO'} />
         <Text style={styles.heading}>{eventWhen(event)}</Text><Text style={styles.text}>{event.location}</Text>
         <Text style={styles.note}>{options?.modalities.find(item => item.value === event.modality)?.label || event.modality}</Text>
         {event.series_id && <Text style={styles.note}>Pelada semanal • {event.recurrence_status === 'cancelled' ? 'recorrência encerrada' : event.recurring_until ? `até ${displayDay(event.recurring_until)}` : 'sem data final'} • presença por data</Text>}
         {event.opponent && <Text style={styles.text}>Adversário: {event.opponent}</Text>}
+        {event.fixture_id && <Text style={styles.note}>Confronto oficial: data, horário e local foram combinados entre os dois times e não mudam por um só time.</Text>}
+        {event.fixture_id && onOpenFixture && <Button variant="secondary" label="Ver confronto" disabled={busy} onPress={() => onOpenFixture(event.fixture_id!)} />}
         {event.notes && <Text style={styles.text}>{event.notes}</Text>}
         {answers(event, true)}
         <Text style={styles.note}>Sua resposta: {event.my_response === 'VOU' ? 'Vou' : event.my_response === 'NAO_VOU' ? 'Não vou' : 'Pendente'}</Text>
@@ -111,10 +113,10 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
       {event.can_manage && event.status === 'open' && <>
         <Field label="Nome/apelido do convidado" value={guest} onChangeText={setGuest} maxLength={80} editable={!busy} />
         <Button label="Adicionar convidado" disabled={busy || !guest.trim()} onPress={() => void run(() => addGuest(team.id, event.id, guest.trim()), 'Convidado adicionado.')} />
-        <Button label="Editar evento" disabled={busy} onPress={() => { setError(null); setMode('edit'); }} />
+        {!event.fixture_id && <><Button label="Editar evento" disabled={busy} onPress={() => { setError(null); setMode('edit'); }} />
         {cancelConfirm === 'event' ? <><Text style={styles.text}>Cancelar {event.series_id ? 'somente esta ocorrência' : 'este evento'}? As respostas serão preservadas.</Text>
           <Button label="Confirmar cancelamento" disabled={busy} onPress={() => void run(() => cancelEvent(team.id, event.id), 'Evento cancelado.')} />
-          <TextAction label="Manter evento" disabled={busy} onPress={() => setCancelConfirm(null)} /></> : <TextAction label="Cancelar evento" disabled={busy} onPress={() => setCancelConfirm('event')} />}
+          <TextAction label="Manter evento" disabled={busy} onPress={() => setCancelConfirm(null)} /></> : <TextAction label="Cancelar evento" disabled={busy} onPress={() => setCancelConfirm('event')} />}</>}
       </>}
       {event.can_manage && event.series_id && event.recurrence_status === 'active' && (cancelConfirm === 'series' ? <>
         <Text style={styles.text}>Encerrar a recorrência? As ocorrências de hoje em diante serão canceladas. Histórico, respostas e convidados serão preservados.</Text>
@@ -126,7 +128,7 @@ export function EventPanel({ team, onNavigate, initialEventId, onInitialConsumed
       {page?.can_manage && <Button label="Criar evento" disabled={busy} onPress={() => { setSuccess(null); setMode('create'); }} />}
       {page && !page.items.length && <EmptyState title="O próximo encontro começa aqui" description="Os eventos do time aparecerão nesta lista." icon="football-outline" />}
       {page?.items.map(item => <Card key={item.id}><View style={styles.stack}>
-        <Badge label={item.kind === 'PELADA' ? 'PELADA' : 'JOGO'} tone="info" /><Text style={styles.heading}>{item.title}</Text><Text style={styles.text}>{eventWhen(item)}</Text><Text style={styles.note}>{item.location}</Text>
+        <Badge label={item.kind === 'PELADA' ? 'PELADA' : item.fixture_id ? 'CONFRONTO OFICIAL' : 'JOGO'} tone="info" /><Text style={styles.heading}>{item.title}</Text><Text style={styles.text}>{eventWhen(item)}</Text><Text style={styles.note}>{item.location}</Text>
         {item.status === 'cancelled' ? <Badge label="CANCELADO" tone="neutral" /> : <Badge label={`${item.going} confirmados`} />}
         {answers(item, false)}
         <Button variant="secondary" label="Ver detalhes" accessibilityLabel={`Abrir ${item.title} • ${displayDay(item.date)}`} disabled={busy} onPress={() => void run(() => getEvent(team.id, item.id))} />

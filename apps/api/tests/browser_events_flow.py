@@ -91,7 +91,7 @@ def test_browser_events_flow(engine: Engine) -> None:
                 headers=owner,
                 json={
                     "name": "Tabajara FC",
-                    "city": "Vitória",
+                    "municipality_code": 3205309,  # Vitória (IBGE).
                     "state": "ES",
                     "modalities": ["society", "futsal"],
                     "category": "mixed",
@@ -314,7 +314,7 @@ def test_browser_events_flow(engine: Engine) -> None:
                     headers=owner,
                     json={
                         "name": "Segundo time",
-                        "city": "Serra",
+                        "municipality_code": 3205002,  # Serra (IBGE).
                         "state": "ES",
                         "modalities": ["society"],
                         "category": "mixed",
@@ -328,7 +328,7 @@ def test_browser_events_flow(engine: Engine) -> None:
                 assert player.status_code == 201, player.text
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(visible_text("Tabajara FC")).to_be_visible()
-            expect(page.get_by_role("tab")).to_have_count(4)
+            expect(page.get_by_role("tab")).to_have_count(5)  # Adversários
             page.get_by_role("button", name="Elenco", exact=True).click()
             expect(visible_text("Tabajara FC")).to_be_visible()
             expect(visible_text("Jogador dos eventos")).to_be_visible()

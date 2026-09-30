@@ -96,7 +96,7 @@ def test_browser_roster_flow(engine: Engine) -> None:
                 headers=owner_headers,
                 json={
                     "name": "Tabajara FC",
-                    "city": "Vitória",
+                    "municipality_code": 3205309,  # Vitória (IBGE).
                     "state": "ES",
                     "modalities": ["society", "futsal"],
                     "category": "mixed",

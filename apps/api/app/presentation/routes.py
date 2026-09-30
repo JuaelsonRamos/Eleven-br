@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.application import team_roles
+from app.application import municipalities, team_locations, team_roles
 from app.application.accounts import complete_profile
 from app.application.billing_access import effective_plan, effective_plans
 from app.application.team_profiles import (
@@ -21,9 +21,11 @@ from app.presentation.auth_schemas import ProfileInput
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.schemas import (
     AdministrationRead,
+    LocationInput,
     PresidencyInput,
     ProfileRead,
     TeamCreate,
+    TeamEdit,
     TeamInput,
     TeamPublicRead,
     TeamRead,
@@ -95,6 +97,7 @@ def team_response(
             "plan": plan,
             "can_edit": can_edit,
             "active_player_count": active_count(session, team.id),
+            "location_confirmed": team.location_confirmed_at is not None,
         }
     )
 
@@ -105,6 +108,15 @@ def team_options(user: CurrentUser) -> dict[str, object]:
         "modalities": [{"value": value, "label": label} for value, label in MODALITIES.items()],
         "states": [{"value": code, "label": f"{name} ({code})"} for code, name in STATES.items()],
     }
+
+
+@router.get("/v1/locations/states/{state}/municipalities", tags=["teams"])
+def state_municipalities(
+    state: str, session: SessionDep, user: CurrentUser, response: Response
+) -> dict[str, object]:
+    # Official reference data; the app caches it and never needs the IBGE service.
+    response.headers["Cache-Control"] = "private, max-age=86400"
+    return {"state": state, "items": municipalities.listing(session, state)}
 
 
 @router.post("/v1/teams/similar", response_model=list[TeamPublicRead], tags=["teams"])
@@ -121,7 +133,7 @@ def new_team(data: TeamCreate, session: SessionDep, user: CurrentUser) -> TeamRe
 
 
 @router.put("/v1/teams/{team_id}", response_model=TeamRead, tags=["teams"])
-def update_team(team_id: UUID, data: TeamInput, session: SessionDep, user: CurrentUser) -> TeamRead:
+def update_team(team_id: UUID, data: TeamEdit, session: SessionDep, user: CurrentUser) -> TeamRead:
     team = edit_team(session, user_id=user.id, team_id=team_id, **data.model_dump())
     return team_response(team, session, user.id)
 
@@ -131,6 +143,19 @@ def team_detail(team_id: UUID, session: SessionDep, user: CurrentUser) -> TeamRe
     return team_response(
         require_membership(session, user_id=user.id, team_id=team_id), session, user.id
     )
+
+
+@router.get("/v1/teams/{team_id}/location", tags=["teams"])
+def team_location(team_id: UUID, session: SessionDep, user: CurrentUser) -> dict[str, object]:
+    return team_locations.location(session, user.id, team_id)
+
+
+@router.put("/v1/teams/{team_id}/location", response_model=TeamRead, tags=["teams"])
+def confirm_location(
+    team_id: UUID, data: LocationInput, session: SessionDep, user: CurrentUser
+) -> TeamRead:
+    team = team_locations.change(session, user.id, team_id, **data.model_dump())
+    return team_response(team, session, user.id)
 
 
 @router.post("/v1/teams/{team_id}/presidency", response_model=TeamRead, tags=["teams"])

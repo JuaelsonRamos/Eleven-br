@@ -22,7 +22,7 @@ export function StatCard({ label, value, tone = 'success', icon }: { label: stri
 }
 export function FilterChip({ label, selected = false, onPress, disabled = false, role = 'button', accessibilityLabel }: { label: string; selected?: boolean; onPress: () => void; disabled?: boolean; role?: 'button' | 'radio' | 'checkbox'; accessibilityLabel?: string }) {
   const [focused, setFocused] = useState(false);
-  return <Pressable accessibilityRole={role} accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected, checked: role !== 'button' ? selected : undefined, disabled }} disabled={disabled} onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} style={({ pressed }) => [ds.chip, selected && ds.chipSelected, focused && ds.focus, (pressed || disabled) && ds.dimmed]}><Text style={[ds.chipText, selected && ds.onPrimary]}>{label}</Text></Pressable>;
+  return <Pressable accessibilityRole={role} accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected, checked: role !== 'button' ? selected : undefined, disabled }} aria-checked={role !== 'button' ? selected : undefined} disabled={disabled} onPress={onPress} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} style={({ pressed }) => [ds.chip, selected && ds.chipSelected, focused && ds.focus, (pressed || disabled) && ds.dimmed]}><Text style={[ds.chipText, selected && ds.onPrimary]}>{label}</Text></Pressable>;
 }
 export function IconButton({ label, icon, onPress, disabled = false }: { label: string; icon: IconName; onPress: () => void; disabled?: boolean }) {
   const [focused, setFocused] = useState(false);

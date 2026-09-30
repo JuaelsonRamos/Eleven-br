@@ -1357,6 +1357,84 @@ Testes em `apps/api`: `uv run pytest -q tests/test_team_roles.py`. Com o Expo We
 e API temporária. Esse fluxo valida a tela pública em 320/375/430/1280 px, a ajuda e a
 troca de papéis.
 
+## Central de Adversários — Fase 5
+
+Aba **Adversários** no menu inferior (Início, Jogos, Adversários, Elenco e Mais). Fluxo:
+buscar → perfil → desafiar → aceitar/recusar → confronto em Jogos dos dois times →
+placar informado por um lado e confirmado (ou contestado) pelo outro → avaliação de
+confiabilidade → histórico entre os times.
+
+- **Busca** (livre em todos os planos): o organizador escolhe a modalidade do confronto;
+  a categoria começa com a do time. Compatíveis primeiro; times sem categoria aparecem
+  depois, como **Categoria não informada**. Ordem: mesma cidade → mesma UF → outras UFs
+  (busca ampliada), usando município/UF oficiais do time (texto digitado só para times
+  antigos ainda não confirmados); filtro opcional de UF e município oficial.
+- **Free/PRO**: Free envia 1 desafio por mês; PRO é ilimitado. O crédito só é gasto no
+  envio válido; receber, aceitar, recusar, buscar e ver perfis nunca gastam.
+- **Desafio**: data, horário, local, mando e observação; proposta pendente equivalente
+  (mesmo par, modalidade, data e hora) é recusada; expira no horário proposto; sem
+  contraproposta. **Aceitar desafios** pode ser desligado.
+- **Confronto**: um único registro compartilhado e um jogo em cada agenda; data, horário
+  e local não são alterados nem cancelados por um só time.
+- **Placar**: só vale com os dois lados de acordo (validado). Pendente ou em divergência
+  não é oficial e não há resolução automática.
+- **Confiabilidade**: confrontos validados e respostas sim/não das avaliações (compareceu,
+  horário, combinado), sem nota, comentário livre nem ranking. W.O. ainda não existe.
+
+A migration aditiva `0015_opponents_challenges` recusa downgrade com dados da fase.
+Endpoints abaixo começam com `/v1/teams/{team_id}/opponents`:
+
+| Método | Sufixo | Ação |
+| --- | --- | --- |
+| GET | vazio | Central: créditos de desafio, pendentes e preferência |
+| PUT | `/settings` | Liga/desliga **Aceitar desafios** |
+| GET | `/search` | Busca (`modality`, `category`, `state`/`municipality` opcionais, `offset`) |
+| GET | `/teams/{opponent_id}` | Perfil público, confiabilidade, créditos e histórico |
+| GET / POST | `/challenges` | Lista (`direction=received` ou `sent`) / envia desafio |
+| POST | `/challenges/{id}/accept`, `/reject`, `/cancel` | Responde ou cancela |
+| GET | `/fixtures` e `/fixtures/{id}` | Confrontos / detalhe |
+| POST | `/fixtures/{id}/score`, `/confirm`, `/review` | Placar, confirmação e avaliação |
+
+Testes em `apps/api`: `uv run pytest -q tests/test_opponents.py`. Com o Expo Web em 8081:
+`uv run --with playwright pytest -q tests/browser_opponents_flow.py` (ciclo completo com
+dois presidentes, filtros/expansão e menu de cinco abas de 320 a 414 px).
+
+## Localização oficial dos times — Fase 5A
+
+Cidade e UF do time vêm da lista oficial de municípios do IBGE: no cadastro, o usuário
+escolhe a UF e depois a cidade, pesquisando parte do nome, sem digitar cidade livre. O app
+mostra só "Município/UF"; o código IBGE é interno.
+
+- **Base oficial**: `apps/api/migrations/data/ibge_municipalities.csv` (5.571 municípios,
+  gerado da API de localidades do IBGE em 2026-09-30) semeia a tabela `municipalities` na
+  migration aditiva `0016_team_locations`. Nada consulta o IBGE em tempo de execução;
+  novos municípios exigem nova migration.
+- **Times novos** nascem com localização confirmada.
+- **Times antigos** mantêm o texto digitado até o Presidente confirmar no Início
+  (**Confirme a localização do seu time**). O app pode pré-selecionar uma correspondência
+  exata, mas só o botão confirma. Até lá, a busca de adversários usa o texto como fallback.
+- **Alteração**: somente o Presidente, em **Perfil do time → Editar time → Alterar
+  localização**, sempre pelas listas oficiais; fica registrada em auditoria.
+- **Beta**: sem confirmação nada é bloqueado; elenco, jogos, peladas, financeiro e Central
+  seguem normais. Ranking ou competições por município/UF no futuro poderão exigir
+  localização confirmada.
+- **Distrito Federal** segue o IBGE: só Brasília; regiões administrativas não são municípios.
+- Sem bairro, coordenadas, distância, raio, mapa ou GPS: a busca continua mesma cidade →
+  mesma UF → outras UFs.
+- **App anterior** (cidade digitada): recebe 422 **Atualize o app para escolher a cidade na
+  lista oficial.** e nada é criado; editar o perfil continua aceitando a localização atual.
+- **Migration**: antes de alterar o banco confere o CSV (arquivo presente e 5.571
+  municípios). Recusa downgrade quando há localização confirmada, que a 0015 não guarda;
+  como a 0016 é aditiva, num rollback da aplicação o banco permanece na 0016.
+
+| Método | Caminho | Ação |
+| --- | --- | --- |
+| GET | `/v1/locations/states/{uf}/municipalities` | Municípios oficiais da UF |
+| GET / PUT | `/v1/teams/{team_id}/location` | Situação e sugestão / confirmação ou alteração (Presidente) |
+
+Testes em `apps/api`: `uv run pytest -q tests/test_team_locations.py`; com o Expo Web em 8081,
+`uv run --with playwright pytest -q tests/browser_locations_flow.py`.
+
 ## Próxima etapa
 
 Configurar o Sandbox do Asaas (API Key, token e webhook HTTPS) e validar o fluxo real.

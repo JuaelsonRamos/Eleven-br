@@ -63,18 +63,39 @@ class Player(Entity, Base):
     __table_args__ = (CheckConstraint("length(trim(display_name)) > 0", name="name"),)
 
 
+class Municipality(Base):
+    """Official IBGE municipality: versioned reference data seeded by migration 0016."""
+
+    __tablename__ = "municipalities"
+    code: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    state: Mapped[str] = mapped_column(String(2))
+    name: Mapped[str] = mapped_column(String(100))
+    __table_args__ = (
+        UniqueConstraint("code", "state", "name", name="uq_municipalities_identity"),
+        CheckConstraint("code BETWEEN 1100000 AND 5399999", name="code"),
+        CheckConstraint("state ~ '^[A-Z]{2}$'", name="state"),
+        Index("ix_municipalities_state_name", "state", "name"),
+    )
+
+
 class Team(Entity, Base):
     __tablename__ = "teams"
     name: Mapped[str] = mapped_column(String(100))
     code: Mapped[str] = mapped_column(String(10), unique=True)
+    # Display city/UF. Once confirmed they equal the official IBGE municipality; legacy
+    # teams keep the typed text (search fallback only) until the President confirms.
     city: Mapped[str] = mapped_column(String(100))
     state: Mapped[str] = mapped_column(String(2))
+    municipality_code: Mapped[int | None] = mapped_column(index=True)
+    location_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     modalities: Mapped[list[str]] = mapped_column(ARRAY(String(40)))
     category: Mapped[str | None] = mapped_column(String(16))
     crest_url: Mapped[str | None] = mapped_column(String(2048))
     status: Mapped[str] = mapped_column(String(16), server_default="active")
     plan: Mapped[str] = mapped_column(String(16), server_default="free")
     settings: Mapped[dict[str, object]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Opponent discovery and new challenges; existing challenges and fixtures are kept.
+    accepts_challenges: Mapped[bool] = mapped_column(server_default=text("true"))
     president_membership_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="name"),
@@ -89,6 +110,17 @@ class Team(Entity, Base):
         CheckConstraint("plan IN ('free', 'pro')", name="plan"),
         CheckConstraint(
             "category IS NULL OR category IN ('male', 'female', 'mixed')", name="category"
+        ),
+        CheckConstraint(
+            "(municipality_code IS NULL) = (location_confirmed_at IS NULL)",
+            name="location_confirmation",
+        ),
+        # Code, UF and name must be one official municipality (renames cascade).
+        ForeignKeyConstraint(
+            ["municipality_code", "state", "city"],
+            ["municipalities.code", "municipalities.state", "municipalities.name"],
+            name="fk_teams_municipality",
+            onupdate="CASCADE",
         ),
         ForeignKeyConstraint(
             ["id", "president_membership_id"],

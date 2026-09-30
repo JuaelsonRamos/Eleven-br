@@ -8,7 +8,7 @@ import type { Team } from '../teams/api';
 import { saveEvent, type SportEvent } from './api';
 import { styles } from './styles';
 
-function isoDate(input: string): string | null {
+export function isoDate(input: string): string | null {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(input);
   if (!match) return null;
   const iso = `${match[3]}-${match[2]}-${match[1]}`;

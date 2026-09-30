@@ -83,8 +83,8 @@ def test_browser_images_flow(engine: Engine, storage: LocalImageStorage) -> None
                 "/v1/teams",
                 json={
                     "name": "Tabajara FC",
-                    "city": "Vitória",
                     "state": "ES",
+                    "municipality_code": 3205309,  # Vitória (IBGE).
                     "modalities": ["society"],
                     "category": "mixed",
                 },
@@ -227,11 +227,13 @@ def test_browser_images_flow(engine: Engine, storage: LocalImageStorage) -> None
                 page.get_by_role("button", name="Criar time", exact=True).click()
                 page.get_by_label("Nome do time", exact=True).fill("Time com escudo")
                 page.get_by_role("radio", name="Misto", exact=True).click()
-                page.get_by_label("Cidade", exact=True).fill("Vitória")
                 page.get_by_role("button", name="UF", exact=True).click()
                 page.get_by_label("Pesquisar UF", exact=True).fill("ES")
                 page.get_by_role("button", name="Espírito Santo (ES)", exact=True).click()
                 expect(page.get_by_label("Pesquisar UF", exact=True)).to_have_count(0)
+                page.get_by_role("button", name="Cidade", exact=True).click()
+                page.get_by_label("Pesquisar cidade", exact=True).fill("Vitória")
+                page.get_by_role("button", name="Vitória", exact=True).click()
                 page.get_by_role("checkbox", name="Society / Fut7", exact=True).click()
                 choose("escudo", picture())
                 fail_crest = True

@@ -153,13 +153,14 @@ def test_category_required_public_counts_and_legacy(session):
     client = client_for(session, player)
     assert client.get(f"/v1/teams/{team.id}").json()["category"] is None
     missing = {k: v for k, v in DATA.items() if k != "category"}
+    profile = {"name": DATA["name"], "modalities": DATA["modalities"]}  # No location edits.
     assert client.post("/v1/teams", json=missing).status_code == 422
     assert client.post("/v1/teams", json={**DATA, "category": "unknown"}).status_code == 422
     assert (
         client.post("/v1/teams", json={**DATA, "category": "female"}).json()["category"] == "female"
     )
     assert (
-        client.put(f"/v1/teams/{team.id}", json={**DATA, "category": "male"}).json()["category"]
+        client.put(f"/v1/teams/{team.id}", json={**profile, "category": "male"}).json()["category"]
         == "male"
     )
     # One global Player counts once even when belonging to two teams.
@@ -464,4 +465,4 @@ def test_0013_preserves_all_original_columns_and_guards_new_data(session, engine
         config.attributes["connection"] = connection
         command.downgrade(config, "0012")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016"

@@ -14,6 +14,7 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { TeamsScreen } from './screens/TeamsScreen';
 import { TeamProvider, useTeams } from './teams/TeamContext';
 import { GamesScreen } from './screens/GamesScreen';
+import { OpponentsScreen } from './screens/OpponentsScreen';
 import { RosterScreen } from './screens/RosterScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { LineupsScreen } from './screens/LineupsScreen';
@@ -29,7 +30,7 @@ import { HelpScreen } from './screens/HelpScreen';
 const Tab = createBottomTabNavigator<TabParams>();
 const icons: Record<MainTab, keyof typeof Ionicons.glyphMap> = {
   'ELEVEN PRO': 'star-outline', Ajuda: 'help-circle-outline',
-  Início: 'home-outline', Jogos: 'football-outline', Times: 'shield-outline',
+  Início: 'home-outline', Jogos: 'football-outline', Adversários: 'shield-half-outline', Times: 'shield-outline',
   Notificações: 'notifications-outline', Perfil: 'person-outline',
   Elenco: 'people-outline', Mais: 'menu-outline', Estatísticas: 'stats-chart-outline', Financeiro: 'wallet-outline', Escalação: 'football-outline',
 };
@@ -38,7 +39,7 @@ function MainNavigation() {
   const { teams } = useTeams();
   const invitation = Platform.OS === 'web' && new URLSearchParams(window.location.search).has('team_code');
   // Keep routes mounted during selection revalidation; operational screens gate data themselves.
-  const visible: MainTab[] = teams.length ? ['Início', 'Jogos', 'Elenco', 'Mais'] : ['Times', 'Notificações', 'Perfil'];
+  const visible: MainTab[] = teams.length ? ['Início', 'Jogos', 'Adversários', 'Elenco', 'Mais'] : ['Times', 'Notificações', 'Perfil'];
   return <Tab.Navigator initialRouteName={invitation ? 'Times' : 'Início'} backBehavior="history" tabBar={props => <BottomNavigation {...props} visible={visible} icons={icons} />} screenOptions={({ route }) => ({
     headerShown: false,
     tabBarAccessibilityLabel: route.name === 'Times' ? 'Meus Times' : route.name,
@@ -52,6 +53,7 @@ function MainNavigation() {
   })}>
     <Tab.Screen name="Início" component={MainScreen} />
     <Tab.Screen name="Jogos" component={GamesScreen} />
+    <Tab.Screen name="Adversários" component={OpponentsScreen} />
     <Tab.Screen name="Times" component={TeamsScreen} initialParams={invitation ? { view: 'join' } : undefined} />
     <Tab.Screen name="Notificações" component={NotificationsScreen} />
     <Tab.Screen name="Perfil" component={ProfileScreen} />

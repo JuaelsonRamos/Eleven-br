@@ -22,8 +22,10 @@ from app.presentation.lineup_routes import router as lineup_router
 from app.presentation.match_event_routes import router as match_event_router
 from app.presentation.match_routes import router as match_router
 from app.presentation.notification_routes import router as notification_router
+from app.presentation.opponent_routes import router as opponent_router
 from app.presentation.roster_routes import router as roster_router
 from app.presentation.routes import router
+from app.presentation.schemas import OUTDATED_CLIENT
 from app.presentation.statistics_routes import router as statistics_router
 
 
@@ -57,13 +59,14 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
         # Pydantic input/ctx can contain plaintext passwords or verification secrets.
+        errors = error.errors()
+        outdated = [item["msg"] for item in errors if item["type"] == OUTDATED_CLIENT]
         return JSONResponse(
             status_code=422,
             content={
-                "detail": "Confira os campos informados.",
+                "detail": outdated[0] if outdated else "Confira os campos informados.",
                 "errors": [
-                    {"field": str(item["loc"][-1]), "message": item["msg"]}
-                    for item in error.errors()
+                    {"field": str(item["loc"][-1]), "message": item["msg"]} for item in errors
                 ],
             },
         )
@@ -100,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(match_router)
     app.include_router(image_router)
     app.include_router(statistics_router)
+    app.include_router(opponent_router)
     return app
 
 

@@ -240,7 +240,7 @@ def test_browser_notifications_flow(engine: Engine) -> None:
                 expect(
                     page.get_by_role("heading", name="Solicitações de entrada", exact=True)
                 ).to_be_visible()
-                expect(page.get_by_role("tab")).to_have_count(4)
+                expect(page.get_by_role("tab")).to_have_count(5)  # Adversários
                 assert bundles and all(status == 200 for status in bundles)
                 assert not errors, errors
                 page.wait_for_load_state("networkidle")

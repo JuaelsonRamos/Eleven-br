@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.infrastructure.models import User
 from app.infrastructure.security import hash_password
 from tests.conftest import make_player
+from tests.migration_snapshot import CLEAR_NEWER_TEAM_DATA
 from tests.test_team_profiles import DATA, client_for
 
 
@@ -17,7 +18,7 @@ def test_migration_roundtrip(engine: Engine) -> None:
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     with engine.begin() as connection:
         config.attributes["connection"] = connection
-        connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
+        connection.execute(text(CLEAR_NEWER_TEAM_DATA))
         command.downgrade(config, "base")
         assert inspect(connection).get_table_names() == ["alembic_version"]
         command.upgrade(config, "head")
@@ -57,6 +58,11 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "billing_payments",
             "billing_webhooks",
             "billing_audit",
+            "team_challenges",
+            "team_fixtures",
+            "fixture_scores",
+            "fixture_reviews",
+            "municipalities",
         }
         command.check(config)
 
@@ -66,7 +72,7 @@ def test_incremental_migration_preserves_foundation_data(engine: Engine) -> None
     user_id, player_id = uuid4(), uuid4()
     with engine.begin() as connection:
         config.attributes["connection"] = connection
-        connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
+        connection.execute(text(CLEAR_NEWER_TEAM_DATA))
         command.downgrade(config, "0001")
         connection.execute(
             text("INSERT INTO users (id, email) VALUES (:id, :email)"),
@@ -100,10 +106,11 @@ def test_0003_preserves_existing_team_account_and_session(engine: Engine) -> Non
         client = client_for(session, player)
         original = client.post("/v1/teams", json={**DATA, "name": "Tabajara FC"}).json()
         original["category"] = None
+        original["municipality_code"], original["location_confirmed"] = None, False
         session.close()
         with engine.begin() as connection:
             config.attributes["connection"] = connection
-            connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
+            connection.execute(text(CLEAR_NEWER_TEAM_DATA))
             command.downgrade(config, "0002")
             legacy = dict(connection.execute(text("SELECT * FROM teams")).mappings().one())
             assert legacy["modality"] == "society"
@@ -141,7 +148,7 @@ def test_0003_downgrade_refuses_to_discard_multiple_modalities(engine: Engine) -
         team = client.post("/v1/teams", json={**DATA, "modalities": ["society", "futsal"]}).json()
     with pytest.raises(RuntimeError, match="multiple modalities"), engine.begin() as connection:
         config.attributes["connection"] = connection
-        connection.execute(text("UPDATE teams SET category = NULL WHERE category IS NOT NULL"))
+        connection.execute(text(CLEAR_NEWER_TEAM_DATA))
         command.downgrade(config, "0002")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT modalities FROM teams")) == team["modalities"]

@@ -46,14 +46,29 @@ export const helpSections = [
         summary: 'Crie seu time e torne-se o Presidente.',
         steps: [
           'Abra **Meus Times** (com um time aberto, em **Mais → Meus Times / Trocar time**) e toque em **Criar time**.',
-          'Preencha nome, cidade, UF e categoria e marque uma ou mais modalidades: Campo, Society / Fut7 ou Futsal. O escudo é opcional.',
+          'Preencha o nome, escolha a **UF** e depois a **Cidade** na lista oficial (digite parte do nome para pesquisar), a categoria e uma ou mais modalidades: Campo, Society / Fut7 ou Futsal. O escudo é opcional.',
           'Toque em **Criar time**. Você passa a ser o Presidente e o time começa no plano Free.',
         ],
         notes: [
           'Se existir um time parecido na mesma cidade, o app avisa. Confira e, se for outro time, toque em **Criar mesmo assim**.',
-          'Para mudar os dados depois, abra **Perfil do time → Editar time**.',
+          'Para mudar os dados depois, abra **Perfil do time → Editar time**. A localização só o Presidente altera.',
         ],
-        related: ['invite-players', 'administrators'],
+        related: ['team-location', 'invite-players', 'administrators'],
+      },
+      {
+        id: 'team-location', title: 'Como confirmar ou alterar a localização do time',
+        summary: 'Cidade e UF escolhidas da lista oficial de municípios.',
+        steps: [
+          'Times antigos mostram **Confirme a localização do seu time** no Início, só para o Presidente.',
+          'Confira a **UF** e a **Cidade** (o app sugere a cidade quando o nome cadastrado corresponde a uma oficial) e toque em **CONFIRMAR LOCALIZAÇÃO**.',
+          'Para mudar depois, o Presidente abre **Perfil do time → Editar time → Alterar localização** e escolhe a nova UF e cidade.',
+        ],
+        notes: [
+          'Só aparecem cidades oficiais da UF escolhida; não é possível digitar outra cidade.',
+          'O perfil mostra apenas cidade e UF. O app não pede endereço, CEP nem GPS.',
+          'Enquanto não for confirmada, a localização antiga continua valendo na busca de adversários.',
+        ],
+        related: ['create-team', 'opponents-search'],
       },
       {
         id: 'join-team', title: 'Como entrar em um time',
@@ -287,8 +302,11 @@ export const helpSections = [
           'Preencha título, modalidade, data, horário, local e, se quiser, o **Adversário (opcional)**.',
           'Toque em **Salvar evento**. O elenco confirma presença como em qualquer evento.',
         ],
-        notes: ['O adversário é informado só pelo nome: ele não precisa ter um time no ELEVEN BR.'],
-        related: ['attendance'],
+        notes: [
+          'O adversário é informado só pelo nome: ele não precisa ter um time no ELEVEN BR.',
+          'Para jogar contra um time do ELEVEN BR, com placar validado pelos dois lados, use **Adversários**.',
+        ],
+        related: ['attendance', 'opponents-challenge'],
       },
       {
         id: 'record-result', title: 'Como registrar resultado',
@@ -300,7 +318,7 @@ export const helpSections = [
           'Ao final, toque em **Finalizar partida** e confirme. Se precisar, use **Corrigir resultado**.',
         ],
         notes: [
-          'Jogos avulsos contra adversários ainda não têm registro de placar.',
+          'Jogos avulsos com adversário só pelo nome não têm registro de placar. Confrontos da Central de Adversários têm placar validado pelos dois times.',
           'Partidas canceladas ficam no histórico, mas não contam nas estatísticas.',
         ],
         related: ['match-stats'],
@@ -317,6 +335,82 @@ export const helpSections = [
           'Os registros não mudam o placar oficial; o app apenas compara os dois.',
           'Gestores podem ajustar totais históricos em **Elenco → jogador → Editar estatísticas**.',
         ],
+      },
+    ],
+  },
+  {
+    id: 'opponents', title: 'Adversários', icon: 'shield-half-outline',
+    topics: [
+      {
+        id: 'opponents-overview', title: 'Como funciona a Central de Adversários',
+        summary: 'Encontre times cadastrados, desafie e valide o resultado com o adversário.',
+        steps: [
+          'Toque em **Adversários** no menu inferior.',
+          'Use **Buscar** para encontrar times compatíveis, **Recebidos** e **Enviados** para acompanhar desafios e **Confrontos** para os jogos combinados.',
+          'Buscam, desafiam, respondem, informam placar e avaliam: o Presidente e administradores com a área **Jogos, peladas e escalações** (PRO).',
+        ],
+        notes: [
+          'Buscar e ver perfis é livre. No Free, o time envia 1 desafio por mês; no ELEVEN BR PRO, os desafios são ilimitados.',
+          'Receber, aceitar e recusar desafios nunca usa o desafio do mês.',
+          'Em **Aceitar desafios**, o time pode sair da busca e parar de receber novos desafios. Desafios e confrontos existentes continuam.',
+        ],
+        related: ['opponents-search', 'opponents-challenge'],
+      },
+      {
+        id: 'opponents-search', title: 'Como buscar adversários',
+        summary: 'Primeiro a compatibilidade; depois, a proximidade.',
+        steps: [
+          'Em **Adversários → Buscar**, escolha em **Buscar adversário para:** a modalidade do confronto e confira a **Categoria**, que começa com a do seu time.',
+          'Em **Local**, use **Perto do meu time** ou escolha uma UF e, se quiser, uma cidade da lista oficial.',
+          'Toque em **Buscar adversários**. Primeiro aparecem os times próximos (sua cidade); depois a busca é ampliada para o seu estado e outras UFs.',
+          'Toque em um time para ver cidade, modalidades, categoria, confiabilidade e o histórico entre vocês.',
+        ],
+        notes: [
+          'Times sem categoria cadastrada aparecem depois dos compatíveis, marcados como **Categoria não informada**. Para outra categoria, escolha-a de propósito.',
+          'A proximidade usa a cidade e a UF oficiais do time; o app não usa endereço nem GPS.',
+          'Buscar quantas vezes quiser não gasta o desafio do mês.',
+        ],
+        related: ['opponents-challenge'],
+      },
+      {
+        id: 'opponents-challenge', title: 'Como desafiar e responder',
+        summary: 'Proponha data, horário, local e mando; o adversário aceita ou recusa.',
+        steps: [
+          'No perfil do adversário, escolha a modalidade, informe data, horário, local e o mando (**Em casa** ou **Fora**) e toque em **Enviar desafio**.',
+          'O time desafiado é avisado e responde em **Adversários → Recebidos**, com **Aceitar desafio** ou **Recusar**.',
+          'Ao aceitar, o confronto aparece em **Jogos** dos dois times, com confirmação de presença.',
+        ],
+        notes: [
+          'No Free, enviar o desafio usa o desafio gratuito do mês, mesmo que depois ele seja recusado ou cancelado. Se o envio falhar, nada é gasto.',
+          'Enquanto o desafio estiver pendente, quem enviou pode cancelá-lo. Não há contraproposta: para outra data ou local, recuse e envie um novo desafio.',
+          'Um desafio sem resposta expira no horário proposto.',
+          'Data, horário e local de um confronto aceito não podem ser alterados nem cancelados por um só time.',
+        ],
+        related: ['opponents-score'],
+      },
+      {
+        id: 'opponents-score', title: 'Como validar o placar do confronto',
+        summary: 'O resultado só vale quando os dois times concordam.',
+        steps: [
+          'A partir do horário do jogo, abra o confronto em **Adversários → Confrontos** e toque em **Informar placar**.',
+          'O adversário é avisado e toca em **Confirmar placar** ou em **Contestar placar**, informando o placar correto.',
+          'Com os dois placares iguais, o resultado fica **validado** e não pode mais ser alterado.',
+        ],
+        notes: [
+          'Placar aguardando confirmação ou **em divergência** não é resultado oficial. Sem resposta, o placar continua aguardando: o silêncio não confirma.',
+          'Ainda não há como resolver uma divergência pelo app.',
+        ],
+        related: ['opponents-review'],
+      },
+      {
+        id: 'opponents-review', title: 'Como avaliar o adversário',
+        summary: 'Avaliação de confiabilidade depois do resultado validado.',
+        steps: [
+          'No confronto validado, responda **Compareceu ao jogo?**, **Cumpriu o horário combinado?** e **Cumpriu o que foi combinado?** com Sim ou Não.',
+          'Toque em **Enviar avaliação**. Cada time avalia o adversário uma vez por confronto.',
+        ],
+        notes: ['A confiabilidade mostra números verificáveis: confrontos validados e respostas das avaliações. Não há nota, estrelas nem ranking; sem confrontos, aparece **Sem histórico suficiente**.'],
+        related: ['opponents-overview'],
       },
     ],
   },
@@ -402,8 +496,8 @@ export const helpSections = [
         summary: 'O plano completo do seu time.',
         steps: [
           'É o plano mensal pago do time. Consulte o preço atual na Central ELEVEN PRO.',
-          'Libera até 100 jogadores ativos, até 5 administradores com permissões por área e escalações visuais.',
-          'O Free continua gratuito, com até 24 jogadores ativos e administração somente pelo Presidente.',
+          'Libera até 100 jogadores ativos, até 5 administradores com permissões por área, escalações visuais e desafios de adversários ilimitados.',
+          'O Free continua gratuito, com até 24 jogadores ativos, administração somente pelo Presidente e 1 desafio de adversário por mês.',
         ],
         notes: ['Mudar de plano nunca apaga jogadores, histórico ou dados do time.'],
         related: ['pro-subscribe', 'administrators'],

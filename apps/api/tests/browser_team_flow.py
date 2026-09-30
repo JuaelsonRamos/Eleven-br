@@ -127,7 +127,6 @@ def test_browser_team_flow(engine: Engine) -> None:
                 page.get_by_role("button", name="Criar time", exact=True).click()
                 page.get_by_label("Nome do time", exact=True).fill(name)
                 page.get_by_role("radio", name="Misto", exact=True).click()
-                page.get_by_label("Cidade", exact=True).fill("Vitória")
                 page.get_by_role("button", name="UF", exact=True).click()
                 if name == "Tabajara":
                     page.screenshot(
@@ -152,10 +151,21 @@ def test_browser_team_flow(engine: Engine) -> None:
                 search.fill("ES")
                 page.get_by_role("button", name="Espírito Santo (ES)", exact=True).click()
                 expect(search).to_have_count(0)
+                # Only official municipalities of the chosen UF; no typed city.
+                page.get_by_role("button", name="Cidade", exact=True).click()
+                city = page.get_by_label("Pesquisar cidade", exact=True)
+                city.fill("vila")
+                for option in ("Vila Pavão", "Vila Valério", "Vila Velha"):
+                    expect(page.get_by_role("button", name=option, exact=True)).to_be_visible()
+                city.fill("Cidade Inventada")
+                expect(page.get_by_text("Nenhuma cidade encontrada.", exact=True)).to_be_visible()
+                city.fill("vitoria")
+                page.get_by_role("button", name="Vitória", exact=True).click()
+                expect(city).to_have_count(0)
                 # Empty selection must be rejected before any creation request.
                 page.get_by_role("button", name="Criar time", exact=True).click()
                 expect(
-                    active_text("Preencha nome, cidade, UF válida e ao menos uma modalidade.")
+                    active_text("Preencha nome, UF, cidade e ao menos uma modalidade.")
                 ).to_be_visible()
                 page.get_by_role("checkbox", name="Society / Fut7", exact=True).click()
                 page.get_by_role("checkbox", name="Futsal", exact=True).click()
@@ -211,7 +221,7 @@ def test_browser_team_flow(engine: Engine) -> None:
             page.get_by_role("tab", name="Início", exact=True).click()
             expect(active_text("Tabajara FC")).to_be_visible()
             expect(active_text("Segundo time")).not_to_be_visible()
-            assert page.get_by_role("tab").count() == 4
+            assert page.get_by_role("tab").count() == 5  # Adversários
             page.screenshot(
                 path=str(artifacts / "teams-home-mobile.png"), full_page=True, animations="disabled"
             )

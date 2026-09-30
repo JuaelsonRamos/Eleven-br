@@ -29,12 +29,13 @@ class Entitlements:
     granular_permissions: bool
     lineups: bool = False
     finance: bool = False  # Financial operations; existing data is never removed on Free.
+    opponent_challenges: int | None = 1  # Challenges sent per month; None is unlimited.
 
 
 ENTITLEMENTS = MappingProxyType(
     {
         Plan.FREE: Entitlements(24, 0, False),
-        Plan.PRO: Entitlements(100, 5, True, lineups=True, finance=True),
+        Plan.PRO: Entitlements(100, 5, True, lineups=True, finance=True, opponent_challenges=None),
     }
 )
 

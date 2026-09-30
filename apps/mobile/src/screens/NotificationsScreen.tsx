@@ -22,7 +22,8 @@ function relative(value: string) {
   return minutes < 1 ? 'Agora' : minutes < 60 ? `${minutes} min` : minutes < 1440 ? `${Math.floor(minutes / 60)}h` : day(value);
 }
 function icon(type: string): IconName {
-  return type.startsWith('FINANCE') ? 'wallet-outline' : type.startsWith('TEAM') ? 'people-outline' : type === 'ATTENDANCE_REMINDER' ? 'calendar-outline' : 'football-outline';
+  return type.startsWith('FINANCE') ? 'wallet-outline' : type.startsWith('TEAM') ? 'people-outline' : type === 'ATTENDANCE_REMINDER' ? 'calendar-outline'
+    : type.startsWith('CHALLENGE') || type.startsWith('FIXTURE') ? 'shield-half-outline' : 'football-outline';
 }
 export function NotificationsScreen({ navigation }: BottomTabScreenProps<TabParams, 'Notificações'>) {
   const { select } = useTeams();
@@ -63,6 +64,9 @@ export function NotificationsScreen({ navigation }: BottomTabScreenProps<TabPara
         case 'OPEN_JOIN_REQUESTS': navigation.navigate('Elenco', { teamId: team.id, view: 'requests' }); break;
         case 'OPEN_EVENT': if (updated.entity_id) navigation.navigate('Jogos', { teamId: team.id, eventId: updated.entity_id }); break;
         case 'OPEN_FINANCE_CHARGE': if (updated.entity_id) navigation.navigate('Financeiro', { teamId: team.id, duesId: updated.entity_id }); break;
+        // Received/cancelled reach the challenged team; accepted/rejected reach the sender.
+        case 'OPEN_CHALLENGE': navigation.navigate('Adversários', { teamId: team.id, view: ['CHALLENGE_RECEIVED', 'CHALLENGE_CANCELLED'].includes(updated.type) ? 'received' : 'sent' }); break;
+        case 'OPEN_FIXTURE': if (updated.entity_id) navigation.navigate('Adversários', { teamId: team.id, fixtureId: updated.entity_id }); break;
       }
     } catch (cause) { if (current === generation.current) setError(cause instanceof Error ? cause.message : 'Não foi possível abrir a notificação.'); }
     finally { sending.current = false; setBusy(false); }

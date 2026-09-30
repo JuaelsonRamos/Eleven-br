@@ -93,7 +93,7 @@ def test_browser_statistics_flow(engine: Engine) -> None:
                 headers=owner,
                 json={
                     "name": "Tabajara FC",
-                    "city": "Vitória",
+                    "municipality_code": 3205309,  # Vitória (IBGE).
                     "state": "ES",
                     "modalities": ["society", "futsal"],
                     "category": "mixed",
@@ -304,7 +304,7 @@ def test_browser_statistics_flow(engine: Engine) -> None:
                 button("Estatísticas").click()
                 expect(visible_text("Tabajara FC")).to_be_visible()
                 expect(visible_text("Gols identificados")).to_be_visible()
-                expect(page.get_by_role("tab")).to_have_count(4)
+                expect(page.get_by_role("tab")).to_have_count(5)  # Adversários
                 assert not errors, errors
                 assert bundles and all(status == 200 for status in bundles)
                 context.unroute_all(behavior="wait")

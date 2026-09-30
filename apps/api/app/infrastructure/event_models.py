@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.infrastructure import opponent_models  # noqa: F401  # Registers the fixture FK target.
 from app.infrastructure.models import Base, Entity
 
 
@@ -55,10 +56,16 @@ class Event(Entity, Base):
     location: Mapped[str] = mapped_column(String(200))
     notes: Mapped[str | None] = mapped_column(String(2000))
     opponent: Mapped[str | None] = mapped_column(String(100))
+    # Official fixture between two registered teams; free-text games keep it empty.
+    fixture_id: Mapped[UUID | None] = mapped_column(ForeignKey("team_fixtures.id"))
     status: Mapped[str] = mapped_column(String(16), server_default="open")
     __table_args__ = (
         UniqueConstraint("team_id", "id", name="uq_events_team_id"),
         UniqueConstraint("team_id", "creation_key", name="uq_events_creation_key"),
+        UniqueConstraint("team_id", "fixture_id", name="uq_events_team_fixture"),
+        CheckConstraint(
+            "fixture_id IS NULL OR (kind = 'JOGO' AND series_id IS NULL)", name="fixture"
+        ),
         CheckConstraint("(creation_key IS NULL) = (creation_hash IS NULL)", name="creation_key"),
         UniqueConstraint("series_id", "recurrence_date", name="uq_events_series_date"),
         ForeignKeyConstraint(["team_id", "series_id"], ["event_series.team_id", "event_series.id"]),

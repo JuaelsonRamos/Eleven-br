@@ -3,7 +3,7 @@ import { authenticated } from '../auth/api';
 export type Notification = {
   id: string; team_id: string | null; team_name: string | null; type: string;
   title: string; message: string; entity_type: string | null; entity_id: string | null;
-  action: 'OPEN_TEAM' | 'OPEN_JOIN_REQUESTS' | 'OPEN_EVENT' | 'OPEN_FINANCE_CHARGE' | null;
+  action: 'OPEN_TEAM' | 'OPEN_JOIN_REQUESTS' | 'OPEN_EVENT' | 'OPEN_FINANCE_CHARGE' | 'OPEN_CHALLENGE' | 'OPEN_FIXTURE' | null;
   read_at: string | null; created_at: string; available: boolean;
 };
 export type Page = { items: Notification[]; next_cursor: string | null };

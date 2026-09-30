@@ -14,6 +14,7 @@ from app.infrastructure.event_models import Event
 from app.infrastructure.finance_models import CashEntry, MonthlyDues
 from app.infrastructure.join_models import TeamJoinRequest
 from app.infrastructure.models import Player, Team, TeamMembership, User
+from app.infrastructure.opponent_models import TeamChallenge, TeamFixture
 
 
 def join_request(session: Session, team: Team, item: TeamJoinRequest) -> None:
@@ -155,4 +156,88 @@ def finance_notice(
         entity_type="finance_charge",
         entity_id=dues.id,
         action=Action.OPEN_FINANCE_CHARGE,
+    )
+
+
+def challenge_notice(
+    session: Session, item: TeamChallenge, kind: Kind, *, to: Team, sender: Team, author: UUID
+) -> None:
+    """Challenge updates go to whoever manages games (MANAGE_EVENTS) in the receiving team."""
+    when = f"{item.date:%d/%m} às {item.time:%H:%M}"
+    title, message = {
+        Kind.CHALLENGE_RECEIVED: (
+            "Novo desafio recebido",
+            f"{sender.name} desafiou seu time para {when}.",
+        ),
+        Kind.CHALLENGE_ACCEPTED: (
+            "Desafio aceito",
+            f"{sender.name} aceitou o desafio de {when}. O confronto já está em Jogos.",
+        ),
+        Kind.CHALLENGE_REJECTED: (
+            "Desafio recusado",
+            f"{sender.name} recusou o desafio de {when}.",
+        ),
+        Kind.CHALLENGE_CANCELLED: (
+            "Desafio cancelado",
+            f"{sender.name} cancelou o desafio de {when}.",
+        ),
+    }[kind]
+    emit(
+        session,
+        users=recipients(session, to, permission=Permission.MANAGE_EVENTS, exclude=author),
+        team_id=to.id,
+        kind=kind,
+        title=title,
+        message=message,
+        key=f"{kind.value.lower()}:{item.id}",
+        entity_type="challenge",
+        entity_id=item.id,
+        action=Action.OPEN_CHALLENGE,
+    )
+
+
+def fixture_notice(
+    session: Session,
+    fixture: TeamFixture,
+    kind: Kind,
+    *,
+    to: UUID,
+    teams: dict[UUID, Team],
+    author: UUID,
+    score: tuple[int, int] | None = None,
+) -> None:
+    home, away = teams[fixture.home_team_id], teams[fixture.away_team_id]
+    other = away if to == home.id else home
+    result = f"{home.name} {score[0]} x {score[1]} {away.name}" if score else ""
+    title, message = {
+        Kind.FIXTURE_SCORE_REPORTED: (
+            "Placar aguardando confirmação",
+            f"{other.name} informou {result}. Confirme ou conteste o placar.",
+        ),
+        Kind.FIXTURE_SCORE_CONFIRMED: (
+            "Resultado validado",
+            f"{result} foi confirmado pelos dois times.",
+        ),
+        Kind.FIXTURE_SCORE_DISPUTED: (
+            "Placar em disputa",
+            f"{other.name} informou {result}, diferente do placar do seu time. "
+            "O resultado não é oficial.",
+        ),
+        Kind.FIXTURE_REVIEW_AVAILABLE: (
+            "Avalie o adversário",
+            f"O resultado contra {other.name} foi validado. Avalie se o adversário compareceu, "
+            "cumpriu o horário e o combinado.",
+        ),
+    }[kind]
+    emit(
+        session,
+        users=recipients(session, teams[to], permission=Permission.MANAGE_EVENTS, exclude=author),
+        team_id=to,
+        kind=kind,
+        title=title,
+        message=message,
+        key=f"{kind.value.lower()}:{fixture.id}:{to}",
+        entity_type="fixture",
+        entity_id=fixture.id,
+        action=Action.OPEN_FIXTURE,
     )

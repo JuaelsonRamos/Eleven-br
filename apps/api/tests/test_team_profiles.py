@@ -15,10 +15,11 @@ from app.infrastructure.models import Player, Team, TeamMembership, User
 from app.main import create_app
 from tests.conftest import make_player
 
+VITORIA, VILA_VELHA = 3205309, 3205200  # Official IBGE municipality codes (ES).
 DATA = {
     "name": "Tabajara",
-    "city": "Vitória",
     "state": "ES",
+    "municipality_code": VITORIA,
     "modalities": ["society"],
     "category": "mixed",
 }
@@ -72,16 +73,15 @@ def test_duplicate_advisory_is_public_limited_and_nonblocking(session: Session) 
     first = client_for(session, make_player(session))
     created = first.post("/v1/teams", json=DATA).json()
     other = client_for(session, make_player(session))
-    similar = other.post(
-        "/v1/teams/similar", json={**DATA, "name": "TABAJARA FC", "city": "vitoria"}
-    )
+    similar = other.post("/v1/teams/similar", json={**DATA, "name": "TABAJARA FC"})
     assert similar.status_code == 200
     assert len(similar.json()) == 1
     assert set(similar.json()[0]) == {"name", "code", "city", "state", "modalities", "category"}
     assert other.get(f"/v1/teams/{created['id']}").status_code == 404
     assert other.post("/v1/teams", json=DATA).status_code == 201
     assert other.post("/v1/teams/similar", json={**DATA, "modalities": ["futsal"]}).json() == []
-    assert other.post("/v1/teams/similar", json={**DATA, "city": "Outra cidade"}).json() == []
+    another = {**DATA, "municipality_code": VILA_VELHA}
+    assert other.post("/v1/teams/similar", json=another).json() == []
 
 
 def test_manipulated_ids_permissions_and_inactive_membership(session: Session) -> None:
@@ -127,7 +127,7 @@ def test_registration_requires_authentication_and_existing_player(session: Sessi
     "change",
     [
         {"name": "  "},
-        {"city": ""},
+        {"municipality_code": "vitoria"},
         {"state": "XX"},
         {"modalities": ["invalid"]},
         {"modalities": []},
@@ -198,8 +198,10 @@ def test_uf_catalog_validation_and_normalization(session: Session) -> None:
         "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split()
     )
     assert {"value": "ES", "label": "Espírito Santo (ES)"} in options["states"]
-    for state in ["es", " SP ", "df"]:
-        response = client.post("/v1/teams", json={**DATA, "state": state})
+    for state, code in [("es", VITORIA), (" SP ", 3550308), ("df", 5300108)]:
+        response = client.post(
+            "/v1/teams", json={**DATA, "state": state, "municipality_code": code}
+        )
         assert response.status_code == 201
         assert response.json()["state"] == state.strip().upper()
     for state in ["", "XX", "ZZ", "São Paulo", "E", "ESP"]:

@@ -5,13 +5,18 @@ import { Button, Card } from '../components/ui';
 import { ImageSelector } from '../images/ImageSelector';
 import { saveCrest, type ImageChoice } from '../images/api';
 import { theme } from '../theme';
-import { categories, findSimilar, modalityLabels, saveTeam, type PublicTeam, type Team, type TeamInput } from './api';
+import { categories, findSimilar, modalityLabels, saveTeam, type Municipality, type PublicTeam, type Team, type TeamInput } from './api';
 import { useTeams } from './TeamContext';
 import { StateSelector } from './StateSelector';
+import { MunicipalitySelector } from './MunicipalitySelector';
+import { LocationEditor } from './LocationEditor';
 
 export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () => void; onCancel: () => void }) {
   const { options, saved, reload } = useTeams();
-  const [data, setData] = useState<TeamInput>({ name: team?.name ?? '', city: team?.city ?? '', state: team?.state ?? '', modalities: team?.modalities ?? [], category: team?.category ?? null });
+  const [data, setData] = useState<TeamInput>({ name: team?.name ?? '', state: team?.state ?? '', municipality_code: team?.municipality_code ?? null, modalities: team?.modalities ?? [], category: team?.category ?? null });
+  // Registration only: an official municipality of the chosen UF, never typed text.
+  const [place, setPlace] = useState<Municipality | null>(null);
+  const [moving, setMoving] = useState(false);
   const [similar, setSimilar] = useState<PublicTeam[] | null>(null);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -22,10 +27,11 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
 
   async function submit(confirmed = false) {
     if (locked.current) return;
-    const clean = { ...data, name: data.name.trim(), city: data.city.trim(), state: data.state.trim().toUpperCase() };
+    const clean = { ...data, name: data.name.trim(), municipality_code: place?.code ?? null };
     if (!clean.category) { setError('Selecione a categoria do time.'); return; }
-    if (!clean.name || !clean.city || !options.states.some(item => item.value === clean.state) || !clean.modalities.length || !clean.modalities.every(value => options.modalities.some(item => item.value === value))) {
-      setError('Preencha nome, cidade, UF válida e ao menos uma modalidade.'); return;
+    const located = Boolean(persisted) || (options.states.some(item => item.value === clean.state) && clean.municipality_code !== null);
+    if (!clean.name || !located || !clean.modalities.length || !clean.modalities.every(value => options.modalities.some(item => item.value === value))) {
+      setError('Preencha nome, UF, cidade e ao menos uma modalidade.'); return;
     }
     locked.current = true; setBusy(true); setError(null);
     try {
@@ -33,7 +39,8 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
         const matches = await findSimilar(clean);
         if (matches.length) { setSimilar(matches); return; }
       }
-      let updated = await saveTeam(clean, persisted?.id);
+      // Profile edits never carry the location: only the President changes it.
+      let updated = await saveTeam(persisted ? { name: clean.name, modalities: clean.modalities, category: clean.category } : clean, persisted?.id);
       setPersisted(updated);
       if (crest !== undefined) {
         try { updated = await saveCrest(updated.id, crest); }
@@ -55,8 +62,16 @@ export function TeamForm({ team, onDone, onCancel }: { team?: Team; onDone: () =
     <ImageSelector kind="crest" name={data.name || 'seu time'} current={persisted?.crest_url || null} choice={crest}
       disabled={busy} onChange={value => { setCrest(value); setError(null); }} />
     <Field label="Nome do time" value={data.name} onChangeText={value => change('name', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
-    <Field label="Cidade" value={data.city} onChangeText={value => change('city', value)} maxLength={100} autoCapitalize="words" editable={!busy} />
-    <StateSelector value={data.state} options={options.states} onChange={value => change('state', value)} disabled={busy} />
+    {persisted ? <View style={styles.form}>
+      <Text style={styles.label}>Localização</Text>
+      <Text style={styles.note}>{persisted.city}/{persisted.state}{persisted.location_confirmed ? '' : ' — aguardando confirmação do Presidente'}</Text>
+      {persisted.my_role !== 'president' ? <Text style={styles.note}>Somente o Presidente confirma ou altera a localização.</Text>
+        : moving ? <LocationEditor team={persisted} onDone={updated => { setPersisted(updated); setMoving(false); }} onCancel={() => setMoving(false)} />
+        : <TextAction label={persisted.location_confirmed ? 'Alterar localização' : 'Confirmar localização'} disabled={busy} onPress={() => setMoving(true)} />}
+    </View> : <>
+      <StateSelector value={data.state} options={options.states} onChange={value => { change('state', value); setPlace(null); }} disabled={busy} />
+      <MunicipalitySelector state={data.state} value={place} onChange={value => { setPlace(value); setSimilar(null); setError(null); }} disabled={busy} />
+    </>}
     <Text style={styles.label}>Categoria</Text>
     <View style={styles.choices}>{(Object.keys(categories) as (keyof typeof categories)[]).map(value => <Pressable key={value} accessibilityRole="radio" accessibilityLabel={categories[value]} accessibilityState={{ selected: data.category === value }} disabled={busy} onPress={() => change('category', value)} style={[styles.choice, data.category === value && styles.checked]}><Text style={styles.choiceText}>{categories[value]}{data.category === value ? ' ✓' : ''}</Text></Pressable>)}</View>
     <Text style={styles.label}>Modalidades</Text>
