@@ -1172,6 +1172,14 @@ O app não captura cartão/CVV. O retorno ao site não comprova pagamento.
 Admin e jogador consultam plano e benefícios; só o Presidente vê contratação,
 pagamento e cancelamento. Ao reabrir uma contratação existente, a Central retoma
 QR Code/link por uma atualização autorizada, sem criar cobrança nem usar polling.
+Logo após criar a assinatura Pix, o backend faz até três tentativas, somente GET, para obter
+a primeira cobrança/QR, com intervalos de 0,5 s e orçamento de 6 s para consultas.
+Se ainda indisponível, informa que o Pix está sendo preparado. **Atualizar assinatura**
+consulta o mesmo `provider_id`; nenhum POST é repetido para recuperar o QR.
+HTTP 400 mantém o tratamento normal de rejeição, inclusive no refresh; não é
+interpretado como preparação do Pix sem classificação segura do provedor.
+O orçamento limita tentativas; timeout HTTP por operação não garante teto absoluto
+de tempo total de parede.
 Na contratação por Pix a Central mostra **Pagamento inicial pendente**, o contador
 **Tempo para concluir esta contratação**, QR Code e **Copiar código Pix**, sem
 "Próxima cobrança" antes da confirmação. Renovações de um Pro ativo mostram valor,

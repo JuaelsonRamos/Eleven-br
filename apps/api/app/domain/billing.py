@@ -31,6 +31,10 @@ class BillingUnavailable(DomainError):
     pass
 
 
+class BillingPixPreparing(BillingUnavailable):
+    """A bounded initial Pix GET did not yield a usable resource yet."""
+
+
 class BillingRejected(DomainError):
     """Provider explicitly rejected the request before creating a resource."""
 

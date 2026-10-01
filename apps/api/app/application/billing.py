@@ -467,7 +467,7 @@ def record_creation(
     if stopping:
         # A cancellation arrived while the resource was being created: finish it now.
         return cancel(session, user_id, team_id, settings)
-    return payment_details(session, user_id, team_id, settings)
+    return payment_details(session, user_id, team_id, settings, initial_creation=method == "PIX")
 
 
 def payment_details(
@@ -475,6 +475,8 @@ def payment_details(
     user_id: UUID,
     team_id: UUID,
     settings: Settings,
+    *,
+    initial_creation: bool = False,
 ) -> dict[str, object]:
     team = authorize(session, user_id, team_id, write=True)
     account = account_for(session, team, settings)
@@ -526,7 +528,11 @@ def payment_details(
         result["checkout_url"] = (
             f"https://{host}/checkoutSession/show?id={quote(checkout_id, safe='')}"
         )
-    if provider_id:
+    if provider_id and method == "PIX" and not started:
+        from app.application.billing_pix import initial_pix
+
+        result.update(initial_pix(provider, provider_id, amount, retry=initial_creation))
+    elif provider_id:
         payments = provider.list_all(f"/subscriptions/{quote(provider_id, safe='')}/payments", {})
         pending = sorted(
             (p for p in payments if p.get("status") in ("PENDING", "OVERDUE")),
@@ -553,6 +559,8 @@ def payment_details(
     # Provider calls may cross the deadline. Never return a QR using the earlier snapshot.
     authorize(session, user_id, team_id, write=True)
     current = subscription_of(session, subscription_id)
+    if current.cancelled_at or current.cancel_requested or current.operation_status == "REVIEW":
+        result = summary(session, user_id, team_id)
     elapsed = not current.cancelled_at and pix_expired(current, datetime.now(UTC))
     session.commit()
     if elapsed:
