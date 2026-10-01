@@ -1,3 +1,6 @@
+import { FixtureHeading } from './FixtureHeading';
+import { FixtureActions } from './FixtureActions';
+import { fixtureStatus } from './api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Field, FormError, TextAction } from '../components/AuthLayout';
@@ -55,6 +58,8 @@ export function FixtureView({ teamId, fixtureId, onBack, onOpenGame, onOpenTeam 
   const theirs = item.scores.theirs, mine = item.scores.mine;
   return <View style={styles.stack}>
     <Text accessibilityRole="header" style={styles.title}>{fixtureTitle(item)}</Text>
+    <FixtureHeading item={item} />
+    {item.status !== 'SCHEDULED' && <StatusBadge label={fixtureStatus[item.status]} tone="warning" />}
     <StatusBadge label={resultLabels[item.result_status]} tone={resultTones[item.result_status]} />
     <Card><View style={styles.stack}>
       <Text style={styles.heading}>{when(item.date, item.time)}</Text>
@@ -66,6 +71,7 @@ export function FixtureView({ teamId, fixtureId, onBack, onOpenGame, onOpenTeam 
     </View></Card>
     <FormError message={error} />
     {success && <Text accessibilityLiveRegion="polite" style={styles.success}>{success}</Text>}
+    <FixtureActions teamId={teamId} item={item} busy={busy} run={run} />
     <Text accessibilityRole="header" style={styles.heading}>Placar</Text>
     {item.result_status === 'NONE' && <Text style={styles.note}>{item.started ? 'Nenhum placar informado ainda.' : 'O placar pode ser informado a partir do horário do jogo.'}</Text>}
     {mine && <Text style={styles.text}>Informado pelo seu time: {scoreLine(item, mine)}</Text>}

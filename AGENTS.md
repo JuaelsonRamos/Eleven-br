@@ -367,6 +367,30 @@ cancelamentos; sem confrontos validados: "Sem histórico suficiente". Ainda sem 
 produto: cancelar/remarcar confronto aceito, resolver divergência, W.O., amostra mínima e
 devolução do crédito em recusa. Não implementar sem decisão.
 
+## Experiência do confronto — Fase 5C
+
+`0017_fixture_experience` é aditiva. Convocação reutiliza `EventAttendance.called_up`
+e resposta PENDENTE; elenco ativo não significa convocação. Migração preserva respostas
+anteriores dos confrontos como convocadas, sem presumir os demais jogadores. Peladas e
+jogos avulsos mantêm a presença anterior. Retirada preserva resposta e TeamAudit; nova
+convocação começa PENDENTE. Lock de Team e callup_version protegem a seleção; só vínculo
+ativo convocado responde. MANAGE_EVENTS continua autorizando gestão, conforme o plano.
+Convidados usam EventGuest, presença manual somente no confronto, remoção lógica e
+command_id por evento; nunca criam identidade esportiva ou conta.
+
+FixtureProposal registra propostas, decisões e desistências com autor/data/motivo,
+valores originais/propostos e command_id. Lock dos dois times em ordem de UUID protege
+decisões e placar. Índice parcial permite uma única proposta pendente por confronto.
+Somente o outro time decide; aceite atualiza o confronto e os dois eventos juntos.
+Desistência confirmada encerra proposta pendente. Cancelamento/desistência são terminais,
+não geram placar, avaliação ou penalidade. Placar informado impede essas alterações;
+proposta pendente precisa ser resolvida antes de informar placar. Nenhum registro é apagado.
+Notificações reutilizam emit, deduplicação e transação existentes: gestão recebe propostas,
+convocados ativos recebem participação/alteração efetiva. Convidados não recebem avisos.
+Financeiro continua notificando somente o titular; não há scheduler de vencimento.
+Field aceita máscaras date/time/month compartilhadas; validação semântica continua obrigatória.
+Downgrade da 0017 é recusado se houver informação da fase a preservar.
+
 ## Localização oficial dos times — Fase 5A
 
 `0016_team_locations` (aditiva) cria `municipalities`, referência com os 5.571 municípios

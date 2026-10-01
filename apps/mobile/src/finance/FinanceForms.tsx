@@ -58,7 +58,7 @@ export function EntryForm({ detail, commandId, save, busy }: { detail?: api.Deta
       {!detail && <><Choices options={{ INCOME: 'Receita', EXPENSE: 'Despesa' }} value={kind} onChange={setKind} /><Field label="Categoria" value={category} onChangeText={setCategory} maxLength={60} /><Field label="Descrição" value={description} onChangeText={setDescription} maxLength={160} /></>}
       <Field label={detail ? 'Valor recebido (R$)' : 'Valor (R$)'} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
       {detail && <Text style={s.note}>Saldo devedor: {api.brl(detail.remaining)}. Pode registrar parte desse valor.</Text>}
-      <Field label="Data (DD/MM/AAAA)" value={day} onChangeText={setDay} maxLength={10} keyboardType="numbers-and-punctuation" />
+      <Field mask="date" label="Data (DD/MM/AAAA)" value={day} onChangeText={setDay} maxLength={10} keyboardType="numbers-and-punctuation" />
       {detail && <Choices options={{ PIX: 'PIX', CASH: 'Dinheiro', CARD: 'Cartão', OTHER: 'Outro' }} value={method} onChange={setMethod} />}
       <Field label="Observação (opcional)" value={note} onChangeText={setNote} maxLength={500} multiline />
       {method === 'CARD' && detail && <Text style={s.note}>Registro manual. Sem integração com operadora ou cálculo de taxas.</Text>}

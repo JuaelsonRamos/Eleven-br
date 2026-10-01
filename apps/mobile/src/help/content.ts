@@ -378,13 +378,15 @@ export const helpSections = [
         steps: [
           'No perfil do adversário, escolha a modalidade, informe data, horário, local e o mando (**Em casa** ou **Fora**) e toque em **Enviar desafio**.',
           'O time desafiado é avisado e responde em **Adversários → Recebidos**, com **Aceitar desafio** ou **Recusar**.',
-          'Ao aceitar, o confronto aparece em **Jogos** dos dois times, com confirmação de presença.',
+          'Ao aceitar, o confronto aparece em **Jogos** dos dois times. Em **Gerenciar convocação**, o Presidente ou gestor de jogos seleciona quem participa.',
+          'Somente convocados ativos respondem **VOU/NÃO VOU** e recebem **Lembrar pendentes**. Convidados ficam separados; a gestão controla sua presença.',
         ],
         notes: [
           'No Free, enviar o desafio usa o desafio gratuito do mês, mesmo que depois ele seja recusado ou cancelado. Se o envio falhar, nada é gasto.',
           'Enquanto o desafio estiver pendente, quem enviou pode cancelá-lo. Não há contraproposta: para outra data ou local, recuse e envie um novo desafio.',
           'Um desafio sem resposta expira no horário proposto.',
-          'Data, horário e local de um confronto aceito não podem ser alterados nem cancelados por um só time.',
+          'Use **Propor alteração** para mudar data, horário ou local. O adversário precisa aceitar; só pode existir uma proposta pendente.',
+          'Em **Solicitar cancelamento**, o adversário aceita ou mantém o confronto. **Desistir do confronto** exige confirmação e avisa os dois times. Histórico e participantes são preservados, sem penalidade automática.',
         ],
         related: ['opponents-score'],
       },

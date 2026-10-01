@@ -62,6 +62,7 @@ def test_migration_roundtrip(engine: Engine) -> None:
             "team_fixtures",
             "fixture_scores",
             "fixture_reviews",
+            "fixture_proposals",
             "municipalities",
         }
         command.check(config)

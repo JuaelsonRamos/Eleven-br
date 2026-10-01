@@ -70,8 +70,8 @@ export function ProfileView({ teamId, otherId, onBack, onOpenFixture, onSent, on
       <View accessibilityRole="radiogroup" accessibilityLabel="Modalidade do desafio" style={styles.row}>
         {profile.compatible_modalities.map(value => <FilterChip key={value} role="radio" label={label(value)} selected={modality === value} disabled={busy} onPress={() => setModality(value)} />)}
       </View>
-      <Field label="Data (DD/MM/AAAA)" value={date} onChangeText={setDate} placeholder="10/10/2026" maxLength={10} editable={!busy} />
-      <Field label="Horário (HH:MM)" value={time} onChangeText={setTime} placeholder="16:00" maxLength={5} editable={!busy} />
+      <Field mask="date" label="Data (DD/MM/AAAA)" value={date} onChangeText={setDate} placeholder="10/10/2026" maxLength={10} editable={!busy} />
+      <Field mask="time" label="Horário (HH:MM)" value={time} onChangeText={setTime} placeholder="16:00" maxLength={5} editable={!busy} />
       <Field label="Local" value={location} onChangeText={setLocation} maxLength={200} editable={!busy} />
       <Text style={styles.text}>Mando</Text>
       <View accessibilityRole="radiogroup" accessibilityLabel="Mando" style={styles.row}>

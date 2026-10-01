@@ -17,16 +17,23 @@ export type Challenge = {
 };
 export type ResultStatus = 'NONE' | 'PENDING' | 'VALIDATED' | 'DISPUTED';
 export type Fixture = {
-  id: string; side: 'HOME' | 'AWAY'; opponent: PublicTeam; home_team: { id: string; name: string }; away_team: { id: string; name: string };
+  id: string; side: 'HOME' | 'AWAY'; opponent: PublicTeam; home_team: { id: string; name: string; crest_url: string | null }; away_team: { id: string; name: string; crest_url: string | null };
+  status: 'SCHEDULED' | 'CANCELLED' | 'WITHDRAWN';
   modality: string; date: string; time: string; location: string; result_status: ResultStatus; home_score: number | null; away_score: number | null;
 };
 export type Score = { home_score: number; away_score: number; kind: 'REPORTED' | 'CONFIRMED'; created_at: string };
 export type Review = { attended: boolean; punctual: boolean; kept_agreement: boolean; created_at: string };
 export type Pair<T> = { mine: T | null; theirs: T | null };
 export type FixtureDetail = Fixture & {
+  version: number; command_id: string; can_change: boolean; proposals: FixtureProposal[];
   notes: string | null; challenge_id: string; event_id: string | null; started: boolean; scores: Pair<Score>; reviews: Pair<Review>;
   can_manage: boolean; can_report: boolean; can_confirm: boolean; can_review: boolean;
 };
+export type FixtureProposal = { id: string; team_id: string; kind: 'CHANGE' | 'CANCEL' | 'WITHDRAW'; status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'SUPERSEDED'; reason: string | null; before: { date: string; time: string; location: string }; proposed: Partial<{ date: string; time: string; location: string }>; created_at: string; resolved_at: string | null };
+export type ProposalInput = { command_id: string; expected_version: number; kind: FixtureProposal['kind']; reason: string | null; confirm: boolean; date?: string; time?: string; location?: string };
+export const proposeChange = (team: string, fixture: string, data: ProposalInput) => authenticated<FixtureDetail>(`${base(team)}/fixtures/${part(fixture)}/proposals`, data, 'POST');
+export const decideChange = (team: string, fixture: string, proposal: string, decision: 'ACCEPTED' | 'REJECTED') => authenticated<FixtureDetail>(`${base(team)}/fixtures/${part(fixture)}/proposals/${part(proposal)}/decision`, { decision }, 'POST');
+export const fixtureStatus = { SCHEDULED: 'AGENDADO', CANCELLED: 'CANCELADO POR ACORDO', WITHDRAWN: 'DESISTÊNCIA' };
 export type Profile = {
   team: PublicTeam; accepts_challenges: boolean; reliability: Reliability; compatible_modalities: string[]; pending_challenge: boolean; can_challenge: boolean; credits: Credits;
   history: { challenges: Challenge[]; fixtures: (Fixture & { reviews: Pair<Review> })[] }; command_id: string;

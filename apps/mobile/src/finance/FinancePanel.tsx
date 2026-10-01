@@ -168,8 +168,8 @@ export function FinancePanel({ teamId, onBack, onNavigate, onPro, initialDuesId,
       {mode === 'cash' && cash && <>
         <Text style={s.heading}>Caixa do time</Text><Text style={s.note}>Saldo atual considera todos os lançamentos válidos. Os filtros abaixo alteram somente o histórico.</Text>
         <Button label="Novo lançamento" disabled={busy} onPress={() => navigate('entry')} />
-        <Field label="De (DD/MM/AAAA)" value={filters.start} onChangeText={start => setFilters({ ...filters, start })} maxLength={10} />
-        <Field label="Até (DD/MM/AAAA)" value={filters.end} onChangeText={end => setFilters({ ...filters, end })} maxLength={10} />
+        <Field mask="date" label="De (DD/MM/AAAA)" value={filters.start} onChangeText={start => setFilters({ ...filters, start })} maxLength={10} />
+        <Field mask="date" label="Até (DD/MM/AAAA)" value={filters.end} onChangeText={end => setFilters({ ...filters, end })} maxLength={10} />
         <Choices options={{ '': 'Todos', INCOME: 'Receitas', EXPENSE: 'Despesas' }} value={filters.kind} onChange={kind => setFilters({ ...filters, kind })} disabled={busy} />
         <Field label="Categoria (opcional)" value={filters.category} onChangeText={category => setFilters({ ...filters, category })} maxLength={60} />
         <Button label="Filtrar movimentações" disabled={busy} onPress={() => void load('cash', 0, undefined, undefined, filters)} />

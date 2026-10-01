@@ -1435,6 +1435,51 @@ mostra só "Município/UF"; o código IBGE é interno.
 Testes em `apps/api`: `uv run pytest -q tests/test_team_locations.py`; com o Expo Web em 8081,
 `uv run --with playwright pytest -q tests/browser_locations_flow.py`.
 
+## Experiência do confronto — Fase 5C
+
+Confrontos oficiais têm **Gerenciar convocação** em Jogos: o Presidente ou gestor
+autorizado de jogos seleciona membros ativos. Somente convocados aparecem na presença
+e respondem VOU/NÃO VOU; inclusões começam pendentes. Retirada não apaga a resposta
+anterior e fica auditada; reconvocação começa pendente novamente. **Lembrar pendentes**
+notifica só convocados ativos pendentes, sem repetir o mesmo lembrete. Convidados ficam
+separados e a gestão controla Pendente/Confirmado/Não vai, sem criar Player ou conta.
+Peladas e jogos avulsos mantêm a regra anterior de participação.
+
+Em **Ver confronto**, **Propor alteração** envia data/horário/local ao adversário;
+**Solicitar cancelamento** pede acordo. Os dados oficiais só mudam após aceite do
+outro time. Uma proposta pendente por confronto; a decisão fica no histórico.
+**Desistir do confronto** exige confirmação, encerra proposta pendente e notifica
+gestão e convocados dos dois times. Cancelamento e desistência preservam os dois
+eventos, presenças, convidados e histórico, sem avaliação ou penalidade automática.
+Confronto com placar informado não aceita essas mudanças; resolva uma proposta
+pendente antes de informar placar. Permissões e créditos Free/Pro permanecem iguais.
+
+Escudos usam TeamBadge e as URLs existentes, inclusive fallback. Campos manuais de
+data/hora/competência usam a máscara compartilhada de Field; as validações continuam
+recusando datas e horários inválidos e a API continua recebendo ISO/HH:MM.
+
+Migration **0017_fixture_experience**: amplia EventAttendance (convocação/PENDENTE),
+EventGuest (presença/chave de operação), Event (versão da convocação), TeamFixture
+(estado/versão) e cria FixtureProposal. A estrutura anterior não registrava seleção
+explícita, presença de convidados nem negociação bilateral. Respostas já existentes
+de confrontos são preservadas como convocadas; nenhum outro membro é incluído por
+presunção. Downgrade recusa informações da fase que a 0016 não consegue guardar.
+Não modifica billing nem as migrations 0015/0016.
+
+Notificações continuam transacionais e deduplicadas. Mensalidades, recebimentos e
+estornos notificam somente o titular ativo da cobrança. Não existem avisos automáticos
+próximos ao vencimento/vencidos nem scheduler; essa lacuna permanece explícita.
+A avaliação existente tem comparecimento, pontualidade e combinado; comportamento
+e “jogaria novamente” não existem nesta base e não foram inventados nesta fase.
+
+Validação isolada em `apps/api`:
+
+```powershell
+uv run pytest -q tests/test_fixture_experience.py tests/test_opponents.py tests/test_notifications.py
+# Com Expo Web em localhost:8081:
+uv run --with playwright pytest -q tests/browser_fixture_experience.py tests/browser_opponents_flow.py
+```
+
 ## Próxima etapa
 
 Configurar o Sandbox do Asaas (API Key, token e webhook HTTPS) e validar o fluxo real.

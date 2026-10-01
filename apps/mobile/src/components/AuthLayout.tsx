@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from './ui';
 import { Feedback } from './design';
 import { theme } from '../theme';
+import { maskDateTime, type DateTimeMask } from './dateTime';
 
 export function AuthLayout({ title, description, children }: PropsWithChildren<{ title: string; description?: string }>) {
   return <SafeAreaView style={styles.safe}>
@@ -22,7 +23,7 @@ export function AuthLayout({ title, description, children }: PropsWithChildren<{
   </SafeAreaView>;
 }
 
-export function Field({ label, password = false, ...props }: TextInputProps & { label: string; password?: boolean }) {
+export function Field({ label, password = false, mask, ...props }: TextInputProps & { label: string; password?: boolean; mask?: DateTimeMask }) {
   const [visible, setVisible] = useState(false);
   const [focused, setFocused] = useState(false);
   return <View style={styles.field}>
@@ -30,6 +31,8 @@ export function Field({ label, password = false, ...props }: TextInputProps & { 
     <View style={[styles.inputRow, focused && styles.focus]}>
       <TextInput accessibilityLabel={label} placeholderTextColor={theme.colors.muted}
         autoCapitalize="none" autoCorrect={false} {...props}
+        keyboardType={mask ? 'number-pad' : props.keyboardType}
+        onChangeText={value => props.onChangeText?.(mask ? maskDateTime(value, mask) : value)}
         onFocus={event => { setFocused(true); props.onFocus?.(event); }} onBlur={event => { setFocused(false); props.onBlur?.(event); }}
         secureTextEntry={password && !visible} style={[styles.input, props.style]} />
       {password && <Pressable onPress={() => setVisible(!visible)} accessibilityRole="button"

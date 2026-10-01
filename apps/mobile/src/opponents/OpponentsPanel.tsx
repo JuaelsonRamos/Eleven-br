@@ -38,11 +38,13 @@ export function OpponentsPanel({ team, initialView, initialFixture, onInitialCon
   useEffect(() => { const stale = generation; void reload(); return () => { stale.current++; }; }, [reload]);
   // Notification links open the requested list or fixture once.
   useEffect(() => {
-    if (!initialView && !initialFixture) return;
+    // TeamContext revalidation can remount this panel on focus. Consume the destination
+    // only after this mounted instance has loaded its authorized central.
+    if (!central || (!initialView && !initialFixture)) return;
     if (initialFixture) setMode({ kind: 'fixture', fixture: initialFixture });
     else if (initialView) { setMode({ kind: 'home' }); setTab(initialView); }
     onInitialConsumed();
-  }, [initialView, initialFixture, onInitialConsumed]);
+  }, [central, initialView, initialFixture, onInitialConsumed]);
   const openTeam = useCallback((other: string) => { setMode({ kind: 'profile', team: other }); onNavigate(); }, [onNavigate]);
   const openFixture = useCallback((fixture: string) => { setMode({ kind: 'fixture', fixture }); onNavigate(); }, [onNavigate]);
   const back = useCallback(() => { setMode({ kind: 'home' }); onNavigate(); void reload(); }, [onNavigate, reload]);

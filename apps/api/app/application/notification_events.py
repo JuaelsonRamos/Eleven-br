@@ -84,7 +84,12 @@ def event_notice(
         key = f"series-cancelled:{event.series_id}" if series else f"event-cancelled:{event.id}"
     emit(
         session,
-        users=recipients(session, team, exclude=author),
+        users=recipients(
+            session,
+            team,
+            exclude=author,
+            permission=Permission.MANAGE_EVENTS if event.fixture_id else None,
+        ),
         team_id=team.id,
         kind=kind,
         title=title,

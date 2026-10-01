@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.application import challenges, fixtures, opponents
+from app.application import challenges, fixture_changes, fixtures, opponents
 from app.domain.team_identity import Modality
 from app.infrastructure.config import get_settings
 from app.infrastructure.rate_limit import rate_limit
@@ -13,6 +13,31 @@ from app.presentation.dependencies import CurrentUser, SessionDep
 
 router = APIRouter(prefix="/v1/teams/{team_id}/opponents", tags=["opponents"])
 Offset = Annotated[int, Query(ge=0, le=1000)]
+
+
+@router.post("/fixtures/{fixture_id}/proposals")
+def propose(
+    team_id: UUID,
+    fixture_id: UUID,
+    data: fixture_changes.ProposalInput,
+    session: SessionDep,
+    user: CurrentUser,
+) -> dict[str, object]:
+    limited(session, user, "action", 60)
+    return fixture_changes.create(session, user.id, team_id, fixture_id, data)
+
+
+@router.post("/fixtures/{fixture_id}/proposals/{proposal_id}/decision")
+def proposal_decision(
+    team_id: UUID,
+    fixture_id: UUID,
+    proposal_id: UUID,
+    data: fixture_changes.DecisionInput,
+    session: SessionDep,
+    user: CurrentUser,
+) -> dict[str, object]:
+    limited(session, user, "action", 60)
+    return fixture_changes.decide(session, user.id, team_id, fixture_id, proposal_id, data)
 
 
 def limited(session: SessionDep, user: CurrentUser, scope: str, limit: int) -> None:

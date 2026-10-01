@@ -15,6 +15,6 @@ export function MonthSelector({ value, onChange, onSelect, disabled }: { value: 
     <View style={s.monthRow}><IconButton label="Competência anterior" icon="chevron-back" disabled={disabled || !valid || value === '01/2000'} onPress={() => move(-1)} />
       <Text style={s.month}>{date ? date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : 'Competência'}</Text>
       <IconButton label="Próxima competência" icon="chevron-forward" disabled={disabled || !valid || value === '12/2100'} onPress={() => move(1)} /></View>
-    <Field label="Competência (MM/AAAA)" value={value} onChangeText={onChange} maxLength={7} keyboardType="numbers-and-punctuation" editable={!disabled} />
+    <Field mask="month" label="Competência (MM/AAAA)" value={value} onChangeText={onChange} maxLength={7} keyboardType="numbers-and-punctuation" editable={!disabled} />
   </View>;
 }

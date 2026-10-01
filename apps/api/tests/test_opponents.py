@@ -522,8 +522,16 @@ def test_acceptance_creates_one_shared_fixture_despite_concurrent_retries(
     )
     assert edit.status_code == 409 and "dois times" in edit.json()["detail"]
     assert visitor_client.post(game + "/cancel").status_code == 409
+    assert visitor_client.put(game + "/attendance", json={"response": "VOU"}).status_code == 409
+    assert (
+        visitor_client.put(
+            game + "/callup",
+            json={"membership_ids": [str(visitor.president_membership_id)], "expected_version": 1},
+        ).status_code
+        == 200
+    )
     attendance = visitor_client.put(game + "/attendance", json={"response": "VOU"})
-    assert attendance.json()["my_response"] == "VOU"  # Presence keeps working.
+    assert attendance.json()["my_response"] == "VOU"  # Explicitly called up.
 
 
 @pytest.mark.parametrize("first", ["home", "away"])

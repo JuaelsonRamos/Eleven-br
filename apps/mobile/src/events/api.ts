@@ -1,12 +1,14 @@
 import { authenticated } from '../auth/api';
+import type { Fixture } from '../opponents/api';
 
 export type Answer = 'VOU' | 'NAO_VOU' | 'PENDENTE';
 export type EventInput = { creation_key?: string; modality: string; kind: 'PELADA' | 'JOGO'; title: string; date: string;
   time: string; location: string; notes: string | null; opponent: string | null; recurring_weekly?: boolean; recurring_until?: string | null };
 export type SportEvent = EventInput & { id: string; team_id: string; series_id: string | null; fixture_id?: string | null;
+  fixture: Fixture | null; can_respond: boolean; participation_open: boolean; callup_version: number; guest_creation_key: string | null; callup_candidates: { membership_id: string; name: string; selected: boolean }[];
   status: 'open' | 'cancelled'; recurrence_status: 'active' | 'cancelled' | null; can_manage: boolean; my_response: Answer; going: number; not_going: number; pending: number;
   participants: { membership_id: string; player_id: string; name: string; response: Answer }[];
-  guests: { id: string; name: string }[] };
+  guests: { id: string; name: string; response: Answer }[] };
 export type EventPage = { items: SportEvent[]; can_manage: boolean; creation_key: string };
 const base = (team: string) => `/v1/teams/${encodeURIComponent(team)}/events`;
 const path = (team: string, id: string) => `${base(team)}/${encodeURIComponent(id)}`;
@@ -17,6 +19,8 @@ export const saveEvent = (team: string, data: EventInput, id?: string) => authen
 export const respond = (team: string, id: string, response: Exclude<Answer, 'PENDENTE'>) => authenticated<SportEvent>(`${path(team, id)}/attendance`, { response }, 'PUT');
 export const cancelEvent = (team: string, id: string) => authenticated<SportEvent>(`${path(team, id)}/cancel`, {}, 'POST');
 export const cancelSeries = (team: string, id: string) => authenticated<SportEvent>(`${path(team, id)}/cancel-series`, {}, 'POST');
-export const addGuest = (team: string, id: string, name: string) => authenticated<SportEvent>(`${path(team, id)}/guests`, { name }, 'POST');
+export const addGuest = (team: string, id: string, name: string, command_id: string | null, response: Answer = 'VOU') => authenticated<SportEvent>(`${path(team, id)}/guests`, { name, command_id, response }, 'POST');
+export const saveCallup = (team: string, event: SportEvent, ids: string[]) => authenticated<SportEvent>(`${path(team, event.id)}/callup`, { membership_ids: ids, expected_version: event.callup_version }, 'PUT');
+export const respondGuest = (team: string, id: string, guest: string, response: Answer) => authenticated<SportEvent>(`${path(team, id)}/guests/${guest}/attendance`, { response }, 'PUT');
 export const removeGuest = (team: string, id: string, guest: string) => authenticated<SportEvent>(`${path(team, id)}/guests/${encodeURIComponent(guest)}/remove`, {}, 'POST');
 export const eventWhen = (event: SportEvent) => `${new Date(`${event.date}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })} • ${event.time.slice(0, 5)}`;

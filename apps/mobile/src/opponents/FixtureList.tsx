@@ -1,7 +1,9 @@
+import { TeamBadge , Button, EmptyState, ListItem, LoadingState, StatusBadge } from '../components/ui';
+import { fixtureStatus } from './api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { FormError } from '../components/AuthLayout';
-import { Button, EmptyState, ListItem, LoadingState, StatusBadge } from '../components/ui';
+
 import { styles } from '../events/styles';
 import { listFixtures, message, resultLabels, when, type Fixture } from './api';
 
@@ -30,8 +32,8 @@ export function FixtureList({ teamId, onOpen }: { teamId: string; onOpen: (fixtu
   return <View style={styles.stack}>
     <FormError message={error} />
     {items && !items.length && <EmptyState title="Nenhum confronto ainda" description="Desafios aceitos viram confrontos entre os dois times e aparecem aqui e em Jogos." icon="shield-half-outline" />}
-    {items?.map(item => <ListItem key={item.id} title={fixtureTitle(item)} subtitle={`${when(item.date, item.time)} • ${item.location}`} onPress={() => onOpen(item.id)}
-      accessibilityLabel={`Abrir confronto ${item.home_team.name} x ${item.away_team.name}`} trailing={<StatusBadge label={resultLabels[item.result_status]} tone={resultTones[item.result_status]} />} />)}
+    {items?.map(item => <ListItem key={item.id} leading={<TeamBadge name={item.opponent.name} crestUrl={item.opponent.crest_url} size={40} />} title={fixtureTitle(item)} subtitle={`${when(item.date, item.time)} • ${item.location}`} onPress={() => onOpen(item.id)}
+      accessibilityLabel={`Abrir confronto ${item.home_team.name} x ${item.away_team.name}`} trailing={<StatusBadge label={item.status === 'SCHEDULED' ? resultLabels[item.result_status] : fixtureStatus[item.status]} tone={resultTones[item.result_status]} />} />)}
     {more && <Button variant="secondary" label={loading ? 'Carregando…' : 'Carregar mais'} disabled={loading} onPress={() => void load(items?.length ?? 0)} />}
   </View>;
 }

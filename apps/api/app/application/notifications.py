@@ -151,11 +151,12 @@ def read_all(session: Session, user_id: UUID) -> None:
 
 def remind_pending(session: Session, user_id: UUID, team_id: UUID, event_id: UUID) -> int:
     # Imports here keep the business event adapters independent of event commands.
-    from app.application.events import authorize, find_event, require_open
+    from app.application.callups import called_users, require_participation_open
+    from app.application.events import authorize, find_event
 
     team = authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
-    require_open(event)
+    require_participation_open(session, event)
     answered = set(
         session.scalars(
             select(Player.user_id)
@@ -166,7 +167,9 @@ def remind_pending(session: Session, user_id: UUID, team_id: UUID, event_id: UUI
     )
     count = emit(
         session,
-        users=recipients(session, team) - answered,
+        users=called_users(session, event, pending=True)
+        if event.fixture_id
+        else recipients(session, team) - answered,
         team_id=team_id,
         kind=NotificationType.ATTENDANCE_REMINDER,
         title="Confirme sua presença",

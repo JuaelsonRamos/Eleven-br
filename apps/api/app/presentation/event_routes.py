@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.application import events
+from app.application import callups, events
 from app.domain.events import EventDraft
 from app.presentation.dependencies import CurrentUser, SessionDep
 from app.presentation.event_schemas import (
@@ -12,9 +12,38 @@ from app.presentation.event_schemas import (
     EventPage,
     EventRead,
     GuestInput,
+    GuestResponseInput,
 )
 
 router = APIRouter(prefix="/v1/teams/{team_id}/events", tags=["events"])
+
+
+@router.put("/{event_id}/callup", response_model=EventRead)
+def callup(
+    team_id: UUID, event_id: UUID, data: callups.CallupInput, session: SessionDep, user: CurrentUser
+) -> EventRead:
+    callups.save(session, user.id, team_id, event_id, data)
+    return detail(team_id, event_id, session, user)
+
+
+@router.put("/{event_id}/guests/{guest_id}/attendance", response_model=EventRead)
+def guest_response(
+    team_id: UUID,
+    event_id: UUID,
+    guest_id: UUID,
+    data: GuestResponseInput,
+    session: SessionDep,
+    user: CurrentUser,
+) -> EventRead:
+    events.respond_guest(
+        session,
+        user_id=user.id,
+        team_id=team_id,
+        event_id=event_id,
+        guest_id=guest_id,
+        response=data.response,
+    )
+    return detail(team_id, event_id, session, user)
 
 
 @router.get("", response_model=EventPage)
@@ -87,7 +116,9 @@ def cancel_recurrence(
 def guest(
     team_id: UUID, event_id: UUID, data: GuestInput, session: SessionDep, user: CurrentUser
 ) -> EventRead:
-    events.add_guest(session, user_id=user.id, team_id=team_id, event_id=event_id, name=data.name)
+    events.add_guest(
+        session, user_id=user.id, team_id=team_id, event_id=event_id, **data.model_dump()
+    )
     return detail(team_id, event_id, session, user)
 
 

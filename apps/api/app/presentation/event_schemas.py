@@ -57,6 +57,13 @@ class AttendanceInput(BaseModel):
 class GuestInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     name: str = Field(min_length=1, max_length=80)
+    response: Literal["VOU", "NAO_VOU", "PENDENTE"] = "VOU"
+    command_id: UUID | None = None
+
+
+class GuestResponseInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    response: Literal["VOU", "NAO_VOU", "PENDENTE"]
 
 
 class Participant(BaseModel):
@@ -70,6 +77,7 @@ class GuestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     name: str
+    response: Literal["VOU", "NAO_VOU", "PENDENTE"]
 
 
 class EventRead(EventInput):
@@ -83,6 +91,12 @@ class EventRead(EventInput):
     created_at: datetime
     updated_at: datetime
     can_manage: bool
+    can_respond: bool
+    participation_open: bool
+    callup_version: int
+    guest_creation_key: UUID | None
+    callup_candidates: list[dict[str, object]]
+    fixture: dict[str, object] | None
     my_response: Literal["VOU", "NAO_VOU", "PENDENTE"]
     going: int
     not_going: int

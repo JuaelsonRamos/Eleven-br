@@ -5,7 +5,7 @@ official, silence never confirms and no rule resolves a dispute automatically.
 """
 
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
@@ -26,7 +26,12 @@ from app.domain.notifications import NotificationType as Kind
 from app.domain.opponents import ResultStatus, Side
 from app.domain.policies import Conflict, NotFound, Permission
 from app.infrastructure.event_models import Event
-from app.infrastructure.opponent_models import FixtureReview, FixtureScore, TeamFixture
+from app.infrastructure.opponent_models import (
+    FixtureProposal,
+    FixtureReview,
+    FixtureScore,
+    TeamFixture,
+)
 
 
 class ScoreInput(BaseModel):
@@ -81,6 +86,29 @@ def present(
     started = rules.started(fixture.date, fixture.time, rules.local_now())
     return {
         **fixture_views(session, [fixture], team_id)[0],
+        "version": fixture.version,
+        "command_id": uuid4(),
+        "can_change": can_manage and fixture.status == "SCHEDULED" and status == ResultStatus.NONE,
+        "proposals": [
+            {
+                "id": p.id,
+                "team_id": p.team_id,
+                "kind": p.kind,
+                "status": p.status,
+                "reason": p.reason,
+                "before": p.before,
+                "proposed": p.proposed,
+                "created_at": p.created_at,
+                "resolved_at": p.resolved_at,
+                "created_by": p.created_by,
+                "resolved_by": p.resolved_by,
+            }
+            for p in session.scalars(
+                select(FixtureProposal)
+                .where(FixtureProposal.fixture_id == fixture.id)
+                .order_by(FixtureProposal.created_at.desc(), FixtureProposal.id)
+            )
+        ],
         "notes": fixture.notes,
         "challenge_id": fixture.challenge_id,
         "event_id": session.scalar(
@@ -94,10 +122,12 @@ def present(
         },
         "can_manage": can_manage,
         "can_report": can_manage
+        and fixture.status == "SCHEDULED"
         and started
         and mine is None
         and status in (ResultStatus.NONE, ResultStatus.PENDING),
         "can_confirm": can_manage
+        and fixture.status == "SCHEDULED"
         and mine is None
         and theirs is not None
         and status == ResultStatus.PENDING,
@@ -143,6 +173,14 @@ def submit(
         session, user_id=user_id, team_id=team_id, permission=Permission.MANAGE_EVENTS
     )
     session.refresh(fixture)
+    if fixture.status != "SCHEDULED":
+        raise Conflict("Confronto cancelado ou com desistência não aceita placar.")
+    if session.scalar(
+        select(FixtureProposal.id).where(
+            FixtureProposal.fixture_id == fixture.id, FixtureProposal.status == "PENDING"
+        )
+    ):
+        raise Conflict("Resolva a proposta pendente antes de informar o placar.")
     side = side_of(fixture, team_id)
     scores = {
         row.side: row

@@ -234,7 +234,9 @@ def respond(
 ) -> Event:
     authorize(session, user_id, team_id, write=True)
     event = find_event(session, team_id, event_id)
-    require_open(event)
+    from app.application.callups import require_participation_open
+
+    require_participation_open(session, event)
     member = session.scalars(
         select(TeamMembership)
         .join(Player, Player.id == TeamMembership.player_id)
@@ -244,6 +246,14 @@ def respond(
             Player.user_id == user_id,
         )
     ).one()
+    if event.fixture_id and not session.scalar(
+        select(EventAttendance.id).where(
+            EventAttendance.event_id == event.id,
+            EventAttendance.membership_id == member.id,
+            EventAttendance.called_up,
+        )
+    ):
+        raise Conflict("Você não está convocado para este confronto.")
     statement = insert(EventAttendance).values(
         team_id=team_id, event_id=event_id, membership_id=member.id, response=response
     )
@@ -258,12 +268,35 @@ def respond(
 
 
 def add_guest(
-    session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID, name: str
+    session: Session,
+    *,
+    user_id: UUID,
+    team_id: UUID,
+    event_id: UUID,
+    name: str,
+    response: str = "VOU",
+    command_id: UUID | None = None,
 ) -> Event:
     authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
-    require_open(event)
-    session.add(EventGuest(event_id=event.id, name=name))
+    from app.application.callups import require_participation_open
+
+    require_participation_open(session, event)
+    if event.fixture_id and command_id is None:
+        raise Conflict("Atualize o app para adicionar convidados ao confronto.")
+    if not event.fixture_id and response != "VOU":
+        raise Conflict("Presença manual de convidado é exclusiva de confronto oficial.")
+    if command_id:
+        previous = session.scalar(
+            select(EventGuest).where(
+                EventGuest.event_id == event.id, EventGuest.command_id == command_id
+            )
+        )
+        if previous:
+            if previous.name != name:
+                raise Conflict("Identificador já utilizado com outro convidado.")
+            return event
+    session.add(EventGuest(event_id=event.id, name=name, response=response, command_id=command_id))
     session.commit()
     return event
 
@@ -273,7 +306,32 @@ def remove_guest(
 ) -> Event:
     authorize(session, user_id, team_id, write=True, manage=True)
     event = find_event(session, team_id, event_id)
-    require_open(event)
+    from app.application.callups import require_participation_open
+
+    require_participation_open(session, event)
+    guest = session.scalar(
+        select(EventGuest).where(
+            EventGuest.id == guest_id,
+            EventGuest.event_id == event.id,
+        )
+    )
+    if guest is None:
+        raise NotFound("Convidado não encontrado")
+    guest.removed_at = guest.removed_at or datetime.now(UTC)
+    session.commit()
+    return event
+
+
+def respond_guest(
+    session: Session, *, user_id: UUID, team_id: UUID, event_id: UUID, guest_id: UUID, response: str
+) -> None:
+    from app.application.callups import require_participation_open
+
+    authorize(session, user_id, team_id, write=True, manage=True)
+    event = find_event(session, team_id, event_id)
+    require_participation_open(session, event)
+    if not event.fixture_id:
+        raise Conflict("Presença manual de convidado é exclusiva de confronto oficial.")
     guest = session.scalar(
         select(EventGuest).where(
             EventGuest.id == guest_id,
@@ -282,10 +340,9 @@ def remove_guest(
         )
     )
     if guest is None:
-        raise NotFound("Convidado não encontrado")
-    guest.removed_at = datetime.now(UTC)
+        raise NotFound("Convidado não encontrado.")
+    guest.response = response
     session.commit()
-    return event
 
 
 def snapshots(
@@ -316,6 +373,29 @@ def snapshots(
         (row.event_id, row.membership_id): row.response
         for row in session.scalars(select(EventAttendance).where(EventAttendance.event_id.in_(ids)))
     }
+    called = {
+        (row.event_id, row.membership_id)
+        for row in session.scalars(
+            select(EventAttendance).where(
+                EventAttendance.event_id.in_(ids), EventAttendance.called_up
+            )
+        )
+    }
+    from app.infrastructure.opponent_models import TeamFixture
+
+    fixtures = {
+        row.id: row
+        for row in session.scalars(
+            select(TeamFixture).where(
+                TeamFixture.id.in_([e.fixture_id for e in events if e.fixture_id])
+            )
+        )
+    }
+    from app.application.opponent_common import fixture_views
+
+    fixture_data = {
+        view["id"]: view for view in fixture_views(session, list(fixtures.values()), team.id)
+    }
     guests = session.scalars(
         select(EventGuest)
         .where(EventGuest.event_id.in_(ids), EventGuest.removed_at.is_(None))
@@ -331,6 +411,7 @@ def snapshots(
                 "response": answers.get((event.id, member.id), "PENDENTE"),
             }
             for member, player in members
+            if not event.fixture_id or (event.id, member.id) in called
         ]
         own = next(member.id for member, player in members if player.user_id == user_id)
         result.append(
@@ -356,6 +437,28 @@ def snapshots(
                     )
                 },
                 "can_manage": can_manage,
+                "participation_open": event.status == "open"
+                and (
+                    not event.fixture_id
+                    or (
+                        fixtures[event.fixture_id].status == "SCHEDULED"
+                        and fixtures[event.fixture_id].result_status == "NONE"
+                    )
+                ),
+                "fixture": fixture_data.get(event.fixture_id),
+                "callup_version": event.callup_version,
+                "guest_creation_key": uuid4() if event.fixture_id else None,
+                "callup_candidates": [
+                    {
+                        "membership_id": m.id,
+                        "name": m.nickname or roster_name(m, p),
+                        "selected": (event.id, m.id) in called,
+                    }
+                    for m, p in members
+                ]
+                if event.fixture_id and can_manage
+                else [],
+                "can_respond": not event.fixture_id or (event.id, own) in called,
                 "recurring_until": series[event.series_id].end_date if event.series_id else None,
                 "recurrence_status": series[event.series_id].status if event.series_id else None,
                 "my_response": answers.get((event.id, own), "PENDENTE"),

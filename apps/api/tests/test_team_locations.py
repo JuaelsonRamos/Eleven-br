@@ -304,7 +304,7 @@ def test_0016_keeps_legacy_text_and_protects_confirmed_locations(engine: Engine)
         command.downgrade(config, "0015")
     with engine.begin() as connection:  # The refusal changed nothing.
         version = connection.execute(text("SELECT version_num FROM alembic_version"))
-        assert version.scalar_one() == "0016"
+        assert version.scalar_one() == "0017"
         confirmed = "SELECT count(*) FROM teams WHERE location_confirmed_at IS NOT NULL"
         assert connection.execute(text(confirmed)).scalar_one() == 1
     with engine.begin() as connection:

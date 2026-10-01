@@ -70,11 +70,11 @@ export function EventForm({ team, event, creationKey, onDone, onCancel, onDenied
     <Text style={styles.text}>Modalidade</Text>
     <View style={styles.row}>{modalities.map(item => <Pressable key={item.value} disabled={busy} accessibilityRole="radio" accessibilityLabel={item.label} accessibilityState={{ checked: selectedModality === item.value }} aria-checked={selectedModality === item.value}
       onPress={() => setModality(item.value)} style={[styles.chip, selectedModality === item.value && styles.selected]}><Text style={styles.text}>{item.label}</Text></Pressable>)}</View>
-    <Field label="Data (DD/MM/AAAA)" value={date} onChangeText={setDate} placeholder="27/09/2026" maxLength={10} editable={!busy} />
-    <Field label="Horário (HH:MM)" value={time} onChangeText={setTime} placeholder="08:00" maxLength={5} editable={!busy} />
+    <Field mask="date" label="Data (DD/MM/AAAA)" value={date} onChangeText={setDate} placeholder="27/09/2026" maxLength={10} editable={!busy} />
+    <Field mask="time" label="Horário (HH:MM)" value={time} onChangeText={setTime} placeholder="08:00" maxLength={5} editable={!busy} />
     <Text style={styles.note}>Use a data e o horário locais da partida.</Text>
     {!event && kind === 'PELADA' && <><View style={styles.row}><Switch accessibilityLabel="Repetir semanalmente" value={weekly} onValueChange={setWeekly} disabled={busy} /><Text style={styles.text}>Repetir semanalmente</Text></View>
-      {weekly && <><Field label="Repetir até (DD/MM/AAAA) — opcional" value={until} onChangeText={setUntil} maxLength={10} editable={!busy} /><Text style={styles.note}>Deixe o término vazio para repetir toda semana até cancelar. Cada data tem sua própria lista de presença. As próximas oito semanas aparecem na agenda.</Text></>}</>}
+      {weekly && <><Field mask="date" label="Repetir até (DD/MM/AAAA) — opcional" value={until} onChangeText={setUntil} maxLength={10} editable={!busy} /><Text style={styles.note}>Deixe o término vazio para repetir toda semana até cancelar. Cada data tem sua própria lista de presença. As próximas oito semanas aparecem na agenda.</Text></>}</>}
     <Field label="Local" value={location} onChangeText={setLocation} maxLength={200} editable={!busy} />
     {kind === 'JOGO' && <Field label="Adversário (opcional)" value={opponent} onChangeText={setOpponent} maxLength={100} editable={!busy} />}
     <Field label="Observações (opcional)" value={notes} onChangeText={setNotes} maxLength={2000} multiline editable={!busy} />

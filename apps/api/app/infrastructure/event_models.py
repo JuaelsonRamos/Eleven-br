@@ -4,6 +4,7 @@ from datetime import date, datetime, time
 from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -44,6 +45,7 @@ class EventSeries(Entity, Base):
 class Event(Entity, Base):
     __tablename__ = "events"
     team_id: Mapped[UUID] = mapped_column(ForeignKey("teams.id"))
+    callup_version: Mapped[int] = mapped_column(server_default="1")
     creation_key: Mapped[UUID | None]
     creation_hash: Mapped[str | None] = mapped_column(String(64))
     series_id: Mapped[UUID | None]
@@ -89,13 +91,14 @@ class EventAttendance(Entity, Base):
     event_id: Mapped[UUID]
     membership_id: Mapped[UUID]
     response: Mapped[str] = mapped_column(String(16))
+    called_up: Mapped[bool] = mapped_column(Boolean, server_default="false")
     __table_args__ = (
         ForeignKeyConstraint(["team_id", "event_id"], ["events.team_id", "events.id"]),
         ForeignKeyConstraint(
             ["team_id", "membership_id"], ["team_memberships.team_id", "team_memberships.id"]
         ),
         UniqueConstraint("event_id", "membership_id", name="uq_event_attendance_member"),
-        CheckConstraint("response IN ('VOU', 'NAO_VOU')", name="response"),
+        CheckConstraint("response IN ('VOU', 'NAO_VOU', 'PENDENTE')", name="response"),
     )
 
 
@@ -103,8 +106,12 @@ class EventGuest(Entity, Base):
     __tablename__ = "event_guests"
     event_id: Mapped[UUID] = mapped_column(ForeignKey("events.id"), index=True)
     name: Mapped[str] = mapped_column(String(80))
+    response: Mapped[str] = mapped_column(String(16), server_default="VOU")
+    command_id: Mapped[UUID | None]
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
+        UniqueConstraint("event_id", "command_id", name="uq_event_guests_command"),
+        CheckConstraint("response IN ('VOU', 'NAO_VOU', 'PENDENTE')", name="response"),
         CheckConstraint("length(trim(name)) > 0", name="name"),
         UniqueConstraint("event_id", "id", name="uq_event_guests_scope"),
     )
