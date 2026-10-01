@@ -31,7 +31,20 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      ["expo-image-picker", { "photosPermission": "Permitir que o ELEVEN BR selecione sua foto ou escudo.", "cameraPermission": false, "microphonePermission": false }]
-    ]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que o ELEVEN BR selecione sua foto ou escudo.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "61c99305-1c9f-46a1-ad4b-536da7cc4f20"
+      }
+    },
+    "owner": "elevenbr-app"
   }
 }
