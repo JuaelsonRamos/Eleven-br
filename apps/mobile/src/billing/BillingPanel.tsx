@@ -110,8 +110,8 @@ export function BillingPanel({ teamId }: { teamId: string }) {
       {data.pix && !expired && <Card><Text style={s.heading}>Pix · {money(data.pix.amount)}</Text>
         {/* The initial attempt follows only the countdown above; renewals show the charge dates. */}
         {!data.signup_expires_at && <><Text style={s.body}>Aguardando pagamento</Text>
-          {data.next_due_date && <Text style={s.note}>Vencimento: {when(data.next_due_date)}</Text>}
-          {data.pix.expires_at && <Text style={s.note}>Código válido até {when(data.pix.expires_at)}</Text>}</>}
+          {data.next_due_date && <Text style={s.note}>Vencimento: {when(data.next_due_date)}</Text>}</>}
+        <Text style={s.note}>Pague pelo QR Code ou Pix Copia e Cola.</Text>
         {data.pix.image && <Image source={{ uri: `data:image/png;base64,${data.pix.image}` }} style={s.qr} accessibilityLabel="QR Code Pix da assinatura" />}
         {data.pix.payload && <><Text selectable style={s.code}>{data.pix.payload}</Text>
         <Button label="Copiar código Pix" onPress={() => { void Clipboard.setStringAsync(data.pix!.payload!).then(() => { if (alive.current) setNotice('Código Pix copiado.'); }).catch(() => { if (alive.current) setError('Selecione o código e copie manualmente.'); }); }} /></>}
