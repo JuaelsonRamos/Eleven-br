@@ -14,7 +14,6 @@ export function AuthScreens() {
   const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [phone, setPhone] = useState(false);
   const [code, setCode] = useState('');
   const [changing, setChanging] = useState(false);
   const [wait, setWait] = useState(0);
@@ -42,6 +41,7 @@ export function AuthScreens() {
   async function submit() {
     if (!contact.trim() || !password) { setError('Informe seu contato e sua senha.'); return; }
     if (screen === 'register') {
+      if (!contact.includes('@')) { setError('Informe seu e-mail. Cadastro por telefone estará disponível em breve.'); return; }
       if (!name.trim()) { setError('Informe seu nome.'); return; }
       if (password.length < 8) { setError('Use uma senha com pelo menos 8 caracteres.'); return; }
       if (password !== confirmation) { setError('As senhas não coincidem.'); return; }
@@ -84,10 +84,13 @@ export function AuthScreens() {
       <TextAction label={wait ? `Reenviar código em ${wait}s` : 'Reenviar código'} disabled={busy || wait > 0}
         onPress={() => void perform(async () => auth.setTicket(await api.resend(ticket)))} />
       {changing ? <>
-        <Field label="Novo telefone ou e-mail" value={contact} onChangeText={setContact} maxLength={254} editable={!busy} />
+        <Field label="Novo e-mail" value={contact} onChangeText={setContact} keyboardType="email-address" autoComplete="email" maxLength={254} editable={!busy} />
         <Button label={wait ? `Aguarde ${wait}s para alterar` : 'Salvar contato e reenviar'} disabled={busy || wait > 0 || !contact.trim()}
-          onPress={() => void perform(async () => auth.setTicket(await api.resend(ticket, contact)))} />
-      </> : <TextAction label="Alterar telefone/e-mail" disabled={busy} onPress={() => { setContact(''); setChanging(true); setError(null); }} />}
+          onPress={() => {
+            if (!contact.includes('@')) { setError('Informe seu e-mail. Cadastro por telefone estará disponível em breve.'); return; }
+            void perform(async () => auth.setTicket(await api.resend(ticket, contact)));
+          }} />
+      </> : <TextAction label="Alterar e-mail" disabled={busy} onPress={() => { setContact(''); setChanging(true); setError(null); }} />}
       <TextAction label="Voltar ao login" disabled={busy} onPress={() => { auth.setTicket(null); go('login'); }} />
     </AuthLayout>;
   }
@@ -99,16 +102,12 @@ export function AuthScreens() {
     description={screen === 'register' ? 'Crie sua conta e confirme seu contato para começar.' : 'Entre com seu telefone ou e-mail.'}>
     {screen === 'register' && <>
       <Field label="Nome" value={name} onChangeText={setName} maxLength={80} autoCapitalize="words" autoComplete="name" editable={!busy} />
-      <View style={authStyles.row}>
-        <TextAction label={phone ? 'Usar e-mail' : 'E-mail selecionado'} disabled={busy} onPress={() => { setPhone(false); setContact(''); }} />
-        <TextAction label={phone ? 'Celular selecionado' : 'Usar celular'} disabled={busy} onPress={() => { setPhone(true); setContact(''); }} />
-      </View>
+      <Text style={authStyles.note}>Cadastro por telefone estará disponível em breve.</Text>
     </>}
-    <Field label={screen === 'login' ? 'Telefone ou e-mail' : phone ? 'Celular com DDD' : 'E-mail'} value={contact}
+    <Field label={screen === 'login' ? 'Telefone ou e-mail' : 'E-mail'} value={contact}
       onChangeText={setContact} maxLength={254} editable={!busy}
-      placeholder={screen === 'register' && phone ? '(11) 99999-9999' : undefined}
-      keyboardType={screen === 'register' ? phone ? 'phone-pad' : 'email-address' : 'default'}
-      autoComplete={screen === 'register' ? phone ? 'tel' : 'email' : 'username'} />
+      keyboardType={screen === 'register' ? 'email-address' : 'default'}
+      autoComplete={screen === 'register' ? 'email' : 'username'} />
     <Field label="Senha" value={password} onChangeText={setPassword} password maxLength={128} editable={!busy}
       autoComplete={screen === 'register' ? 'new-password' : 'current-password'} />
     {screen === 'register' && <>
