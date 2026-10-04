@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     jwt_audience: str = "eleven-mobile"
     cors_origins: list[str] = []
     dev_verification_codes: bool = False
+    sms_provider: Literal["", "zenvia"] = ""
+    zenvia_api_token: SecretStr = SecretStr("")
+    zenvia_sms_from: str = ""
     smtp_host: str = ""
     smtp_port: int = Field(default=465, ge=1, le=65535)
     smtp_username: str = ""

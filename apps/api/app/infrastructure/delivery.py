@@ -112,7 +112,29 @@ class SMTPVerificationSender:
             ) from None
 
 
+class ChannelVerificationSender:
+    def __init__(self, settings: Settings):
+        self.settings = settings
+
+    def send(
+        self, *, contact: str, channel: str, code: str, purpose: str = "verify_contact"
+    ) -> None:
+        if channel == "phone":
+            from app.infrastructure.sms_delivery import ZenviaSMSVerificationSender
+
+            ZenviaSMSVerificationSender(self.settings).send(
+                contact=contact, channel=channel, code=code, purpose=purpose
+            )
+            # The OTP caller treats a returned string as development_code, not a delivery ID.
+            return None
+        return SMTPVerificationSender(self.settings).send(
+            contact=contact, channel=channel, code=code, purpose=purpose
+        )
+
+
 def get_sender(settings: Settings) -> VerificationSender:
     if settings.app_env in ("development", "test") and settings.dev_verification_codes:
         return DevelopmentSender()
+    if settings.sms_provider == "zenvia":
+        return ChannelVerificationSender(settings)
     return SMTPVerificationSender(settings)
