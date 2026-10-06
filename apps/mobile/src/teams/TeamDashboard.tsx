@@ -1,42 +1,65 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { Badge, Button, Card, EmptyState, IconButton, LoadingState, QuickAction, SectionHeader, TeamBadge } from '../components/ui';
+import { Badge, Button, EmptyState, IconButton, LoadingState, SectionHeader, TeamBadge } from '../components/ui';
 import { FormError, TextAction } from '../components/AuthLayout';
 import { listEvents, eventWhen, type SportEvent } from '../events/api';
 import type { TabParams } from '../navigation';
 import { theme } from '../theme';
-import { modalityLabels, roles, type Team } from './api';
+import type { Team } from './api';
 import { useTeams } from './TeamContext';
 import { TeamPublicId } from './TeamPublicId';
 import { LocationEditor } from './LocationEditor';
 
+const shortcutPalette = {
+  green: { icon: theme.colors.green, background: '#DDF2E6' },
+  gold: { icon: '#A87500', background: '#FFF0BF' },
+  teal: { icon: '#087F8C', background: '#DDF4F3' },
+  blue: { icon: theme.colors.blue, background: '#DFEBFA' },
+  orange: { icon: '#B85C16', background: '#FFE9D5' },
+};
+
 export function TeamDashboard({ team, navigation }: { team: Team; navigation: BottomTabNavigationProp<TabParams> }) {
-  const { options } = useTeams();
   return <View style={s.stack}>
-    <View style={s.hero}>
-      <View style={s.heroTop}><Text style={s.eyebrow}>SEU TIME. SEU JOGO.</Text><IconButton label="Trocar time" icon="swap-horizontal-outline" onPress={() => navigation.navigate('Times', { view: 'list' })} /></View>
-      <View style={s.identity}><TeamBadge name={team.name} crestUrl={team.crest_url} size={64} /><View style={s.grow}><Text accessibilityRole="header" style={s.teamName}>{team.name}</Text><Text style={s.heroNote}>{team.city} · {team.state}</Text></View></View>
-      <Text style={s.heroNote}>{modalityLabels(team.modalities, options.modalities)}</Text>
-      <View style={s.row}><Badge label={roles[team.my_role]} /><Badge label={team.plan === 'free' ? 'Free' : 'Pro'} /><Text style={s.heroNote}>{team.active_player_count} jogadores ativos</Text></View>
-      <Button variant="secondary" label="Perfil do time" onPress={() => navigation.navigate('Times', { view: 'detail' })} />
+    <Pressable accessibilityRole="button" accessibilityLabel={`Perfil do time ${team.name}`} onPress={() => navigation.navigate('Times', { view: 'detail' })}
+      style={({ pressed }) => [s.summary, pressed && s.pressed]}>
+      <TeamBadge name={team.name} crestUrl={team.crest_url} size={56} />
+      <View style={s.grow}><Text style={s.teamName}>{team.name}</Text><Text style={s.note}>{team.active_player_count} jogadores ativos</Text>
+        <View style={s.row}><Badge label={team.plan === 'free' ? 'Free' : 'Pro'} /></View>
+      </View>
+      <Ionicons name="chevron-forward" size={22} color={theme.colors.muted} />
+    </Pressable>
+    <View style={s.grid}>
+      <HomeShortcutCard label="Elenco" icon="people-outline" tone="green" onPress={() => navigation.navigate('Elenco')} />
+      <HomeShortcutCard label="Calendário" icon="calendar-outline" tone="gold" onPress={() => navigation.navigate('Jogos')} />
+      <HomeShortcutCard label="Escalação" icon="football-outline" tone="green" onPress={() => navigation.navigate('Escalação')} />
+      <HomeShortcutCard label="Financeiro" icon="wallet-outline" tone="teal" onPress={() => navigation.navigate('Financeiro')} />
+      <HomeShortcutCard label="Estatísticas" icon="stats-chart-outline" tone="blue" onPress={() => navigation.navigate('Estatísticas')} />
+      <HomeShortcutCard label="Adversários" icon="shield-outline" tone="gold" onPress={() => navigation.navigate('Adversários')} />
     </View>
+    <NextEvent team={team} onAll={() => navigation.navigate('Jogos')} onOpen={event => navigation.navigate('Jogos', { teamId: team.id, eventId: event.id })} />
     {team.my_role === 'president' && !team.location_confirmed && <LocationEditor team={team} />}
     <TeamPublicId code={team.code} />
-    <SectionHeader title="Ações rápidas" subtitle="Tudo para o próximo jogo." />
-    <View style={s.row}>
-      <QuickAction label="Jogos" description="Agenda e presença" icon="football-outline" onPress={() => navigation.navigate('Jogos')} />
-      <QuickAction label="Elenco" description="Quem joga com você" icon="people-outline" onPress={() => navigation.navigate('Elenco')} />
-      <QuickAction label="Estatísticas" description="Números do time" icon="stats-chart-outline" onPress={() => navigation.navigate('Estatísticas')} />
-      <QuickAction label="Financeiro" description="Mensalidades e caixa" icon="wallet-outline" onPress={() => navigation.navigate('Financeiro')} />
-      <QuickAction label="Escalação" description="Seu time em campo · Pro" icon="football-outline" onPress={() => navigation.navigate('Escalação')} />
-      <QuickAction label="Mais" description="Sua conta e seus times" icon="grid-outline" onPress={() => navigation.navigate('Mais')} />
-    </View>
-    <NextEvent teamId={team.id} onOpen={event => navigation.navigate('Jogos', { teamId: team.id, eventId: event.id })} />
+    <TextAction label="Trocar time" onPress={() => navigation.navigate('Times', { view: 'list' })} />
   </View>;
 }
 
-function NextEvent({ teamId, onOpen }: { teamId: string; onOpen: (event: SportEvent) => void }) {
+function HomeShortcutCard({ label, icon, tone, onPress, fullWidth = false }: {
+  label: string; icon: keyof typeof Ionicons.glyphMap; tone: keyof typeof shortcutPalette; onPress: () => void; fullWidth?: boolean;
+}) {
+  const palette = shortcutPalette[tone];
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}
+    style={({ pressed }) => [s.shortcut, { borderColor: palette.background }, fullWidth && s.fullWidth, pressed && s.pressed]}>
+    <View style={[s.shortcutIcon, { backgroundColor: palette.background }]}>
+      <Ionicons name={icon} size={30} color={palette.icon} />
+    </View>
+    <Text style={s.shortcutTitle}>{label}</Text>
+  </Pressable>;
+}
+
+function NextEvent({ team, onOpen, onAll }: { team: Team; onOpen: (event: SportEvent) => void; onAll: () => void }) {
+  const teamId = team.id;
   const [event, setEvent] = useState<SportEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,30 +70,48 @@ function NextEvent({ teamId, onOpen }: { teamId: string; onOpen: (event: SportEv
     let active = true; setLoading(true); setError(null); setEvent(null);
     void listEvents(teamId).then(page => {
       const now = Date.now();
-      const next = page.items.filter(item => item.status === 'open' && new Date(`${item.date}T${item.time}`).getTime() >= now)
+      const next = page.items.filter(item => item.status === 'open' && item.kind === 'JOGO' && (!item.fixture || item.fixture.status === 'SCHEDULED') && new Date(`${item.date}T${item.time}`).getTime() >= now)
         .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))[0] ?? null;
       if (active) setEvent(next);
     }).catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível consultar a agenda.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [teamId, retry]);
-  return <View style={s.stack}><SectionHeader title="Próximo evento" action={<IconButton label="Atualizar próximo evento" icon="refresh-outline" onPress={reload} disabled={loading} />} />
-    <Card>{loading ? <LoadingState label="Consultando a agenda…" /> : error ? <><FormError message={error} /><TextAction label="Tentar novamente" onPress={reload} /></> : event ? <>
-      <Badge label={event.kind === 'PELADA' ? 'PELADA' : 'JOGO'} /><Text style={s.heading}>{event.title}</Text>
-      <Text style={s.text}>{eventWhen(event)}</Text><Text style={s.note}>{event.location} · {options.modalities.find(item => item.value === event.modality)?.label ?? event.modality}</Text>
-      <View style={s.row}><Badge label={`${event.going} confirmados`} /><Badge label={`${event.pending} pendentes`} tone="warning" /><Badge label={`${event.not_going} não vão`} tone="neutral" /></View>
-      <Button label="Ver evento" onPress={() => onOpen(event)} />
-    </> : <EmptyState title="Agenda livre por enquanto" description="Quando houver um próximo evento, ele aparecerá aqui." icon="calendar-outline" />}</Card>
+  const opponent = event?.fixture?.opponent;
+  const opponentName = opponent?.name || event?.opponent || 'Adversário a definir';
+  return <View style={s.stack}><SectionHeader title="Próximo jogo" action={<IconButton label="Atualizar próximo jogo" icon="refresh-outline" onPress={reload} disabled={loading} />} />
+    <View style={s.matchCard}>{loading ? <LoadingState label="Consultando a agenda…" /> : error ? <><FormError message={error} /><TextAction label="Tentar novamente" onPress={reload} /></> : event ? <>
+      <Text style={s.date}>{eventWhen(event)}</Text>
+      <View style={s.match}>
+        <View style={s.side}><TeamBadge name={team.name} crestUrl={team.crest_url} size={52} /><Text style={s.matchName}>{team.name}</Text></View>
+        <Text style={s.versus}>X</Text>
+        <View style={s.side}><TeamBadge name={opponentName} crestUrl={opponent?.crest_url} size={52} /><Text style={s.matchName}>{opponentName}</Text></View>
+      </View>
+      <Text style={s.location}>{event.location} · {options.modalities.find(item => item.value === event.modality)?.label ?? event.modality}</Text>
+      <Button label="Ver jogo" onPress={() => onOpen(event)} />
+    </> : <EmptyState title="Nenhum jogo agendado." description="Os próximos jogos do time aparecerão aqui." icon="calendar-outline" />}
+      <TextAction label="Ver todos" onPress={onAll} />
+    </View>
   </View>;
 }
 const s = StyleSheet.create({
-  stack: { gap: theme.space.lg }, row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.md, alignItems: 'center' },
-  hero: { backgroundColor: theme.colors.primaryDark, borderRadius: theme.radii.lg, padding: theme.space.xl, gap: theme.space.lg },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space.sm },
-  eyebrow: { color: theme.colors.onDarkMuted, fontFamily: theme.fontFamily, fontSize: theme.type.caption, letterSpacing: 1, fontWeight: '700', flex: 1 },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: theme.space.lg }, grow: { flex: 1, minWidth: 0, gap: theme.space.sm },
-  teamName: { color: theme.colors.white, fontFamily: theme.fontFamily, fontSize: theme.type.title, fontWeight: '800' },
-  heroNote: { color: theme.colors.onDarkMuted, fontFamily: theme.fontFamily, fontSize: theme.type.small, lineHeight: 21 },
-  heading: { fontFamily: theme.fontFamily, fontSize: theme.type.heading, fontWeight: '700', color: theme.colors.graphite },
-  text: { fontFamily: theme.fontFamily, fontSize: theme.type.body, color: theme.colors.graphite }, note: { fontFamily: theme.fontFamily, fontSize: theme.type.small, color: theme.colors.muted },
+  stack: { gap: theme.space.xl },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.sm },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: theme.space.md, paddingHorizontal: theme.space.lg, paddingVertical: 20, backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, borderWidth: 1, borderColor: theme.colors.surfaceMuted, shadowColor: theme.colors.graphite, shadowOpacity: 0.05, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  grow: { flex: 1, minWidth: 0, gap: 6 },
+  teamName: { color: theme.colors.graphite, fontFamily: theme.fontFamily, fontSize: theme.type.heading, lineHeight: 26, fontWeight: '800', flexShrink: 1 },
+  note: { fontFamily: theme.fontFamily, fontSize: theme.type.small, color: theme.colors.muted },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.md },
+  shortcut: { flexBasis: '45%', flexGrow: 1, minWidth: 0, minHeight: 128, padding: theme.space.lg, gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surface, borderRadius: 20, borderWidth: 1, shadowColor: theme.colors.graphite, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  fullWidth: { flexBasis: '100%' },
+  shortcutIcon: { width: 52, height: 52, borderRadius: theme.radii.md, alignItems: 'center', justifyContent: 'center' },
+  shortcutTitle: { color: theme.colors.graphite, fontFamily: theme.fontFamily, fontSize: 15, lineHeight: 21, fontWeight: '700', textAlign: 'center', flexShrink: 1, alignSelf: 'stretch' },
+  pressed: { opacity: 0.65 },
+  matchCard: { padding: theme.space.lg, gap: theme.space.lg, backgroundColor: theme.colors.surface, borderRadius: theme.radii.lg, borderWidth: 1, borderColor: theme.colors.surfaceMuted },
+  date: { color: theme.colors.green, backgroundColor: theme.colors.lightGreen, borderRadius: theme.radii.sm, padding: theme.space.sm, fontFamily: theme.fontFamily, fontSize: theme.type.small, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
+  match: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space.sm, paddingVertical: theme.space.sm },
+  side: { flex: 1, minWidth: 0, alignItems: 'center', gap: theme.space.md },
+  matchName: { color: theme.colors.graphite, fontFamily: theme.fontFamily, fontSize: theme.type.small, lineHeight: 20, fontWeight: '700', textAlign: 'center', alignSelf: 'stretch' },
+  versus: { color: theme.colors.muted, fontFamily: theme.fontFamily, fontSize: 18, lineHeight: 52, fontWeight: '700' },
+  location: { color: theme.colors.muted, fontFamily: theme.fontFamily, fontSize: theme.type.small, lineHeight: 20, textAlign: 'center' },
 });

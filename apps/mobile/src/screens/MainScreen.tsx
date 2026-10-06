@@ -1,7 +1,8 @@
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppHeader, Badge, Button, Card, EmptyState, LoadingState, ErrorState } from '../components/ui';
+import { Badge, Button, Card, EmptyState, LoadingState, ErrorState } from '../components/ui';
 import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTeams } from '../teams/TeamContext';
@@ -15,9 +16,9 @@ export function MainScreen({ navigation }: BottomTabScreenProps<TabParams, 'Iní
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.container}>
-        <AppHeader onProfile={() => navigation.navigate('Perfil')} />
+        <TeamScreenHeader onProfile={() => navigation.navigate('Perfil')} />
         <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.pageTitle}>{selected ? 'Início do time' : 'Início'}</Text>
+          <Text accessibilityRole="header" style={styles.pageTitle}>{selected ? 'Meu Time' : 'Início'}</Text>
           <Text style={styles.pageDescription}>Mais futebol. Menos burocracia.</Text>
         </View>
           {!selected && !loading && !error && <View style={styles.hero}>

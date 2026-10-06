@@ -1,10 +1,11 @@
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import { useCallback, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
-import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
 import { TeamHeading } from '../teams/TeamHeading';
 import { HelpShortcut } from '../help/HelpShortcut';
 import { LineupsPanel } from '../lineups/LineupsPanel';
@@ -17,7 +18,7 @@ export function LineupsScreen({ navigation }: BottomTabScreenProps<TabParams>) {
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <ScrollView ref={scroll} contentContainerStyle={styles.scroll}><View style={styles.container}>
-      <AppHeader />
+      <TeamScreenHeader />
       {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="create-lineup" label="Como criar uma escalação?" /><LineupsPanel teamId={selected.id} onPro={() => navigation.navigate('ELEVEN PRO')} /></View> : <>
         <EmptyState title="Selecione seu time" description="Abra um time para consultar suas escalações." />
         <Button label="Meus times" onPress={() => navigation.navigate('Times')} />

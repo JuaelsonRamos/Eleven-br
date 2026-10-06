@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren } from 'react';
+import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from './ui';
@@ -6,12 +6,12 @@ import { Feedback } from './design';
 import { theme } from '../theme';
 import { maskDateTime, type DateTimeMask } from './dateTime';
 
-export function AuthLayout({ title, description, children }: PropsWithChildren<{ title: string; description?: string }>) {
+export function AuthLayout({ title, description, children, header, wide = false }: PropsWithChildren<{ title: string; description?: string; header?: ReactNode; wide?: boolean }>) {
   return <SafeAreaView style={styles.safe}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
-        <View style={styles.container}>
-          <AppHeader />
+        <View style={[styles.container, wide && styles.wideContainer]}>
+          {header ?? <AppHeader />}
           <View style={styles.heading}>
             <Text accessibilityRole="header" style={styles.title}>{title}</Text>
             {description && <Text style={styles.description}>{description}</Text>}
@@ -66,6 +66,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
   scroll: { flexGrow: 1, paddingHorizontal: theme.space.lg, paddingBottom: 32 },
   container: { width: '100%', maxWidth: theme.formWidth, alignSelf: 'center', gap: theme.space.lg },
+  wideContainer: { maxWidth: theme.maxWidth },
   heading: { gap: 10, paddingVertical: 16 },
   title: { fontFamily: theme.fontFamily, fontSize: theme.type.title, fontWeight: '800', color: theme.colors.green },
   description: { fontFamily: theme.fontFamily, color: theme.colors.muted, fontSize: 16, lineHeight: 25 },

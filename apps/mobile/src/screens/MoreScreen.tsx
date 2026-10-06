@@ -1,5 +1,6 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { AuthLayout } from '../components/AuthLayout';
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import { Badge, ListItem } from '../components/ui';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
@@ -11,7 +12,7 @@ export function MoreScreen({ navigation }: BottomTabScreenProps<TabParams>) {
   const { selected } = useTeams();
   const { count, refresh } = useNotifications();
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
-  return <AuthLayout title="Mais" description="Sua conta e seus times.">
+  return <AuthLayout title="Mais" description="Sua conta e seus times." header={<TeamScreenHeader />} wide>
     <ListItem title="Meus Times / Trocar time" subtitle="Escolha seu time para jogar e administrar." onPress={() => navigation.navigate('Times', { view: 'list' })} />
     <ListItem title="Notificações" subtitle="Novidades dos seus times." trailing={count ? <Badge label={`${count} não lidas`} /> : undefined} onPress={() => navigation.navigate('Notificações')} />
     {selected && <ListItem title="ELEVEN PRO" subtitle="Plano e assinatura do time selecionado." onPress={() => navigation.navigate('ELEVEN PRO')} />}

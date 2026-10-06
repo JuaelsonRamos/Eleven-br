@@ -1,10 +1,11 @@
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import { useCallback, useRef } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
-import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
 import { TeamHeading } from '../teams/TeamHeading';
 import { HelpShortcut } from '../help/HelpShortcut';
 import { OpponentsPanel } from '../opponents/OpponentsPanel';
@@ -20,7 +21,7 @@ export function OpponentsScreen({ navigation, route }: BottomTabScreenProps<TabP
   const params = route.params?.teamId === selected?.id ? route.params : undefined;
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" ref={scroll} contentContainerStyle={styles.scroll}><View style={styles.container}>
-      <AppHeader />
+      <TeamScreenHeader />
       {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="opponents-overview" label="Como funciona a Central de Adversários?" />
         <OpponentsPanel team={selected} initialView={params?.view} initialFixture={params?.fixtureId} onInitialConsumed={consume} onNavigate={onNavigate}
           onPro={() => navigation.navigate('ELEVEN PRO')} onOpenGame={eventId => navigation.navigate('Jogos', { teamId: selected.id, eventId })} /></View> : <>

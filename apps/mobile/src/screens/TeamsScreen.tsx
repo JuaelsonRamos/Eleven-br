@@ -6,6 +6,7 @@ import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Te
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, Badge, Button, Card, EmptyState, ErrorState, LoadingState, ListItem, TeamBadge } from '../components/ui';
 import { TextAction } from '../components/AuthLayout';
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import { TeamForm } from '../teams/TeamForm';
 import { TeamSummary } from '../teams/TeamSummary';
 import { useTeams } from '../teams/TeamContext';
@@ -39,7 +40,7 @@ export function TeamsScreen({ route, navigation }: BottomTabScreenProps<TabParam
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
         <View style={styles.container}>
-          <AppHeader />
+          {list ? <TeamScreenHeader /> : <AppHeader />}
           <Text accessibilityRole="header" style={styles.title}>{mode === 'join' ? 'Entrar em um time' : mode === 'create' ? 'Criar time' : editing ? 'Editar time' : list ? 'Meus times' : 'Perfil do time'}</Text>
           {mode === 'join' && <HelpShortcut topic="join-team" label="Como entrar em um time?" />}
           {mode === 'create' && <HelpShortcut topic="create-team" label="Como criar um time?" />}
