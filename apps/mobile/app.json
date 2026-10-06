@@ -1,50 +1,51 @@
-{
-  "expo": {
-    "name": "ELEVEN BR",
-    "slug": "eleven-br",
-    "version": "0.1.0",
-    "icon": "./assets/app/icon.png",
-    "splash": {
-      "image": "./assets/app/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
-    "orientation": "default",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "br.com.eleven.app"
-    },
-    "android": {
-      "package": "br.com.eleven.app",
-      "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/app/adaptive-icon.png",
-        "backgroundColor": "#075E45"
-      }
-    },
-    "web": {
-      "bundler": "metro",
-      "name": "ELEVEN BR",
-      "lang": "pt-BR"
-    },
-    "plugins": [
-      "expo-font",
-      "expo-secure-store",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Permitir que o ELEVEN BR selecione sua foto ou escudo.",
-          "cameraPermission": false,
-          "microphonePermission": false
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "61c99305-1c9f-46a1-ad4b-536da7cc4f20"
-      }
-    },
-    "owner": "elevenbr-app"
-  }
+﻿{
+    "expo":  {
+                 "name":  "ELEVEN BR",
+                 "slug":  "eleven-br",
+                 "version":  "0.1.1",
+                 "icon":  "./assets/app/icon.png",
+                 "splash":  {
+                                "image":  "./assets/app/splash.png",
+                                "resizeMode":  "contain",
+                                "backgroundColor":  "#FFFFFF"
+                            },
+                 "orientation":  "default",
+                 "userInterfaceStyle":  "light",
+                 "ios":  {
+                             "supportsTablet":  true,
+                             "bundleIdentifier":  "br.com.eleven.app",
+                             "buildNumber":  "1"
+                         },
+                 "android":  {
+                                 "package":  "br.com.eleven.app",
+                                 "versionCode":  2,
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/app/adaptive-icon.png",
+                                                      "backgroundColor":  "#075E45"
+                                                  }
+                             },
+                 "web":  {
+                             "bundler":  "metro",
+                             "name":  "ELEVEN BR",
+                             "lang":  "pt-BR"
+                         },
+                 "plugins":  [
+                                 "expo-font",
+                                 "expo-secure-store",
+                                 [
+                                     "expo-image-picker",
+                                     {
+                                         "photosPermission":  "Permitir que o ELEVEN BR selecione sua foto ou escudo.",
+                                         "cameraPermission":  false,
+                                         "microphonePermission":  false
+                                     }
+                                 ]
+                             ],
+                 "extra":  {
+                               "eas":  {
+                                           "projectId":  "61c99305-1c9f-46a1-ad4b-536da7cc4f20"
+                                       }
+                           },
+                 "owner":  "elevenbr-app"
+             }
 }
