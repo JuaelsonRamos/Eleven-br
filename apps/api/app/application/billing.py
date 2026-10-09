@@ -17,9 +17,10 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.application.billing_access import access_state, pix_deadline, pix_expired
+from app.application.billing_access import access_state, granted, pix_deadline, pix_expired
 from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
 from app.domain import billing as billing_policy
@@ -27,11 +28,32 @@ from app.domain.billing import PRO_CODE, PRO_PRICE, BillingRejected, BillingUnav
 from app.domain.billing import SubscriptionStatus as Status
 from app.domain.policies import Conflict, Forbidden, NotFound, Plan
 from app.infrastructure.asaas import Asaas, item_image
-from app.infrastructure.billing_models import BillingAudit, BillingSubscription, TeamBilling
-from app.infrastructure.config import Settings
+from app.infrastructure.billing_models import (
+    BillingAudit,
+    BillingPayment,
+    BillingSubscription,
+    TeamBilling,
+)
+from app.infrastructure.config import Settings, get_settings
 from app.infrastructure.models import Team
 
 CHECKOUT_MINUTES = 60
+
+
+def payment_methods(settings: Settings) -> tuple[str, ...]:
+    """Cards are exposed only against the explicitly isolated local Sandbox."""
+    if settings.app_env == "production" or settings.asaas_env != "sandbox":
+        return ("PIX",)
+    database = make_url(settings.database_url)
+    if (
+        database.database == "eleven_test"
+        and database.host in ("localhost", "127.0.0.1", "::1")
+        and settings.asaas_base_url == "https://api-sandbox.asaas.com/v3"
+    ):
+        return ("PIX", "CREDIT_CARD")
+    return billing_policy.ENABLED_PAYMENT_METHODS
+
+
 WARNINGS = {
     Status.OVERDUE: "Pagamento pendente. Regularize sua assinatura para manter os recursos PRO.",
     Status.RECONCILIATION: (
@@ -144,16 +166,43 @@ def billing_account(session: Session, team_id: UUID) -> TeamBilling:
 
 def summary(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]:
     team = authorize(session, user_id, team_id)
-    plan, status, expiry = access_state(session, team)
+    now = datetime.now(UTC)
+    plan, status, expiry = access_state(session, team, now)
     subscription = latest(session, team_id)
-    deadline, now = pix_deadline(subscription), datetime.now(UTC)
+    deadline = pix_deadline(subscription)
+    account = session.scalar(select(TeamBilling).where(TeamBilling.team_id == team_id))
+    origin = (
+        "COURTESY"
+        if account and granted(account, now)
+        else "LEGACY"
+        if plan == Plan.PRO and account is None
+        else "PAID"
+        if plan == Plan.PRO
+        else "NONE"
+    )
+    recurring = bool(subscription and subscription.provider_id and not subscription.cancelled_at)
+    renewal = None
+    if recurring and origin == "PAID" and subscription:
+        renewal = session.scalar(
+            select(BillingPayment.due_date)
+            .where(
+                BillingPayment.subscription_id == subscription.id,
+                BillingPayment.status == "PENDING",
+                BillingPayment.due_date > now.astimezone(ZoneInfo("America/Sao_Paulo")).date(),
+            )
+            .order_by(BillingPayment.due_date)
+            .limit(1)
+        )
     return {
         "command_id": str(uuid4()),
         "plan": plan.value,
+        "entitlement_origin": origin,
+        "has_recurring_subscription": recurring,
+        "renewal_date": renewal.isoformat() if renewal else None,
         "plan_code": PRO_CODE if plan == Plan.PRO else "FREE",
         "status": status.value,
         "price": str(PRO_PRICE),
-        "available_payment_methods": list(billing_policy.ENABLED_PAYMENT_METHODS),
+        "available_payment_methods": list(payment_methods(get_settings())),
         # Millisecond ISO strings for the app countdown: parsed alike by every JS engine.
         "server_time": now.isoformat(timespec="milliseconds"),
         "signup_expires_at": deadline.isoformat(timespec="milliseconds") if deadline else None,
@@ -229,7 +278,7 @@ def begin_checkout(
     settings: Settings,
 ) -> dict[str, object]:
     team = authorize(session, user_id, team_id, write=True)
-    if data.method not in billing_policy.ENABLED_PAYMENT_METHODS:
+    if data.method not in payment_methods(settings):
         raise Conflict(
             "Pagamento por cartão estará disponível em breve. "
             "Utilize PIX para assinar o ELEVEN BR PRO."

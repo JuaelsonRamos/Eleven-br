@@ -14,7 +14,7 @@ Raw payloads and payer/card data are never persisted.
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 from uuid import UUID
 
@@ -48,6 +48,11 @@ PAYMENT_EVENTS = frozenset(
         "PAYMENT_UPDATED",
         "PAYMENT_RESTORED",
         "PAYMENT_REFUND_IN_PROGRESS",
+        "PAYMENT_AWAITING_RISK_ANALYSIS",
+        "PAYMENT_APPROVED_BY_RISK_ANALYSIS",
+        "PAYMENT_REPROVED_BY_RISK_ANALYSIS",
+        "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED",
+        "PAYMENT_PARTIALLY_REFUNDED",
     }
 )
 SUBSCRIPTION_EVENTS = frozenset(
@@ -215,7 +220,15 @@ def adopt(session: Session, facts: PaymentFacts) -> BillingSubscription | None:
     raise BillingDivergence("Assinatura do Asaas sem correspondência local.", account.team_id)
 
 
-def apply_payment(session: Session, facts: PaymentFacts, kind: str, settings: Settings) -> None:
+def apply_payment(
+    session: Session,
+    facts: PaymentFacts,
+    kind: str,
+    settings: Settings,
+    *,
+    origin: Literal["webhook", "reconciliation"] = "webhook",
+    reason: str | None = None,
+) -> None:
     subscription = session.scalar(
         select(BillingSubscription).where(BillingSubscription.provider_id == facts.subscription_ref)
     )
@@ -262,16 +275,23 @@ def apply_payment(session: Session, facts: PaymentFacts, kind: str, settings: Se
     elif facts.observed_at > row.event_at:
         # Only a newer observation replaces the status; an older fetch may arrive late.
         if row.status != status:
-            audit(session, team.id, "PAYMENT_" + status, row.provider_id, origin="webhook")
+            audit(
+                session, team.id, "PAYMENT_" + status, row.provider_id, origin=origin, reason=reason
+            )
         row.status, row.event_at = status, facts.observed_at
     # CREATED (even if provider already reports paid) cannot activate by itself.
     if (
-        kind in {"PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"}
+        (
+            kind in {"PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"}
+            or (origin == "reconciliation" and subscription.method == "CREDIT_CARD")
+        )
         and status in PAID
+        and row.status in PAID
+        and facts.observed_at >= row.event_at
         and row.confirmed_at is None
     ):
         row.confirmed_at = datetime.now(UTC)
-        audit(session, team.id, "PAYMENT_CONFIRMED", row.provider_id, origin="webhook")
+        audit(session, team.id, "PAYMENT_CONFIRMED", row.provider_id, origin=origin, reason=reason)
         deadline = pix_deadline(subscription)
         if deadline and (
             facts.observed_at >= deadline
@@ -292,8 +312,26 @@ def apply_payment(session: Session, facts: PaymentFacts, kind: str, settings: Se
             subscription.started_at = subscription.started_at or row.confirmed_at
     session.flush()
     after = access_state(session, team)
+    if kind == "PAYMENT_PARTIALLY_REFUNDED":
+        # No proportional coverage rule exists. Keep canonical entitlement and
+        # retain an explicit review record instead of inventing a shorter period.
+        audit(
+            session,
+            team.id,
+            "PARTIAL_REFUND_REVIEW",
+            row.provider_id,
+            origin="webhook",
+            reason="Reembolso parcial: revisar cobertura; sem rateio automático do período.",
+        )
     if before[:2] != after[:2]:
-        audit(session, team.id, "ACCESS_" + after[1].value, row.provider_id, origin="webhook")
+        audit(
+            session,
+            team.id,
+            "ACCESS_" + after[1].value,
+            row.provider_id,
+            origin=origin,
+            reason=reason,
+        )
 
 
 def checkout_event(session: Session, resource: dict[str, Any], kind: str) -> None:
@@ -315,8 +353,10 @@ def checkout_event(session: Session, resource: dict[str, Any], kind: str) -> Non
     if item is None:
         return
     lock_team(session, item.team_id)
+    session.refresh(item)
     item.checkout_id = str(resource["id"])
-    item.operation_status = "READY"
+    if not item.cancelled_at and item.operation_status not in ("EXPIRED", "EXPIRING", "REVIEW"):
+        item.operation_status = "READY"
     # Checkout PAID is not used to grant a period; the payment webhook supplies the charge.
     if kind in {"CHECKOUT_CANCELED", "CHECKOUT_EXPIRED"} and not item.provider_id:
         item.cancelled_at = item.cancelled_at or datetime.now(UTC)

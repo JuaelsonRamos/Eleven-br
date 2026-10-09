@@ -10,7 +10,7 @@ from app.domain.policies import DomainError
 
 PRO_PRICE = Decimal("29.99")
 PRO_CODE = "PRO_MONTHLY"
-ENABLED_PAYMENT_METHODS = ("PIX",)  # Add CREDIT_CARD only after validating its real checkout.
+ENABLED_PAYMENT_METHODS: tuple[str, ...] = ("PIX",)  # Production remains PIX-only.
 GRACE_DAYS = 3
 PIX_SIGNUP_MINUTES = 10
 

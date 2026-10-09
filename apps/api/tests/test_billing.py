@@ -195,8 +195,15 @@ def test_access_periods(session, offset, status, confirmed, cancelled, grant, ex
 
 
 @pytest.mark.parametrize("existing", [False, True])
-def test_pix_only_rejects_card_before_any_financial_effect(session, provider, existing):
+def test_pix_only_rejects_card_before_any_financial_effect(
+    session, provider, existing, monkeypatch
+):
     _, team, client, path = setup(session)
+    # Local Sandbox now permits cards; production must reject before any provider call.
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DEV_VERIFICATION_CODES", "false")
+    monkeypatch.setenv("CORS_ORIGINS", "[]")
+    get_settings.cache_clear()
     if existing:
         session.add(TeamBilling(team_id=team.id, environment="sandbox"))
         session.add(

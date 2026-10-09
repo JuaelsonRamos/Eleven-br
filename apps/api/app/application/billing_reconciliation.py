@@ -5,7 +5,8 @@ creates provider resources: it records references the provider proves, releases
 claims the provider proves unfulfilled once no request can still be in flight,
 stops recurrences the team already cancelled, refreshes payment statuses in
 observation order and reprocesses DIVERGENT webhook events with the webhook rules.
-Coverage still requires a PAYMENT_CONFIRMED/RECEIVED event: this never grants Pro.
+Card coverage also accepts a canonical, individually fetched confirmed payment.
+PIX still requires its confirmation event and preserves the initial expiry window.
 Provider I/O runs outside transactions; each change is a short Team-locked commit.
 """
 
@@ -29,7 +30,7 @@ from app.application.billing import (
 )
 from app.application.billing_access import access_state
 from app.application.billing_expiration import expire_initial_pix
-from app.application.billing_webhooks import PAID, apply_payment, payment_facts
+from app.application.billing_webhooks import PAID, PaymentFacts, apply_payment, payment_facts
 from app.domain.billing import BillingDivergence, BillingUnavailable, next_month
 from app.domain.policies import Conflict, NotFound
 from app.infrastructure.billing_models import (
@@ -147,12 +148,138 @@ class Reconciliation:
                     provider_id = self.intent(item_id)
                 elif cancelled_at and provider_id:
                     self.stop(provider_id)
+                if checkout_id:
+                    self.card_payments(item_id, checkout_id, provider_id)
+                    continue
                 if provider_id:
                     self.payments(item_id, provider_id)
                 expire_initial_pix(self.session, self.team_id, item_id, self.settings, self.now)
             except BillingUnavailable:
                 self.session.rollback()
                 self.report.append(f"Asaas indisponível para a assinatura {item_id}: repita.")
+            except BillingDivergence:
+                self.session.rollback()
+                lock_team(self.session, self.team_id)
+                audit(
+                    self.session,
+                    self.team_id,
+                    "RECONCILIATION_DIVERGENT",
+                    str(item_id),
+                    origin="reconciliation",
+                    reason=self.reason,
+                )
+                self.session.commit()
+                self.report.append(f"Assinatura {item_id}: vínculo financeiro divergente; revise.")
+
+    def card_payments(self, item_id: UUID, checkout_id: str, provider_id: str | None) -> None:
+        """Match the hosted checkout by canonical evidence, never a synthetic webhook."""
+        if not self.customer_id:
+            return
+        if not provider_id:
+            # Asaas may return no results for checkoutSession as a query filter.
+            # The customer listing exposes the exact checkoutSession on each payment.
+            candidates = self.provider.list_all("/payments", {"customer": self.customer_id})
+            candidates = [p for p in candidates if p.get("checkoutSession") == checkout_id]
+            references = {str(p["subscription"]) for p in candidates if p.get("subscription")}
+            if len(references) != 1:
+                self.report.append(
+                    f"Checkout {checkout_id}: associação ausente ou ambígua; revise."
+                )
+                return
+            provider_id = references.pop()
+        else:
+            candidates = self.provider.list_all(
+                f"/subscriptions/{quote(provider_id, safe='')}/payments", {}
+            )
+        contract = self.provider.request("GET", f"/subscriptions/{quote(provider_id, safe='')}")
+        facts = []
+        for candidate in candidates:
+            payment_id = str(candidate.get("id") or "")
+            if not payment_id:
+                continue
+            observed = datetime.now(UTC)
+            payment = self.provider.request("GET", f"/payments/{quote(payment_id, safe='')}")
+            facts.append(
+                PaymentFacts(
+                    payment_id,
+                    provider_id,
+                    self.customer_id,
+                    observed,
+                    payment,
+                    contract,
+                    frozenset(),
+                )
+            )
+        lock_team(self.session, self.team_id)
+        item = subscription_of(self.session, item_id)
+        account = billing_account(self.session, self.team_id)
+        if (
+            item.team_id != self.team_id
+            or item.checkout_id != checkout_id
+            or item.method != "CREDIT_CARD"
+            or item.operation_status in ("REVIEW", "EXPIRING")
+            or item.provider_id not in (None, provider_id)
+            or account.environment != self.settings.asaas_env
+            or account.customer_id != self.customer_id
+            or contract.get("id") != provider_id
+            or contract.get("customer") != self.customer_id
+            or contract.get("billingType") != "CREDIT_CARD"
+            or contract.get("cycle") != "MONTHLY"
+            or Decimal(str(contract.get("value", 0))) != item.amount
+            or any(
+                f.payment.get("id") != f.payment_id
+                or f.payment.get("customer") != self.customer_id
+                or f.payment.get("subscription") != provider_id
+                or f.payment.get("billingType") != "CREDIT_CARD"
+                or Decimal(str(f.payment.get("value", 0))) != item.amount
+                or (item.provider_id is None and f.payment.get("checkoutSession") != checkout_id)
+                for f in facts
+            )
+        ):
+            self.session.rollback()
+            self.report.append(f"Checkout {checkout_id}: evidência canônica divergente; revise.")
+            return
+        if not facts:
+            self.session.commit()
+            return
+        if item.provider_id is None:
+            item.provider_id = provider_id
+            audit(
+                self.session,
+                self.team_id,
+                "RECONCILED_SUBSCRIPTION",
+                provider_id,
+                origin="reconciliation",
+                reason=self.reason,
+            )
+            self.session.flush()
+        for fact in facts:
+            if (
+                self.session.scalar(
+                    select(BillingPayment.id).where(BillingPayment.provider_id == fact.payment_id)
+                )
+                is None
+            ):
+                audit(
+                    self.session,
+                    self.team_id,
+                    "CANONICAL_PAYMENT_IMPORTED",
+                    fact.payment_id,
+                    origin="reconciliation",
+                    reason=self.reason,
+                )
+            apply_payment(
+                self.session,
+                fact,
+                "CANONICAL_PAYMENT",
+                self.settings,
+                origin="reconciliation",
+                reason=self.reason,
+            )
+        self.session.commit()
+        self.report.append(
+            f"Assinatura {provider_id}: {len(facts)} cobranças conciliadas canonicamente."
+        )
 
     def intent(self, item_id: UUID) -> str | None:
         """Resolve a creation claim whose provider response was never recorded."""
