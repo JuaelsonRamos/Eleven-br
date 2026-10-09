@@ -1,0 +1,10 @@
+[Unit]
+Description=ELEVEN BR - verificar mensalidades diariamente
+
+[Timer]
+OnCalendar=*-*-* 00:10:00 America/Sao_Paulo
+Persistent=true
+Unit=eleven-finance-recurring.service
+
+[Install]
+WantedBy=timers.target

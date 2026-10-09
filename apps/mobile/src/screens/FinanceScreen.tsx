@@ -4,7 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TabParams } from '../navigation';
-import { AppHeader, Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState } from '../components/ui';
+import { TeamScreenHeader } from '../components/TeamScreenHeader';
 import { TeamHeading } from '../teams/TeamHeading';
 import { HelpShortcut } from '../help/HelpShortcut';
 import { FinancePanel } from '../finance/FinancePanel';
@@ -19,7 +20,7 @@ export function FinanceScreen({ navigation, route }: BottomTabScreenProps<TabPar
   const consume = useCallback(() => navigation.setParams({ teamId: undefined, duesId: undefined }), [navigation]);
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" ref={scroll} contentContainerStyle={styles.scroll}><View style={styles.container}>
-      <AppHeader />
+      <TeamScreenHeader />
       {loading ? <LoadingState /> : error ? <ErrorState onRetry={() => void reload()} /> : selected ? <View key={selected.id} style={{ gap: 16 }}><TeamHeading team={selected} /><HelpShortcut topic="finance-overview" label="Como funciona o Financeiro?" /><FinancePanel teamId={selected.id} initialDuesId={route.params?.teamId === selected.id ? route.params.duesId : undefined} onInitialConsumed={consume} onBack={() => navigation.navigate('Início')} onNavigate={onNavigate} onPro={() => navigation.navigate('ELEVEN PRO')} /></View> : <>
         <EmptyState title="Selecione seu time" description="Abra um time para consultar seu financeiro." />
         <Button label="Meus times" onPress={() => navigation.navigate('Times')} />

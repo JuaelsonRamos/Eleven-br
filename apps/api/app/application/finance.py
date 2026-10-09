@@ -13,7 +13,13 @@ from app.application.team_profiles import membership_context
 from app.application.teams import require_membership
 from app.domain.billing import PRO_PRICE
 from app.domain.policies import ENTITLEMENTS, Conflict, Forbidden, NotFound, Permission
-from app.infrastructure.finance_models import CashEntry, DuesSettings, FinanceAudit, MonthlyDues
+from app.infrastructure.finance_models import (
+    CashEntry,
+    DuesSettings,
+    FinanceAudit,
+    FinancePreferences,
+    MonthlyDues,
+)
 from app.infrastructure.models import Player, Team, TeamMembership, User
 
 
@@ -67,6 +73,7 @@ def settings_read(item: DuesSettings | None) -> dict[str, object]:
         "due_day": item.due_day if item else 10,
         "active": item.active if item else False,
         "version": item.version if item else 0,
+        "repeat_monthly": item.repeat_monthly if item else False,
     }
 
 
@@ -78,6 +85,11 @@ def context(session: Session, user_id: UUID, team_id: UUID) -> dict[str, object]
     if not result["enabled"]:
         result["pro_price"] = str(PRO_PRICE)
     if manage:
+        result["active_player_count"] = session.scalar(
+            select(func.count())
+            .select_from(TeamMembership)
+            .where(TeamMembership.team_id == team_id, TeamMembership.status == "active")
+        )
         result["command_id"] = str(uuid4())
         result["settings"] = settings_read(
             session.scalar(select(DuesSettings).where(DuesSettings.team_id == team_id))
@@ -96,7 +108,19 @@ def totals(session: Session, team_id: UUID) -> dict[str, str]:
         ).all()
     }
     income, expense = values.get("INCOME", Decimal(0)), values.get("EXPENSE", Decimal(0))
-    return {"income": money(income), "expense": money(expense), "balance": money(income - expense)}
+    preferences = session.scalar(
+        select(FinancePreferences).where(FinancePreferences.team_id == team_id)
+    )
+    opening = (
+        preferences.opening_balance
+        if preferences and preferences.opening_date and preferences.opening_date <= date.today()
+        else Decimal(0)
+    )
+    return {
+        "income": money(income),
+        "expense": money(expense),
+        "balance": money(opening + income - expense),
+    }
 
 
 def entry_read(item: CashEntry) -> dict[str, object]:
@@ -117,6 +141,7 @@ def entry_read(item: CashEntry) -> dict[str, object]:
                 "cancelled_at",
                 "cancelled_by",
                 "cancellation_reason",
+                "version",
             )
         },
         "amount": money(item.amount),
@@ -289,6 +314,7 @@ def cash_page(
     kind: str | None,
     category: str | None,
     offset: int,
+    search: str | None = None,
 ) -> dict[str, object]:
     authorize(session, user_id, team_id, manage=True)
     if start and end and start > end:
@@ -302,6 +328,11 @@ def cash_page(
         conditions.append(CashEntry.kind == kind)
     if category:
         conditions.append(CashEntry.category == category)
+    if search:
+        conditions.append(
+            CashEntry.description.icontains(search, autoescape=True)
+            | CashEntry.category.icontains(search, autoescape=True)
+        )
     items = list(
         session.scalars(
             select(CashEntry)

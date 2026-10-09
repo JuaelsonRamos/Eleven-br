@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.models import Base, Entity
@@ -28,6 +29,8 @@ class DuesSettings(Entity, Base):
     active: Mapped[bool] = mapped_column(Boolean)
     version: Mapped[int] = mapped_column(server_default="1")
     updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    repeat_monthly: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    next_competence: Mapped[date | None]
     __table_args__ = (
         CheckConstraint("amount > 0", name="amount"),
         CheckConstraint("due_day BETWEEN 1 AND 31", name="due_day"),
@@ -77,6 +80,7 @@ class CashEntry(Entity, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelled_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     cancellation_reason: Mapped[str | None] = mapped_column(String(500))
+    version: Mapped[int] = mapped_column(server_default="1")
     __table_args__ = (
         ForeignKeyConstraint(["team_id", "dues_id"], ["monthly_dues.team_id", "monthly_dues.id"]),
         UniqueConstraint("team_id", "id"),
@@ -114,8 +118,19 @@ class FinanceAudit(Entity, Base):
     actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(32))
     reason: Mapped[str | None] = mapped_column(String(500))
+    changes: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
     __table_args__ = (
         ForeignKeyConstraint(["team_id", "dues_id"], ["monthly_dues.team_id", "monthly_dues.id"]),
         ForeignKeyConstraint(["team_id", "entry_id"], ["cash_entries.team_id", "cash_entries.id"]),
         Index("ix_finance_audit_team_dues", "team_id", "dues_id"),
     )
+
+
+class FinancePreferences(Entity, Base):
+    __tablename__ = "finance_preferences"
+    team_id: Mapped[UUID] = mapped_column(ForeignKey("teams.id"), unique=True)
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), server_default="0")
+    opening_date: Mapped[date | None]
+    share_summary: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    categories: Mapped[dict[str, list[str]]] = mapped_column(JSONB, server_default="{}")
+    version: Mapped[int] = mapped_column(server_default="1")

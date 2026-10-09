@@ -2,7 +2,7 @@
 
 import calendar
 import hashlib
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -34,6 +34,7 @@ def audit(
     dues_id: UUID | None = None,
     entry_id: UUID | None = None,
     reason: str | None = None,
+    changes: dict[str, object] | None = None,
 ) -> None:
     session.add(
         FinanceAudit(
@@ -43,6 +44,7 @@ def audit(
             dues_id=dues_id,
             entry_id=entry_id,
             reason=reason,
+            changes=changes,
         )
     )
 
@@ -64,12 +66,19 @@ def settings(
         data.active,
         user_id,
     )
+    repeat = data.repeat_monthly if data.repeat_monthly is not None else bool(item.repeat_monthly)
+    if repeat and not item.repeat_monthly:
+        item.next_competence = date.today().replace(day=1)
+    if not repeat:
+        item.next_competence = None
+    item.repeat_monthly = repeat
     audit(
         session,
         team_id,
         user_id,
         "SETTINGS",
-        reason=f"BRL {f.money(data.amount)}; dia {data.due_day}; ativa={data.active}",
+        reason=f"BRL {f.money(data.amount)}; dia {data.due_day}; "
+        f"ativa={data.active}; repetir mensalmente={repeat}",
     )
     session.flush()
     return f.settings_read(item)
@@ -138,6 +147,10 @@ def generate(
         audit(session, team_id, user_id, "GENERATED", dues_id=item.id)
         finance_notice(session, item, NotificationType.FINANCE_CHARGE_CREATED)
     session.flush()
+    if config.repeat_monthly and data.competence == date.today().replace(day=1):
+        config.next_competence = (data.competence.replace(day=28) + timedelta(days=4)).replace(
+            day=1
+        )
     return preview
 
 
@@ -246,6 +259,9 @@ def manual_entry(
     f.confirmed(data.confirm)
     old = existing_command(session, team_id, data.command_id)
     fields = data.model_dump(exclude={"confirm", "command_id"})
+    fields["description"] = data.description or data.category
+    if data.category.casefold() == "mensalidade":
+        raise Conflict("Use o fluxo específico de mensalidade.")
     if old:
         if old.dues_id or any(getattr(old, key) != value for key, value in fields.items()):
             raise Conflict("Este identificador já foi usado com outros dados.")
@@ -285,6 +301,7 @@ def cancel_entry(
         user_id,
         data.reason,
     )
+    item.version += 1
     audit(
         session,
         team_id,

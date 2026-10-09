@@ -1,16 +1,19 @@
 import { authenticated } from '../auth/api';
 
 export type Totals = { income: string; expense: string; balance: string };
-export type Settings = { amount: string; due_day: number; active: boolean; version: number };
-export type Context = { can_manage: boolean; currency: 'BRL'; enabled: boolean; pro_price?: string; settings?: Settings; totals?: Totals; command_id?: string };
+export type Settings = { amount: string; due_day: number; active: boolean; version: number; repeat_monthly: boolean };
+export type Context = { can_manage: boolean; active_player_count?: number; currency: 'BRL'; enabled: boolean; pro_price?: string; settings?: Settings; totals?: Totals; command_id?: string };
 export type Dues = { id: string; membership_id: string; name: string; competence: string; due_date: string; amount: string; received: string; remaining: string; status: 'PENDING' | 'PAID' | 'EXEMPT' | 'CANCELLED'; overdue: boolean; version: number };
 export type Entry = { id: string; dues_id: string | null; kind: 'INCOME' | 'EXPENSE'; category: string; description: string; amount: string; entry_date: string; payment_method: string | null; note: string | null; cancelled_at: string | null; cancellation_reason: string | null; created_at: string; source: string; created_by_name: string; cancelled_by_name: string | null };
 export type Detail = Dues & { command_id?: string; payments: Entry[]; audit: { action: string; actor_name: string; reason: string | null; created_at: string }[] };
 export type DuesPage = { items: Dues[]; counts: Record<string, number>; has_more: boolean };
 export type CashPage = { items: Entry[]; totals: Totals; categories: string[]; has_more: boolean };
 export type Preview = { count: number; ignored: number; total: string; amount: string; due_date: string; preview_token: string };
+export type Preferences = { opening_balance: string; opening_date: string | null; share_summary: boolean; version: number };
+export type Dashboard = { visible: boolean; balance: string; previous_balance: string; period_balance: string; income: string; expense: string; receivable?: string; debtors?: number; counts?: Record<string, number>; recent?: Entry[]; preferences?: Preferences; categories: Record<'INCOME' | 'EXPENSE', { name: string; amount: string; percent: string }[]> };
+export type EntryDetail = Entry & { version: number; audit: Detail['audit'] };
 export const call = <T>(team: string, path = '', data?: unknown, method: 'GET' | 'POST' | 'PUT' = 'GET') => authenticated<T>(`/v1/teams/${encodeURIComponent(team)}/finance${path}`, data, method);
-export const labels: Record<string, string> = { PENDING: 'PENDENTE', PAID: 'PAGA', EXEMPT: 'ISENTA', CANCELLED: 'CANCELADA', OVERDUE: 'ATRASADA', PIX: 'PIX', CASH: 'Dinheiro', CARD: 'Cartão', OTHER: 'Outro', PAYMENT: 'Pagamento registrado', GENERATED: 'Cobrança gerada', EXEMPT_ACTION: 'Isenção', UNDO_EXEMPTION: 'Isenção desfeita', CANCEL: 'Cobrança cancelada', REVERSAL: 'Pagamento estornado' };
+export const labels: Record<string, string> = { PENDING: 'PENDENTE', PAID: 'PAGA', EXEMPT: 'ISENTA', CANCELLED: 'CANCELADA', OVERDUE: 'ATRASADA', PIX: 'PIX', CASH: 'Dinheiro', CARD: 'Cartão', OTHER: 'Outro', ENTRY_EDITED: 'Movimentação editada', DUES_EDITED: 'Valor da cobrança alterado', GENERATED_RECURRING: 'Cobrança recorrente gerada', MANUAL_ENTRY: 'Movimentação registrada', PAYMENT: 'Pagamento registrado', GENERATED: 'Cobrança gerada', EXEMPT_ACTION: 'Isenção', UNDO_EXEMPTION: 'Isenção desfeita', CANCEL: 'Cobrança cancelada', REVERSAL: 'Pagamento estornado' };
 export const status = (dues: Dues) => dues.overdue ? 'ATRASADA' : labels[dues.status] ?? dues.status;
 export function brl(value: string) {
   const [whole = '0', cents = '00'] = value.split('.');

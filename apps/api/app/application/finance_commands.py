@@ -29,6 +29,7 @@ class SettingsInput(Input):
     due_day: int = Field(ge=1, le=31, strict=True)
     active: StrictBool
     expected_version: int = Field(ge=0, strict=True)
+    repeat_monthly: StrictBool | None = None
 
 
 class CompetenceInput(Input):
@@ -69,7 +70,7 @@ class EntryInput(Input):
     command_id: UUID
     kind: Literal["INCOME", "EXPENSE"]
     category: str = Field(min_length=1, max_length=60)
-    description: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=160)
     amount: Money
     entry_date: date
     note: Note | None = None
@@ -80,3 +81,33 @@ class CancelEntryInput(Input):
     expected_dues_version: int | None = Field(default=None, ge=1, strict=True)
     reason: str = Field(min_length=1, max_length=500)
     confirm: StrictBool = False
+
+
+class PreferencesInput(Input):
+    opening_balance: Annotated[
+        Decimal,
+        BeforeValidator(exact_money),
+        Field(
+            ge=Decimal("-99999999.99"), le=Decimal("99999999.99"), max_digits=10, decimal_places=2
+        ),
+    ]
+    opening_date: date
+    share_summary: StrictBool
+    expected_version: int = Field(ge=0, strict=True)
+    confirm: StrictBool = False
+
+
+class CategoryInput(Input):
+    kind: Literal["INCOME", "EXPENSE"]
+    name: str = Field(min_length=1, max_length=60)
+
+
+class EditEntryInput(VersionInput):
+    category: str = Field(min_length=1, max_length=60)
+    description: str = Field(max_length=160)
+    amount: Money
+    entry_date: date
+
+
+class EditDuesInput(VersionInput):
+    amount: Money

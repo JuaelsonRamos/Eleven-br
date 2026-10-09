@@ -1,0 +1,10 @@
+[Unit]
+Description=ELEVEN BR - gerar mensalidades recorrentes
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Ajustar caminhos e usuario para a instalacao existente antes de habilitar.
+User=eleven
+WorkingDirectory=/opt/eleven/apps/api
+ExecStart=/opt/eleven/apps/api/.venv/bin/python -m app.finance_recurring
