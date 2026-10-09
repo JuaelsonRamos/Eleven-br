@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Linking, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Field, FormError } from '../components/AuthLayout';
 import { Badge, Button, Card, FilterChip, LoadingState, SecondaryButton } from '../components/ui';
@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useTeams } from '../teams/TeamContext';
 import { theme } from '../theme';
 import * as api from './api';
+import { planLabel } from './presentation';
 
 const statuses: Record<string, string> = { FREE: 'Plano gratuito', PENDING: 'Pagamento inicial pendente', ACTIVE: 'Ativo', OVERDUE: 'Pagamento pendente', CANCELLED: 'Assinatura cancelada', SUSPENDED: 'Recursos Pro suspensos', ADMIN_GRANTED: 'Pro administrativo', EXPIRED: 'Tempo para contratação expirado.', RECONCILIATION: 'Pagamento em conciliação' };
 const money = (value: string) => `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -35,7 +36,7 @@ export function BillingPanel({ teamId }: { teamId: string }) {
         if (!alive.current) return;
         setData(value);
         // Resume an existing payment once on entry; never create another checkout or poll.
-        if (value.can_manage && value.can_cancel) {
+        if (Platform.OS === 'web' && value.can_manage && value.can_cancel) {
           lock.current = true; setBusy(true);
           const payment = await api.refreshBilling(teamId);
           if (alive.current) setData(payment);
@@ -54,7 +55,7 @@ export function BillingPanel({ teamId }: { teamId: string }) {
   }, [reload, selected?.id, selected?.plan, teamId]);
   useEffect(() => {
     // Any live initial attempt counts down, even when its charge is shown as OVERDUE after midnight.
-    if (!data?.signup_expires_at || !data.can_manage || !data.can_cancel || data.status === 'RECONCILIATION') { setRemaining(null); return; }
+    if (Platform.OS !== 'web' || !data?.signup_expires_at || !data.can_manage || !data.can_cancel || data.status === 'RECONCILIATION') { setRemaining(null); return; }
     // Counts down to the backend deadline on the server clock; the device clock cannot extend it.
     const deadline = Date.parse(data.signup_expires_at);
     const offset = Date.parse(data.server_time) - Date.now();
@@ -84,18 +85,22 @@ export function BillingPanel({ teamId }: { teamId: string }) {
   if (!data) return <><FormError message={error} />{error ? <Button label="Tentar novamente" onPress={() => void run(() => api.getBilling(teamId))} /> : <LoadingState />}</>;
   return <View style={s.stack}>
     <Text accessibilityRole="header" style={s.title}>ELEVEN BR PRO</Text>
-    <Card><Badge label={data.plan === 'pro' ? 'ELEVEN PRO ATIVO' : 'FREE'} />
-      <Text style={s.title}>{money(data.price)}/mês<Text style={s.body}> por time</Text></Text>
-      <Text style={s.body}>{remaining === 0 ? statuses.EXPIRED : statuses[data.status] ?? data.status}</Text>
+    <Card><Badge label={planLabel(data)} />
+      {Platform.OS === 'web' && <Text style={s.title}>{money(data.price)}/mês<Text style={s.body}> por time</Text></Text>}
+      {data.status !== 'ADMIN_GRANTED' && <Text style={s.body}>{remaining === 0 ? statuses.EXPIRED : statuses[data.status] ?? data.status}</Text>}
       {remaining !== null && !expired && <Text accessibilityRole="timer" style={s.heading}>Tempo para concluir esta contratação: {clock(remaining)}</Text>}
-      {data.expires_at && <Text style={s.note}>{data.status === 'ADMIN_GRANTED' ? 'Concessão válida até' : 'Período pago até'} {when(data.expires_at)}</Text>}
-      {data.plan === 'pro' && data.next_due_date && <Text style={s.note}>Próxima cobrança: {when(data.next_due_date)}</Text>}
-      <Text style={s.body}>Escalações visuais · Até 100 jogadores ativos · Até 5 administradores com permissões por área</Text>
-      <Text style={s.note}>Free · R$ 0. Até 24 jogadores e administração pelo Presidente.</Text>
+      {data.entitlement_origin === 'COURTESY' ? <Text style={s.note}>{data.has_recurring_subscription ? 'Pro por cortesia. Há uma assinatura recorrente ativa; a cortesia não cancela suas cobranças.' : 'Sem cobrança recorrente'}</Text> : data.plan === 'pro' && <>
+        {data.entitlement_origin === 'PAID' && data.expires_at && <Text style={s.note}>Período pago até: {when(data.expires_at)}</Text>}
+        {data.renewal_date && <Text style={s.note}>Próxima renovação: {when(data.renewal_date)}</Text>}
+        {!data.has_recurring_subscription && data.entitlement_origin !== 'PAID' && <Text style={s.note}>Assinatura ainda não vinculada a uma cobrança recorrente.</Text>}
+      </>}
+      <Text style={s.note}>O ELEVEN BR Pro é vinculado exclusivamente ao time atual: {selected?.name}.</Text>
     </Card>
+    <Card><Text style={s.heading}>FREE · Gestão essencial</Text>{['Até 24 jogadores ativos', 'Administração pelo Presidente', 'Recursos básicos de gestão'].map(item => <Text key={item} style={s.body}>✓ {item}</Text>)}</Card>
+    <Card><Text style={s.heading}>PRO · Mais para o seu time</Text>{['Até 100 jogadores ativos', 'Até 5 administradores com permissões por área', 'Financeiro completo', 'Escalações visuais e gestão avançada', 'Acesso aos novos recursos Pro que forem sendo liberados'].map(item => <Text key={item} style={s.body}>✓ {item}</Text>)}<Text style={s.note}>Previstos, ainda indisponíveis: sorteio inteligente/equilibrado e estatísticas avançadas.</Text></Card>
     <FormError message={error} />
     {(data.warning || data.notice || notice) && <Text accessibilityRole="alert" style={s.body}>{data.warning || data.notice || notice}</Text>}
-    {!data.can_manage ? <><Text style={s.note}>Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.</Text><SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /></> : <>
+    {Platform.OS !== 'web' ? <SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /> : !data.can_manage ? <><Text style={s.note}>Somente o Presidente do time pode contratar ou gerenciar o ELEVEN BR PRO.</Text><SecondaryButton label="Atualizar plano" disabled={busy} onPress={() => void run(() => api.getBilling(teamId))} /></> : <>
       {data.plan === 'pro' && data.status === 'CANCELLED' && <Text style={s.note}>A renovação foi cancelada. O PRO continua até o fim do período pago; depois, você pode assinar novamente.</Text>}
       {data.plan !== 'pro' && data.status !== 'RECONCILIATION' && !data.can_cancel && !form && <Button label={data.can_retry_pix ? 'Gerar novo Pix' : 'ASSINAR ELEVEN PRO'} onPress={() => { command.current = data.command_id; setMethod('PIX'); setForm(true); }} disabled={busy} />}
       {form && <Card><Text style={s.heading}>{cardAvailable ? 'Como deseja pagar?' : 'Pagamento disponível: PIX'}</Text>
@@ -118,7 +123,7 @@ export function BillingPanel({ teamId }: { teamId: string }) {
       </Card>}
       {cardAvailable && data.checkout_url && <Button label="Abrir pagamento seguro no Asaas" disabled={busy} onPress={() => { void Linking.openURL(data.checkout_url!).catch(() => setError('Não foi possível abrir o Asaas.')); }} />}
       {(data.checkout_url || (data.pix && !expired)) && <Text style={s.note}>Após pagar, volte ao ELEVEN BR e atualize a assinatura. O Pro será liberado somente após a confirmação do pagamento pelo backend.</Text>}
-      <SecondaryButton label="Atualizar assinatura" disabled={busy} onPress={() => void run(() => api.refreshBilling(teamId))} />
+      <SecondaryButton label={data.has_recurring_subscription ? 'Atualizar assinatura' : data.can_cancel ? 'Atualizar pagamento' : 'Gerenciar plano'} disabled={busy} onPress={() => void run(() => data.has_recurring_subscription || data.can_cancel ? api.refreshBilling(teamId) : api.getBilling(teamId))} />
       {data.can_cancel && !expired && data.status !== 'RECONCILIATION' && !cancel && <SecondaryButton label="Cancelar assinatura" disabled={busy} onPress={() => setCancel(true)} />}
       {cancel && <Card><Text style={s.heading}>Cancelar a assinatura?</Text><Text style={s.body}>Novas cobranças serão interrompidas. Seu time mantém o Pro até o fim do período já pago. Seus dados e histórico serão preservados.</Text>
         <Button label="Confirmar cancelamento" variant="danger" disabled={busy} onPress={() => void run(() => api.cancelBilling(teamId))} />

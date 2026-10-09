@@ -1,6 +1,8 @@
 import { authenticated } from '../auth/api';
 
 export type Billing = {
+  entitlement_origin: 'COURTESY' | 'LEGACY' | 'PAID' | 'NONE';
+  has_recurring_subscription: boolean; renewal_date: string | null;
   command_id: string;
   available_payment_methods: ('PIX' | 'CREDIT_CARD')[];
   plan: 'free' | 'pro'; plan_code: string; status: string; price: string;

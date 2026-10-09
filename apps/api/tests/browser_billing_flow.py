@@ -1,5 +1,7 @@
 """Real Expo browser, API and PostgreSQL isolated; provider simulated, no dev data writes."""
 
+import json
+import os
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -23,9 +25,28 @@ from tests.test_billing import (  # noqa: F401
 )
 
 
+@pytest.fixture(autouse=True)
+def billing_web_origin(engine, monkeypatch):
+    from app.infrastructure.config import get_settings
+
+    monkeypatch.setenv(
+        "CORS_ORIGINS", json.dumps([os.getenv("BILLING_WEB_URL", "http://localhost:8081")])
+    )
+    get_settings.cache_clear()
+
+
 def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
     from playwright.sync_api import expect, sync_playwright
 
+    from app.application import billing
+    from app.infrastructure.config import get_settings
+
+    # Exercise production payment availability without changing local HTTP auth/cookies.
+    production = get_settings().model_copy(
+        update={"app_env": "production", "asaas_env": "production"}
+    )
+    payment_methods = billing.payment_methods
+    monkeypatch.setattr(billing, "payment_methods", lambda _: payment_methods(production))
     owner, team, client, path = setup(session)
     user = session.get(User, owner.user_id)
     user.email, user.password_hash = "billing@example.com", hash_password("browser-password-123")
@@ -73,7 +94,11 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
         page = context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.goto("http://localhost:8081", wait_until="domcontentloaded", timeout=120000)
+        page.goto(
+            os.getenv("BILLING_WEB_URL", "http://localhost:8081"),
+            wait_until="domcontentloaded",
+            timeout=120000,
+        )
 
         def button(label):
             return page.get_by_role("button", name=label, exact=True)
@@ -82,7 +107,13 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
         page.get_by_label("Telefone ou e-mail", exact=True).fill("billing@example.com")
         page.get_by_label("Senha", exact=True).fill("browser-password-123")
         button("Entrar").click()
-        button("Perfil do time").click()
+        button("Ativar Pro").click()
+        expect(page.get_by_text("Ativar ELEVEN BR Pro", exact=True)).to_be_visible()
+        button("Continuar").click()
+        expect(page.get_by_role("heading", name="ELEVEN BR PRO", exact=True)).to_be_visible()
+        expect(page.get_by_text("Criação de Flyers", exact=False)).to_have_count(0)
+        page.get_by_role("tab", name="Início", exact=True).click()
+        page.get_by_role("button", name=re.compile(r"^Perfil do time ")).click()
         expect(page.get_by_text("Plano atual", exact=True)).to_be_visible()
         button("Conhecer o PRO").click()
         expect(page.get_by_text("Plano gratuito", exact=True)).to_be_visible()
@@ -123,31 +154,36 @@ def test_browser_billing_flow(session, provider, monkeypatch):  # noqa: F811
             page.set_viewport_size({"width": width, "height": 900})
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             page.screenshot(path=str(artifacts / f"pix-{width}.png"), full_page=True)
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_have_count(
+            0
+        )
         assert len(provider["subscriptions"]) == 1
         page.get_by_role("tab", name="Mais", exact=True).click()
         button("ELEVEN PRO").click()
         expect(button("Copiar código Pix")).to_be_visible()
         assert len(provider["subscriptions"]) == 1  # Reentry only refreshes the existing payment.
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_have_count(
+            0
+        )
         provider["status"] = "CONFIRMED"
         provider["payments"] = []
         assert webhook(client, payload()).status_code == 200
         button("Atualizar assinatura").click()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_be_visible()
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_be_visible()
         expect(page.get_by_text("Ativo", exact=True).filter(visible=True)).to_have_count(1)
-        expect(page.get_by_text("Próxima cobrança:", exact=False)).to_be_visible()
+        expect(page.get_by_text("Próxima renovação:", exact=False)).to_have_count(0)
+        expect(page.get_by_text("Período pago até:", exact=False)).to_be_visible()
         expect(
             page.get_by_text("Tempo para concluir esta contratação:", exact=False)
         ).to_have_count(0)
         page.get_by_role("tab", name="Início", exact=True).click()
-        button("Perfil do time").click()
+        page.get_by_role("button", name=re.compile(r"^Perfil do time ")).click()
         button("Gerenciar assinatura").click()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_be_visible()
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_be_visible()
         button("Cancelar assinatura").click()
         button("Confirmar cancelamento").click()
         expect(page.get_by_text("Assinatura cancelada", exact=True)).to_be_visible()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_be_visible()
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_be_visible()
         assert not errors, errors
         context.close()
         browser.close()
@@ -174,7 +210,8 @@ def test_browser_billing_read_only(session, provider, role):  # noqa: F811
         route_api(context, client)
         page = context.new_page()
         login(page, "viewer@example.com")
-        page.get_by_role("button", name="Perfil do time", exact=True).click()
+        expect(page.get_by_role("button", name="Ativar Pro", exact=True)).to_have_count(0)
+        page.get_by_role("button", name=re.compile(r"^Perfil do time ")).click()
         page.get_by_role("button", name="Conhecer o PRO", exact=True).click()
         expect(
             page.get_by_text(
@@ -188,9 +225,9 @@ def test_browser_billing_read_only(session, provider, role):  # noqa: F811
         team.plan = Plan.PRO
         session.commit()
         page.get_by_role("tab", name="Início", exact=True).click()
-        page.get_by_role("button", name="Perfil do time", exact=True).click()
+        page.get_by_role("button", name=re.compile(r"^Perfil do time ")).click()
         page.get_by_role("button", name="Ver plano PRO", exact=True).click()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_be_visible()
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_be_visible()
         expect(page.get_by_role("button", name="Cancelar assinatura", exact=True)).to_have_count(0)
         assert provider["calls"] == []
         context.close()
@@ -233,9 +270,11 @@ def test_browser_billing_hosted_card_stays_pending(session, provider):  # noqa: 
             "https://sandbox.asaas.com/checkoutSession/show?id=checkout_test"
         )
         checkout.close()
-        button("Atualizar assinatura").click()
+        button("Atualizar pagamento").click()
         expect(page.get_by_text("Pagamento inicial pendente", exact=True)).to_be_visible()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_have_count(
+            0
+        )
         assert len([call for call in provider["calls"] if call[:2] == ("POST", "/checkouts")]) == 1
         context.close()
         browser.close()
@@ -304,7 +343,9 @@ def test_browser_pix_countdown_expiry_and_new_attempt(session, provider):  # noq
         expect(button("Copiar código Pix")).to_have_count(0)
         expect(page.get_by_text("Tempo para contratação expirado.", exact=True)).to_be_visible()
         expect(button("Gerar novo Pix")).to_be_visible()
-        expect(page.get_by_text("ELEVEN PRO ATIVO", exact=True)).to_have_count(0)
+        expect(page.get_by_text("PRO ATIVO", exact=True).filter(visible=True).first).to_have_count(
+            0
+        )
         artifacts = Path(__file__).resolve().parents[3] / ".local/prompt16-browser"
         artifacts.mkdir(exist_ok=True)
         for width in (320, 390, 768, 1280):
@@ -323,11 +364,67 @@ def test_browser_pix_countdown_expiry_and_new_attempt(session, provider):  # noq
 
 
 def login(page, email):
-    page.goto("http://localhost:8081", wait_until="domcontentloaded", timeout=120000)
+    page.goto(
+        os.getenv("BILLING_WEB_URL", "http://localhost:8081"),
+        wait_until="domcontentloaded",
+        timeout=120000,
+    )
     page.get_by_role("button", name="Já tenho conta", exact=True).click(timeout=120000)
     page.get_by_label("Telefone ou e-mail", exact=True).fill(email)
     page.get_by_label("Senha", exact=True).fill("browser-password-123")
     page.get_by_role("button", name="Entrar", exact=True).click()
+
+
+def test_browser_courtesy_with_paid_recurrence(session, provider):  # noqa: F811
+    from playwright.sync_api import expect, sync_playwright
+
+    from app.application.billing import administrative_grant
+    from app.infrastructure.config import get_settings
+
+    owner, team, client, path = setup(session)
+    user = session.get(User, owner.user_id)
+    user.email = "courtesy-billing@example.com"
+    user.password_hash = hash_password("browser-password-123")
+    session.commit()
+    from tests.test_billing import checkout_data
+
+    assert client.post(path + "/checkout", json=checkout_data()).status_code == 200
+    provider["status"] = "CONFIRMED"
+    assert webhook(client, payload()).status_code == 200
+    administrative_grant(
+        session,
+        team.id,
+        enabled=True,
+        operator="test",
+        reason="isolated courtesy",
+        settings=get_settings(),
+    )
+    session.commit()
+    calls_before = list(provider["calls"])
+    client.headers.pop("Authorization", None)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        context = browser.new_context(viewport={"width": 375, "height": 900})
+        route_api(context, client)
+        page = context.new_page()
+        login(page, user.email)
+        page.get_by_role("tab", name="Mais", exact=True).click()
+        page.get_by_role("button", name="ELEVEN PRO", exact=True).click()
+        expect(page.get_by_text("PRO CORTESIA", exact=True).last).to_be_visible()
+        expect(
+            page.get_by_text(
+                "Pro por cortesia. Há uma assinatura recorrente ativa; "
+                "a cortesia não cancela suas cobranças.",
+                exact=True,
+            )
+        ).to_be_visible()
+        expect(page.get_by_text("Sem cobrança recorrente", exact=True)).to_have_count(0)
+        for width in (320, 375, 430, 1280):
+            page.set_viewport_size({"width": width, "height": 900})
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+        assert not any(call[0] != "GET" for call in provider["calls"][len(calls_before) :])
+        context.close()
+        browser.close()
 
 
 @pytest.mark.parametrize("role", [None, Role.ADMIN, Role.MEMBER])

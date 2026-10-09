@@ -1,4 +1,4 @@
-import { useContext, useState, type PropsWithChildren } from 'react';
+import { useContext, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { NavigationContext, NavigationRouteContext } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import { IconButton, StatusBadge, type Tone } from './design';
 export { SectionHeader, StatCard, StatusBadge, FilterChip, IconButton, ListItem, QuickAction, Feedback, FormSurface } from './design';
 
-export function AppHeader({ onProfile, onNotifications }: { onProfile?: () => void; onNotifications?: () => void } = {}) {
+export function AppHeader({ onProfile, onNotifications, brandAccessory }: { onProfile?: () => void; onNotifications?: () => void; brandAccessory?: ReactNode } = {}) {
   const { profile } = useAuth();
   // Authenticated screens live inside the navigator; public auth screens have no help route.
   const navigation = useContext(NavigationContext);
@@ -18,6 +18,7 @@ export function AppHeader({ onProfile, onNotifications }: { onProfile?: () => vo
     <View>
       <Text accessibilityRole="header" style={styles.brand}>{brand.name}</Text>
       <Text style={styles.slogan}>{brand.slogan}</Text>
+      {brandAccessory}
     </View>
     <View style={styles.headerActions}>{navigation && route?.name !== 'Ajuda' && <IconButton label="Aprenda a usar o ELEVEN BR" icon="help-circle-outline" onPress={() => navigation.navigate('Ajuda')} />}{onNotifications &&<IconButton label="Notificações" icon="notifications-outline" onPress={onNotifications} />}{onProfile ? <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={onProfile} style={({ pressed }) => [styles.headerMark, pressed && styles.dimmed]}><Avatar name={profile?.display_name || 'Jogador'} photoUrl={profile?.photo_url} /></Pressable> : profile?.photo_url ? <Avatar name={profile.display_name || 'Jogador'} photoUrl={profile.photo_url} /> : <View accessible accessibilityLabel="Futebol brasileiro" style={styles.headerMark}>
       <Ionicons name="football-outline" size={26} color={theme.colors.green} />
